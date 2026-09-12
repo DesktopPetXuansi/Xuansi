@@ -1,0 +1,11 @@
+.venv/
+upstream-nekoai/
+runtime/
+data/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
+*.part
+build/
+dist/
