@@ -4,7 +4,8 @@
 
 | 组件 | 来源与版本 | 许可/说明 |
 | --- | --- | --- |
-| 猫精灵、图标、动画定义 | [nucket/NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT；原文在 `assets/neko/LICENSE`，上游源码在 `upstream-nekoai` |
+| 历史猫精灵、图标、动画定义 | [nucket/NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT；原文在 `assets/neko/LICENSE`，上游源码在 `upstream-nekoai`；当前形象不再加载 |
+| 当前玄司立绘与头像 | 用户提供角色参考图；内置图像工具编辑后按用户授权本机抠图，见 `assets/xuansi/README.md` | 用户提供素材，未指定公开再分发许可；不标为 MIT。图像工具只参与制作，桌宠运行不调用它 |
 | 图文基础模型 | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | Apache-2.0 |
 | GGUF 及视觉组件 | [unsloth/Qwen3.5-4B-GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF)，提交 `e87f176479d0855a907a41277aca2f8ee7a09523` | 基于上述模型的转换；按 HF LFS 摘要校验 |
 | 推理引擎 | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)，b10930 Windows CUDA 12.4 | MIT；CUDA 运行库为 NVIDIA 发布组件，不能把整个二进制包统称 MIT |

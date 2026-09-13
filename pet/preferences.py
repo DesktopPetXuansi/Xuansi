@@ -83,7 +83,14 @@ class PreferencesPage(QWidget):
         self.interval.setValue(settings.interval)
         form.addRow("观察间隔", self.interval)
         self.size = QComboBox()
-        for label, value in [("小", 64), ("中", 96), ("大", 128)]:
+        for label, value in [
+            ("迷你 · 64", 64),
+            ("小 · 96", 96),
+            ("紧凑 · 128", 128),
+            ("中 · 160", 160),
+            ("大 · 224", 224),
+            ("特大 · 288", 288),
+        ]:
             self.size.addItem(label, value)
         self.size.setCurrentIndex(self.size.findData(settings.pet_size))
         form.addRow("桌宠大小", self.size)

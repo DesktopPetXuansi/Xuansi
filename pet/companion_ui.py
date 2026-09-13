@@ -36,8 +36,8 @@ class CompanionUI:
 
     def _tray(self):
         pet = self.owner
-        tray = QSystemTrayIcon(QIcon(str(ROOT / "assets/neko/sprites/awake.png")), pet)
-        tray.setToolTip("糯米 · 本地桌宠")
+        tray = QSystemTrayIcon(QIcon(str(ROOT / "assets/xuansi/icon.png")), pet)
+        tray.setToolTip(f"{pet.settings.name} · 本地桌宠")
         menu = QMenu()
         for text, slot in [
             ("快捷对话", self.quick.toggle),

@@ -58,7 +58,7 @@ class Panel(QWidget):
 
         configure_fonts(QApplication.instance())
         self.settings = settings
-        self.setWindowTitle("糯米 · 本地 AI 桌宠")
+        self.setWindowTitle(f"{settings.name} · 本地 AI 桌宠")
         self.resize(510, 670)
         self.setMinimumSize(460, 550)
         self.setStyleSheet(STYLE)
@@ -102,6 +102,7 @@ class Panel(QWidget):
         scroll.setWidget(self.model_page)
         self.tabs.addTab(scroll, "配置")
         self.logs = LogViewer(STYLE)
+        self.logs.setWindowTitle(f"{settings.name} · 运行日志")
         self.audio_status = QLabel("声音回避已开启")
         self.audio_status.setObjectName("hint")
         layout.addWidget(self.audio_status)

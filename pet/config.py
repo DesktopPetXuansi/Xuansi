@@ -13,11 +13,11 @@ LOG = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Settings:
-    name: str = "糯米"
-    persona: str = "你是一只温柔、机灵的小猫，陪我工作和学习。自然地说中文，关心但不过度打扰。"
+    name: str = "玄司"
+    persona: str = "你是一位温柔、机灵的桌面伙伴，陪我工作和学习。自然地说中文，关心但不过度打扰。"
     system_prompt: str = "回复简短自然，通常一到两句话。看不清或无法确认的事情要直说，不要编造。"
     interval: int = 20
-    pet_size: int = 96
+    pet_size: int = 160
     observe: bool = True
     capture_scope: str = "screen"
     speak_replies: bool = True
@@ -43,8 +43,8 @@ class Settings:
             value, original = getattr(self, field.name), getattr(defaults, field.name)
             if type(value) is not type(original):
                 raise ValueError(f"设置类型错误：{field.name}")
-        if not 10 <= self.interval <= 300 or self.pet_size not in (64, 96, 128):
-            raise ValueError("观察间隔为 10–300 秒，尺寸为 64、96 或 128")
+        if not 10 <= self.interval <= 300 or self.pet_size not in (64, 96, 128, 160, 224, 288):
+            raise ValueError("观察间隔为 10–300 秒，高度可选 64、96、128、160、224 或 288")
         if self.capture_scope not in ("screen", "nearby"):
             raise ValueError("观察范围需为整块屏幕或鼠标附近")
         limit = 0 if self.tts_engine == "fast" else 102

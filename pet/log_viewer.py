@@ -54,7 +54,7 @@ class LogViewer(QWidget):
         self.path = path
         self.lines = []
         self.loading = False
-        self.setWindowTitle("糯米 · 运行日志")
+        self.setWindowTitle("运行日志")
         self.resize(780, 490)
         self.setStyleSheet(style)
         layout = QVBoxLayout(self)

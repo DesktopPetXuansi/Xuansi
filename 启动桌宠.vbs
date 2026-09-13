@@ -6,7 +6,7 @@ Set shell = CreateObject("WScript.Shell")
 root = files.GetParentFolderName(WScript.ScriptFullName)
 python = files.BuildPath(root, ".venv\Scripts\pythonw.exe")
 If Not files.FileExists(python) Then
-    MsgBox "Please run setup.ps1 first.", 48, "Neko Local Companion"
+    MsgBox "Please run setup.ps1 first.", 48, "Xuansi Local Companion"
     WScript.Quit 1
 End If
 shell.CurrentDirectory = root

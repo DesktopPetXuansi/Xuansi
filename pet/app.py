@@ -230,6 +230,9 @@ class DesktopPet(QObject):
         self.avatar.set_size(settings.pet_size)
         self.avatar.follow = settings.follow_mouse
         self.panel.title.setText(settings.name)
+        self.panel.setWindowTitle(f"{settings.name} · 本地 AI 桌宠")
+        self.panel.logs.setWindowTitle(f"{settings.name} · 运行日志")
+        self.tray.setToolTip(f"{settings.name} · 本地桌宠")
         self.panel.status.setText("已保存；下次回应使用新设置")
 
     def _resources(self):

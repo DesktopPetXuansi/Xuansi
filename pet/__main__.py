@@ -7,9 +7,10 @@ from logging.handlers import RotatingFileHandler
 
 import psutil
 from PySide6.QtCore import QLockFile, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from .config import DATA
+from .config import DATA, ROOT
 
 
 def main():
@@ -32,7 +33,8 @@ def main():
 
     configure_fonts(app)
     app.setQuitOnLastWindowClosed(False)
-    app.setApplicationName("Neko Local Companion")
+    app.setApplicationName("Xuansi Local Companion")
+    app.setWindowIcon(QIcon(str(ROOT / "assets/xuansi/icon.ico")))
     from .app import DesktopPet
 
     # 冒烟验收只验证生命周期，不观察用户正在工作的画面。

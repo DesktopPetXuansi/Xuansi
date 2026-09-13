@@ -1,14 +1,13 @@
-"""复用 NekoAI 动画定义的原生桌宠；自动展示永不取得输入焦点。"""
+"""玄司原生桌宠；自动展示永不取得输入焦点。"""
 
-import json
 import logging
 import math
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPixmap
+from PySide6.QtGui import QCursor, QGuiApplication, QPainter
 from PySide6.QtWidgets import QLabel, QWidget
 
-from .config import ROOT
+from .character_frames import build_frames
 
 LOG = logging.getLogger(__name__)
 PASSIVE = (
@@ -48,24 +47,20 @@ class Bubble(QLabel):
 class Avatar(QWidget):
     open_requested = Signal()
 
-    def __init__(self, size=96):
+    def __init__(self, size=160):
         super().__init__(None, PASSIVE)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.definition = json.loads((ROOT / "assets/neko/pet.json").read_text(encoding="utf-8"))
-        self.sprites = {
-            path.name: QPixmap(str(path)) for path in (ROOT / "assets/neko/sprites").glob("*.png")
-        }
+        self.frames = {}
         self.animation = "idle"
         self.frame = 0
         self.follow = False
         self.paused = False
         self.drag_start = None
         self.move_start = None
-        self.status_color = QColor("#73937c")
         self.set_size(size)
         bounds = QGuiApplication.primaryScreen().availableGeometry()
-        self.move(bounds.right() - size - 32, bounds.bottom() - size - 24)
+        self.move(bounds.right() - self.width() - 32, bounds.bottom() - self.height() - 24)
         self.clock = QTimer(self)
         self.clock.setInterval(180)
         self.clock.timeout.connect(self._tick)
@@ -74,27 +69,40 @@ class Avatar(QWidget):
         self.setToolTip("点击打开对话 · 拖动调整位置")
 
     def set_size(self, size):
-        self.setFixedSize(size, size)
+        if self.frames and self.height() == size:
+            return
+        self.frames = build_frames(size)
+        self.setFixedSize(self.frames["idle"][0][0].size())
+        self._shown_frame = None
         self._frame_mask()
+        # 增大形象后仍完整留在当前工作区，不伸进任务栏或屏幕外。
+        bounds = self.screen().availableGeometry()
+        self.move(
+            max(bounds.left(), min(self.x(), bounds.right() - self.width() + 1)),
+            max(bounds.top(), min(self.y(), bounds.bottom() - self.height() + 1)),
+        )
 
     def set_animation(self, name):
-        if name in self.definition["animations"] and name != self.animation:
+        if name in self.frames and name != self.animation:
             self.animation, self.frame = name, 0
         self._frame_mask()
 
     def _pixmap(self):
-        frames = self.definition["animations"][self.animation]["files"]
-        original = self.sprites.get(frames[self.frame % len(frames)], self.sprites["awake.png"])
-        return original.scaled(
-            self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation
-        )
+        frames = self.frames[self.animation]
+        return frames[self.frame % len(frames)][0]
 
     def _frame_mask(self):
         # 原生窗口形状只覆盖非透明像素，外围矩形不会挡住下面的程序。
-        self.setMask(self._pixmap().mask())
+        key = self.animation, self.frame % len(self.frames[self.animation])
+        if key == self._shown_frame:
+            return
+        self._shown_frame = key
+        self.setMask(self.frames[key[0]][key[1]][1])
         self.update()
 
     def _tick(self):
+        if not self.isVisible():
+            return
         self.frame += 1
         if self.follow and not self.paused and self.drag_start is None:
             target = QCursor.pos() + QPoint(70, 50)
