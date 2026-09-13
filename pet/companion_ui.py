@@ -45,7 +45,7 @@ class CompanionUI:
             ("配置：模型参数与快捷键", pet.panel.open_configuration),
             ("日志：运行日志", pet.panel.open_logs),
             ("开启/关闭连续对话", pet.toggle_voice),
-            ("看一眼鼠标附近", pet.look),
+            ("看一眼屏幕", pet.look),
             ("休眠/唤醒", pet.toggle_sleep),
             ("退出", pet.quit),
         ]:

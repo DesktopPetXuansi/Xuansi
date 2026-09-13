@@ -15,7 +15,7 @@ from PySide6.QtCore import QObject, Signal
 from .audio_activity import AudioActivity
 from .audio_models import AudioModels
 from .config import Settings, save_settings
-from .desktop import capture_near_cursor, observation_current
+from .desktop import capture_screen, observation_current
 from .inference import LocalEngine
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
@@ -102,7 +102,11 @@ class Runtime(QObject):
                     position = None
             if not observation_current(observation):
                 return
-            images = [await asyncio.to_thread(capture_near_cursor, *position)] if position else []
+            images = (
+                [await asyncio.to_thread(capture_screen, *position, settings.capture_scope)]
+                if position
+                else []
+            )
             if not observation_current(observation):
                 return
             if kind != "observation":

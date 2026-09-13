@@ -91,7 +91,7 @@ class DesktopPet(QObject):
         self.runtime.ask(self.settings, text, position=self.last_external if with_screen else None)
 
     def look(self):
-        self.send("看看红圈附近的内容，结合画面用一句话和我聊聊。", True)
+        self.send("请理解提供的画面，结合红圈标记的鼠标位置，用一句话和我聊聊。", True)
 
     def preview_voice(self, settings):
         self._begin()

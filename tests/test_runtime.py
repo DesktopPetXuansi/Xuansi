@@ -145,3 +145,25 @@ def test_quiet_observation_finishes_with_ready_state(runtime):
     runtime.engine.chat = chat
     runtime.schedule(runtime._conversation(0, Settings(), "观察", "observation", None, None)).result(3)
     assert states[-1] == "已就绪 · 麦克风关闭"
+
+
+def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
+    captures, images_seen = [], []
+    main_thread = threading.get_ident()
+
+    def capture(x, y, scope):
+        captures.append((x, y, scope, threading.get_ident()))
+        return b"synthetic-screen"
+
+    async def chat(_settings, _text, images, _history):
+        images_seen.append(images)
+        return "测试已看到整屏"
+
+    monkeypatch.setattr("pet.runtime.capture_screen", capture)
+    runtime.engine.chat = chat
+    for scope in ("screen", "nearby"):
+        settings = replace(Settings(), speak_replies=False, capture_scope=scope)
+        runtime.schedule(runtime._conversation(0, settings, "看画面", "chat", (-100, 50), None)).result(3)
+    assert [(x, y, scope) for x, y, scope, _ in captures] == [(-100, 50, "screen"), (-100, 50, "nearby")]
+    assert all(thread != main_thread and thread != runtime.thread.ident for _, _, _, thread in captures)
+    assert images_seen == [[b"synthetic-screen"], [b"synthetic-screen"]]

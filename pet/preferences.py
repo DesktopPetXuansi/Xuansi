@@ -58,7 +58,7 @@ class PreferencesPage(QWidget):
     def __init__(self, settings: Settings):
         super().__init__()
         form = QFormLayout(self)
-        self.observe = QCheckBox("自动理解鼠标附近的画面")
+        self.observe = QCheckBox("结合屏幕画面理解鼠标操作")
         self.observe.setChecked(settings.observe)
         self.follow = QCheckBox("跟随鼠标走动（关闭时停在原地）")
         self.follow.setChecked(settings.follow_mouse)
@@ -68,6 +68,15 @@ class PreferencesPage(QWidget):
         self.proactive.setChecked(settings.speak_observations)
         for widget in (self.observe, self.follow, self.speak, self.proactive):
             form.addRow(widget)
+        self.capture_scope = QComboBox()
+        self.capture_scope.addItem("整块屏幕 · 鼠标所在显示器", "screen")
+        self.capture_scope.addItem("鼠标附近 · 局部画面", "nearby")
+        self.capture_scope.setCurrentIndex(self.capture_scope.findData(settings.capture_scope))
+        form.addRow("观察范围", self.capture_scope)
+        note = QLabel("整屏会保留完整画面，长边最多 1600 像素；所有图像仅在本机内存中处理。")
+        note.setWordWrap(True)
+        note.setObjectName("hint")
+        form.addRow(note)
         self.interval = QSpinBox()
         self.interval.setRange(10, 300)
         self.interval.setSuffix(" 秒")
@@ -127,6 +136,7 @@ class PreferencesPage(QWidget):
         return replace(
             settings,
             observe=self.observe.isChecked(),
+            capture_scope=self.capture_scope.currentData(),
             follow_mouse=self.follow.isChecked(),
             speak_replies=self.speak.isChecked(),
             speak_observations=self.proactive.isChecked(),

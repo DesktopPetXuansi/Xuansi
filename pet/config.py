@@ -19,6 +19,7 @@ class Settings:
     interval: int = 20
     pet_size: int = 96
     observe: bool = True
+    capture_scope: str = "screen"
     speak_replies: bool = True
     speak_observations: bool = False
     tts_engine: str = "fast"
@@ -44,6 +45,8 @@ class Settings:
                 raise ValueError(f"设置类型错误：{field.name}")
         if not 10 <= self.interval <= 300 or self.pet_size not in (64, 96, 128):
             raise ValueError("观察间隔为 10–300 秒，尺寸为 64、96 或 128")
+        if self.capture_scope not in ("screen", "nearby"):
+            raise ValueError("观察范围需为整块屏幕或鼠标附近")
         limit = 0 if self.tts_engine == "fast" else 102
         if (
             self.tts_engine not in ("fast", "natural")

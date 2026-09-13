@@ -1,6 +1,7 @@
-"""Windows 原生桌面信息及局部截图；不读取键盘内容或保存截图。"""
+"""Windows 桌面信息及整屏/局部截图；不读取键盘内容或保存截图。"""
 
 import ctypes
+import logging
 import os
 import time
 from ctypes import wintypes
@@ -8,9 +9,12 @@ from dataclasses import dataclass
 from io import BytesIO
 
 import mss
+from mss.exception import ScreenShotError
 from PIL import Image, ImageDraw
 
 from .events import crop_rect
+
+LOG = logging.getLogger(__name__)
 
 USER32 = ctypes.WinDLL("user32", use_last_error=True)
 USER32.GetForegroundWindow.restype = wintypes.HWND
@@ -94,8 +98,11 @@ def point_is_own_window(x, y):
     return pid.value == os.getpid()
 
 
-def capture_near_cursor(x: int, y: int):
-    """mss 使用物理坐标，和鼠标钩子一致，跨屏时不混用 Qt 逻辑坐标。"""
+def capture_screen(x: int, y: int, scope="screen"):
+    """默认保留鼠标所在显示器的完整范围；mss 与鼠标钩子均使用物理坐标。"""
+    if scope not in ("screen", "nearby"):
+        raise ValueError("观察范围无效")
+    started = time.monotonic()
     with mss.mss() as grabber:
         monitor = next(
             (
@@ -103,21 +110,35 @@ def capture_near_cursor(x: int, y: int):
                 for m in grabber.monitors[1:]
                 if m["left"] <= x < m["left"] + m["width"] and m["top"] <= y < m["top"] + m["height"]
             ),
-            grabber.monitors[1],
+            None,
         )
+        if monitor is None:
+            # 拔掉显示器或坐标失效时，不能悄悄改抓另一块屏幕。
+            raise ScreenShotError("鼠标所在显示器暂不可用")
         bounds = (
             monitor["left"],
             monitor["top"],
             monitor["left"] + monitor["width"],
             monitor["top"] + monitor["height"],
         )
-        left, top, right, bottom = crop_rect(x, y, bounds)
+        left, top, right, bottom = bounds if scope == "screen" else crop_rect(x, y, bounds)
         frame = grabber.grab({"left": left, "top": top, "width": right - left, "height": bottom - top})
         picture = Image.frombytes("RGB", frame.size, frame.rgb)
-    # 红圈标记鼠标，便于视觉模型区分目标；仅对内存中的局部图像操作。
+    # 整屏按比例缩小，保留四周内容；限制编码与视觉推理成本，不放大小图。
+    original_width, original_height = picture.size
+    picture.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(picture)
-    cx, cy = x - left, y - top
+    cx = min(picture.width - 1, round((x - left) * picture.width / original_width))
+    cy = min(picture.height - 1, round((y - top) * picture.height / original_height))
+    # 缩放后再标记，保证整屏预览里的鼠标位置仍清晰。
     draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), outline="#e04d46", width=2)
     with BytesIO() as output:
         picture.save(output, format="JPEG", quality=88)
+        LOG.info(
+            "观察画面准备完成 scope=%s size=%dx%d elapsed=%.3fs",
+            scope,
+            picture.width,
+            picture.height,
+            time.monotonic() - started,
+        )
         return output.getvalue()

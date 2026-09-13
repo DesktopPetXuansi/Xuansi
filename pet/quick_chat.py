@@ -33,7 +33,7 @@ class QuickChat(QWidget):
         self.chat.setMaximumBlockCount(150)
         self.chat.setPlaceholderText("和主面板共用人设、对话和本地记忆。")
         layout.addWidget(self.chat)
-        self.with_screen = QCheckBox("附上鼠标附近画面")
+        self.with_screen = QCheckBox("附上屏幕画面")
         layout.addWidget(self.with_screen)
         row = QHBoxLayout()
         self.input = QLineEdit()

@@ -120,7 +120,7 @@ class Panel(QWidget):
         )
         self.chat.setMaximumBlockCount(250)
         layout.addWidget(self.chat)
-        self.with_screen = QCheckBox("这次对话附上鼠标附近画面")
+        self.with_screen = QCheckBox("这次对话附上屏幕画面")
         layout.addWidget(self.with_screen)
         row = QHBoxLayout()
         self.input = QLineEdit()

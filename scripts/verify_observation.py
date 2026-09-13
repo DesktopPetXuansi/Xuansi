@@ -49,7 +49,8 @@ def main():
     fixture.setPixmap(pixels)
     fixture.setFixedSize(round(900 / scale), round(650 / scale))
     fixture.move(60, 60)
-    pet = DesktopPet(app, Settings(observe=True, speak_replies=False))
+    # 此历史测试窗口只覆盖局部区域，显式限制范围，避免默认整屏采集到用户工作。
+    pet = DesktopPet(app, Settings(observe=True, speak_replies=False, capture_scope="nearby"))
     pet.monitor.stop()
     original_ask = pet.runtime.ask
 
