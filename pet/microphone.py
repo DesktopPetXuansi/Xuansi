@@ -1,10 +1,13 @@
 """连续对话收音：音频回调只入有界队列，识别永不阻塞声卡回调。"""
+
 import logging
-from queue import Queue, Empty, Full
 import threading
 from collections.abc import Callable
+from queue import Empty, Full, Queue
+
 import numpy as np
 import sounddevice as sd
+
 from .segmentation import Segmenter
 
 LOG = logging.getLogger(__name__)
@@ -23,8 +26,7 @@ class Microphone:
         if self.thread and self.thread.is_alive():
             return
         self.stop_event.clear()
-        self.muted.clear()
-        self.thread = threading.Thread(target=self._run, args=(device,), daemon=True, name='pet-microphone')
+        self.thread = threading.Thread(target=self._run, args=(device,), daemon=True, name="pet-microphone")
         self.thread.start()
 
     def stop(self):
@@ -34,6 +36,8 @@ class Microphone:
     def join(self):
         if self.thread:
             self.thread.join(timeout=3)
+            return not self.thread.is_alive()
+        return True
 
     def _callback(self, data, frames, timing, status):
         if self.stop_event.is_set() or self.muted.is_set():
@@ -46,16 +50,23 @@ class Microphone:
 
     def _run(self, device):
         segmenter = Segmenter()
+        failed = False
         try:
             while not self.frames.empty():
                 self.frames.get_nowait()
-            with sd.InputStream(samplerate=16000, channels=1, dtype='float32', blocksize=1600,
-                                device=None if device == -1 else device, callback=self._callback):
-                self.on_state('正在聆听，说完停顿即可')
-                LOG.info('麦克风已开启')
+            with sd.InputStream(
+                samplerate=16000,
+                channels=1,
+                dtype="float32",
+                blocksize=1600,
+                device=None if device == -1 else device,
+                callback=self._callback,
+            ):
+                self.on_state("正在聆听，说完停顿即可")
+                LOG.info("麦克风已开启")
                 while not self.stop_event.is_set():
                     try:
-                        samples = self.frames.get(timeout=.1)
+                        samples = self.frames.get(timeout=0.1)
                     except Empty:
                         if self.muted.is_set():
                             segmenter.reset()
@@ -68,8 +79,10 @@ class Microphone:
                         self.muted.set()
                         self.on_segment(utterance)
         except Exception as exc:
-            LOG.warning('麦克风无法使用 type=%s', type(exc).__name__)
-            self.on_state('麦克风无法开启，请在设置中选择可用输入设备')
+            failed = True
+            LOG.warning("麦克风无法使用 type=%s", type(exc).__name__)
+            self.on_state("麦克风无法开启，请在设置中选择可用输入设备")
         finally:
-            self.on_state('麦克风已关闭')
-            LOG.info('麦克风已关闭')
+            if not failed:
+                self.on_state("麦克风已关闭")
+            LOG.info("麦克风已关闭")

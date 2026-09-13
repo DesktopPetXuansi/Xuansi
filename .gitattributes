@@ -1,0 +1,11 @@
+# 仓库统一文本换行；Windows 启动脚本检出为 CRLF。
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+*.png binary
+*.ico binary
