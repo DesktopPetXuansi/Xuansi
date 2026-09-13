@@ -100,23 +100,6 @@ class PreferencesPage(QWidget):
         self.device = QComboBox()
         self.device.addItem("系统默认麦克风", -1)
         form.addRow("麦克风", self.device)
-        self.model = QLineEdit(settings.model_path)
-        self.projector = QLineEdit(settings.projector_path)
-        self.layers = QSpinBox()
-        self.layers.setRange(0, 99)
-        self.layers.setValue(settings.gpu_layers)
-        advanced = QWidget()
-        advanced_form = QFormLayout(advanced)
-        advanced_form.setContentsMargins(0, 0, 0, 0)
-        advanced_form.addRow("图文模型 GGUF", self.model)
-        advanced_form.addRow("视觉组件 GGUF", self.projector)
-        advanced_form.addRow("GPU 层数（0 为 CPU）", self.layers)
-        expand = QPushButton("高级：更换图文模型")
-        expand.setCheckable(True)
-        expand.toggled.connect(advanced.setVisible)
-        form.addRow(expand)
-        form.addRow(advanced)
-        advanced.hide()
         hint = QLabel(
             "麦克风需手动开启；全屏时暂停观察。\n休眠会关闭麦克风并释放模型，恢复后需再次开启对话。"
         )
@@ -153,7 +136,4 @@ class PreferencesPage(QWidget):
             speed=float(self.speed.value()),
             input_device=self.device.currentData(),
             tts_engine=self.tts_engine.currentData(),
-            model_path=self.model.text().strip(),
-            projector_path=self.projector.text().strip(),
-            gpu_layers=self.layers.value(),
         )

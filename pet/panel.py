@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenuBar,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -16,6 +17,8 @@ from PySide6.QtWidgets import (
 )
 
 from .config import Settings
+from .log_viewer import LogViewer
+from .model_page import ModelPage
 from .preferences import PersonaPage, PreferencesPage
 from .theme import configure_fonts
 
@@ -47,6 +50,7 @@ class Panel(QWidget):
     settings_requested = Signal(object)
     memory_requested = Signal(str)
     preview_requested = Signal(object)
+    message_added = Signal(str, str)
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -60,6 +64,13 @@ class Panel(QWidget):
         self.setStyleSheet(STYLE)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 18, 22, 18)
+        bar = QMenuBar(self)
+        configuration = bar.addMenu("配置")
+        configuration.addAction("模型参数与快捷键", self.open_configuration)
+        configuration.addAction("人设与系统提示词", lambda: self.tabs.setCurrentIndex(1))
+        configuration.addAction("语音与行为", lambda: self.tabs.setCurrentIndex(3))
+        bar.addMenu("日志").addAction("运行日志", self.open_logs)
+        layout.setMenuBar(bar)
         self.title = QLabel(settings.name)
         self.title.setObjectName("title")
         layout.addWidget(self.title)
@@ -84,6 +95,16 @@ class Panel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.preferences)
         self.tabs.addTab(scroll, "偏好")
+        self.model_page = ModelPage(settings)
+        self.model_page.save_requested.connect(self._save)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.model_page)
+        self.tabs.addTab(scroll, "配置")
+        self.logs = LogViewer(STYLE)
+        self.audio_status = QLabel("声音回避已开启")
+        self.audio_status.setObjectName("hint")
+        layout.addWidget(self.audio_status)
         self.footer = QLabel("仅本机处理 · 双击托盘也能打开面板")
         self.footer.setObjectName("hint")
         layout.addWidget(self.footer)
@@ -161,6 +182,7 @@ class Panel(QWidget):
         # 纯文本显示，模型不能把回复变成 HTML、链接动作或脚本。
         self.chat.appendPlainText(f"{speaker}\n{text}\n")
         self.chat.moveCursor(QTextCursor.MoveOperation.End)
+        self.message_added.emit(speaker, text)
 
     def voice_state(self, enabled):
         self.voice_button.blockSignals(True)
@@ -170,7 +192,9 @@ class Panel(QWidget):
 
     def _save(self):
         try:
-            settings = self.preferences.apply(self.persona.apply(self.settings)).validate()
+            settings = self.model_page.apply(
+                self.preferences.apply(self.persona.apply(self.settings))
+            ).validate()
             self.settings_requested.emit(settings)
         except ValueError as exc:
             self.status.setText(str(exc))
@@ -181,6 +205,21 @@ class Panel(QWidget):
             self.preview_requested.emit(settings)
         except ValueError as exc:
             self.status.setText(str(exc))
+
+    def open_configuration(self):
+        self.tabs.setCurrentIndex(4)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def open_logs(self):
+        self.logs.show()
+        self.logs.raise_()
+        self.logs.activateWindow()
+
+    def saving(self, enabled):
+        for button in (self.persona.save_button, self.preferences.save_button, self.model_page.save_button):
+            button.setEnabled(not enabled)
 
     def closeEvent(self, event):
         self.hide()

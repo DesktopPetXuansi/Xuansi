@@ -13,6 +13,8 @@
 | 可选语音权重 | [hexgrad/Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh)，sherpa int8 multi-lang v1_1 | 模型 Apache-2.0；转换包自带 LICENSE，含额外语音处理资源，保留原包 |
 | 语音运行时/转换 | [k2-fsa/sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)，1.13.8 | Apache-2.0；预训练权重分别按各自许可 |
 | 界面 | [Qt for Python / PySide6](https://doc.qt.io/qtforpython-6/)，6.11.2 Essentials | LGPL-3.0 / GPL-3.0 / 商业许可体系；本机动态使用 pip 包 |
+| Windows 音频会话接口 | [AndreMiras/pycaw](https://github.com/AndreMiras/pycaw)，20251023 | MIT；只使用查询和通知接口 |
+| Windows COM 桥接 | [enthought/comtypes](https://github.com/enthought/comtypes)，1.4.16 | MIT；本机 pip 包保留许可 |
 
 Python 依赖准确版本由 `requirements.lock.txt` 锁定。公开下载清单见 `assets-manifest.json`。Melo 历史 GitHub 发布包未提供作者摘要，清单中的 SHA256 是本次首次 HTTPS 下载后计算并锁定的摘要；不把它描述为作者签名。
 

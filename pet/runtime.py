@@ -6,17 +6,20 @@ import re
 import threading
 from contextlib import suppress
 from dataclasses import replace
+from pathlib import Path
 
 import sounddevice as sd
 from mss.exception import ScreenShotError
 from PySide6.QtCore import QObject, Signal
 
+from .audio_activity import AudioActivity
 from .audio_models import AudioModels
 from .config import Settings, save_settings
 from .desktop import capture_near_cursor, observation_current
 from .inference import LocalEngine
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
+from .speech_output import speak
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +44,7 @@ class Runtime(QObject):
         self.microphone_epoch = 0
         self.engine = LocalEngine()
         self.audio = AudioModels()
+        self.audio_activity = AudioActivity()
         self.memory = MemoryStore()
         self.history: list[dict[str, str]] = []
         self.job: asyncio.Task | None = None
@@ -152,17 +156,12 @@ class Runtime(QObject):
             self.finished.emit(epoch)
 
     async def _speak(self, epoch, settings, answer, observation):
-        self.state.emit(epoch, "准备朗读…")
-        samples_out, rate = await asyncio.to_thread(
-            self.audio.synthesize, answer, settings.speaker, settings.speed, settings.tts_engine
+        await speak(
+            self.audio_activity,
+            lambda: self.audio.synthesize(answer, settings.speaker, settings.speed, settings.tts_engine),
+            lambda: epoch == self.epoch and observation_current(observation),
+            lambda text: self.state.emit(epoch, text),
         )
-        if epoch != self.epoch or not len(samples_out) or not observation_current(observation):
-            return
-        self.state.emit(epoch, "正在说话…")
-        sd.play(samples_out, rate)
-        await asyncio.to_thread(sd.wait)
-        await asyncio.sleep(0.3)
-        self.state.emit(epoch, "已回复 · 麦克风关闭" if not self.listening else "正在聆听，说完停顿即可")
 
     def _new_microphone(self, epoch):
         return Microphone(
@@ -216,13 +215,22 @@ class Runtime(QObject):
                 await asyncio.to_thread(self.audio.unload)
 
     def persist(self, settings: Settings):
+        def validate_files():
+            settings.validate()
+            if not all(Path(p).is_file() for p in (settings.model_path, settings.projector_path)):
+                raise ValueError("模型文件不存在，请在配置中选择配套的本地 GGUF 文件。")
+
         async def write():
             try:
                 async with self.storage_control:
+                    await asyncio.to_thread(validate_files)
                     await durable_io(save_settings, settings)
                 self.settings_saved.emit(settings, "")
-            except Exception:
-                self.settings_saved.emit(settings, "设置保存失败，请检查磁盘空间。")
+            except Exception as exc:
+                LOG.warning("设置保存失败 type=%s", type(exc).__name__)
+                self.settings_saved.emit(
+                    settings, str(exc) if isinstance(exc, ValueError) else "设置保存失败，请检查磁盘空间。"
+                )
 
         self.schedule(write())
 
@@ -274,10 +282,14 @@ class Runtime(QObject):
         self.epoch += 1
 
         async def close():
+            # 退出要等已接受的设置落盘，不能在原子替换前结束后台线程。
+            async with self.storage_control:
+                pass
             async with self.microphone_control:
                 await asyncio.to_thread(self.microphone.join)
             await self._suspend(True)
             await asyncio.to_thread(self.microphone.join)
+            await asyncio.to_thread(self.audio_activity.close)
             self.shutdown_done.emit()
 
         self.schedule(close())

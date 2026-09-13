@@ -47,13 +47,19 @@ class LocalEngine:
     def __init__(self):
         self.process: asyncio.subprocess.Process | None = None
         self.client: httpx.AsyncClient | None = None
-        self.loaded: tuple[str, str, int] | None = None
+        self.loaded: tuple[str, str, int, int, int] | None = None
         self.last_used = time.monotonic()
         self.stats: dict[str, float] = {}
         self.guard: ProcessGuard | None = None
 
     async def start(self, settings: Settings):
-        signature = (settings.model_path, settings.projector_path, settings.gpu_layers)
+        signature = (
+            settings.model_path,
+            settings.projector_path,
+            settings.gpu_layers,
+            settings.context_size,
+            settings.cpu_threads,
+        )
         if self.process and self.process.returncode is None and self.loaded == signature:
             return
         await self.stop()
@@ -76,15 +82,15 @@ class LocalEngine:
             "--port",
             str(port),
             "-c",
-            "4096",
+            str(settings.context_size),
             "-np",
             "1",
             "-ngl",
             str(settings.gpu_layers),
             "-t",
-            "4",
+            str(settings.cpu_threads),
             "-tb",
-            "4",
+            str(settings.cpu_threads),
             "-b",
             "256",
             "-ub",
@@ -147,9 +153,9 @@ class LocalEngine:
                 json={
                     "model": "local-pet",
                     "messages": request_messages(settings, text, images, history),
-                    "max_tokens": 180,
-                    "temperature": 0.7,
-                    "top_p": 0.9,
+                    "max_tokens": settings.max_tokens,
+                    "temperature": settings.temperature,
+                    "top_p": settings.top_p,
                     "stream": False,
                     "chat_template_kwargs": {"enable_thinking": False},
                 },
@@ -162,7 +168,7 @@ class LocalEngine:
             self.last_used = time.monotonic()
             self.stats["last_response_seconds"] = round(self.last_used - started, 2)
             LOG.info("推理完成 images=%d elapsed=%.2fs", len(images), self.last_used - started)
-            return result[:1200]
+            return result[:6000]
         except asyncio.CancelledError:
             # 断开 HTTP 不保证 GPU 停止计算；终止自己启动的服务以确保释放。
             await self.stop()
@@ -171,7 +177,7 @@ class LocalEngine:
     async def _fit_history(self, settings, text, with_image, history):
         """用当前模型的分词器裁掉最老会话，保留图像、回复和模板的空间。"""
         kept = history[-8:]
-        budget = 2400 if with_image else 3500
+        budget = settings.context_size - settings.max_tokens - (1500 if with_image else 416)
         while True:
             content = "\n".join([system_message(settings), *(turn["content"] for turn in kept), text])
             response = await self.client.post("/tokenize", json={"content": content, "parse_special": False})

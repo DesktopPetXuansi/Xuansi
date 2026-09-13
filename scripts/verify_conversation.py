@@ -19,6 +19,9 @@ from pet.runtime import Runtime
 
 def main():
     runtime = Runtime()
+    # 本脚本验证合成语音闭环；声卡为替身，声音回避固定为安静并由独立脚本验收。
+    runtime.audio_activity.clock = lambda: 10.0
+    runtime.audio_activity.update(False, now=10.0)
     settings = Settings(name="团子", speak_replies=True)
     heard, replies, playback, states = [], [], [], []
     finished = threading.Event()

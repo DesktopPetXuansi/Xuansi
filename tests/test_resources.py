@@ -16,6 +16,7 @@ def test_unavailable_or_fullscreen_desktop_releases_model(monkeypatch, state):
     monkeypatch.setattr("pet.app.psutil.virtual_memory", lambda: SimpleNamespace(available=8 * 2**30))
     label = SimpleNamespace(setText=lambda _: None)
     pet = SimpleNamespace(
+        ui=SimpleNamespace(refresh=lambda: None),
         fullscreen=False,
         paused=False,
         busy=False,

@@ -29,6 +29,12 @@ class Settings:
     model_path: str = str(MODELS / "Qwen3.5-4B-Q4_K_M.gguf")
     projector_path: str = str(MODELS / "mmproj-F16.gguf")
     gpu_layers: int = 99
+    temperature: float = 0.7
+    top_p: float = 0.9
+    max_tokens: int = 180
+    context_size: int = 4096
+    cpu_threads: int = 4
+    chat_hotkey: str = "Ctrl+Alt+Space"
 
     def validate(self):
         defaults = Settings()
@@ -47,6 +53,15 @@ class Settings:
             raise ValueError("语速或音色超出范围")
         if not 0 <= self.gpu_layers <= 99 or self.input_device < -1:
             raise ValueError("设备或模型参数无效")
+        if not 0 <= self.temperature <= 2 or not 0.01 <= self.top_p <= 1:
+            raise ValueError("temperature 为 0–2，top_p 为 0.01–1")
+        if not 32 <= self.max_tokens <= 1024 or self.context_size not in (4096, 8192, 16384):
+            raise ValueError("回复上限为 32–1024 token，上下文为 4096、8192 或 16384")
+        if not 1 <= self.cpu_threads <= 8:
+            raise ValueError("CPU 线程数为 1–8")
+        from .hotkey import parse_hotkey
+
+        parse_hotkey(self.chat_hotkey)
         if not self.name.strip() or len(self.name) > 40:
             raise ValueError("名字需为 1–40 字")
         if len(self.persona) > 4000 or len(self.system_prompt) > 8000:

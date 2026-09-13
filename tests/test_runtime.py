@@ -19,6 +19,9 @@ def runtime(monkeypatch, tmp_path):
     monkeypatch.setattr("pet.runtime.sd.play", lambda *_: None)
     monkeypatch.setattr("pet.runtime.sd.wait", lambda: None)
     result = Runtime()
+    # 音频回避单独验证；运行时测试固定为安静环境。
+    result.audio_activity.clock = lambda: 10.0
+    result.audio_activity.update(False, now=10.0)
     result.memory = MemoryStore(tmp_path / "memory.json")
     yield result
     result.microphone.stop()

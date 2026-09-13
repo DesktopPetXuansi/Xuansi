@@ -5,11 +5,11 @@ import time
 
 import psutil
 from PySide6.QtCore import QObject, QTimer
-from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication
 
 from .avatar import Avatar
-from .config import ROOT, Settings, load_settings
+from .companion_ui import CompanionUI
+from .config import Settings, load_settings
 from .desktop import cursor_position, desktop_state, point_is_own_window
 from .events import MouseEvent, ObservationGate
 from .mouse_monitor import MouseMonitor
@@ -30,13 +30,15 @@ class DesktopPet(QObject):
         self.observation_started = 0.0
         self.pending = None
         self.runtime = Runtime()
+        self.runtime.audio_activity.start()
         self.avatar = Avatar(self.settings.pet_size)
         self.avatar.follow = self.settings.follow_mouse
         self.panel = Panel(self.settings)
         self.gate = ObservationGate(self.settings.interval)
         self.monitor = MouseMonitor()
         self._connect()
-        self._tray()
+        self.ui = CompanionUI(self)
+        self.tray = self.ui.tray
         self.monitor.start()
         self.resource_timer = QTimer(self)
         self.resource_timer.setInterval(2000)
@@ -53,10 +55,8 @@ class DesktopPet(QObject):
         self.panel.voice_requested.connect(self.voice)
         self.panel.look_requested.connect(self.look)
         self.panel.sleep_requested.connect(self.toggle_sleep)
-        self.panel.settings_requested.connect(self.runtime.persist)
         self.panel.memory_requested.connect(self.runtime.save_memory)
         self.panel.preview_requested.connect(self.preview_voice)
-        self.runtime.settings_saved.connect(self.apply_settings)
         self.runtime.memory_loaded.connect(self.panel.memory.setPlainText)
         self.runtime.memory_saved.connect(self.panel.status.setText)
         self.runtime.devices_loaded.connect(
@@ -72,28 +72,6 @@ class DesktopPet(QObject):
         self.runtime.segment.connect(self.on_segment)
         self.runtime.shutdown_done.connect(self.application.quit)
         self.monitor.event.connect(self.on_mouse)
-
-    def _tray(self):
-        self.tray = QSystemTrayIcon(QIcon(str(ROOT / "assets/neko/sprites/awake.png")), self)
-        self.tray.setToolTip("糯米 · 本地桌宠")
-        menu = QMenu()
-        for text, slot in [
-            ("打开对话与设置", self.open_panel),
-            ("开启/关闭连续对话", self.toggle_voice),
-            ("看一眼鼠标附近", self.look),
-            ("休眠/唤醒", self.toggle_sleep),
-            ("退出", self.quit),
-        ]:
-            action = QAction(text, menu)
-            action.triggered.connect(slot)
-            menu.addAction(action)
-        self.tray.setContextMenu(menu)
-        self.tray.activated.connect(
-            lambda reason: (
-                self.open_panel() if reason == QSystemTrayIcon.ActivationReason.DoubleClick else None
-            )
-        )
-        self.tray.show()
 
     def open_panel(self):
         # 只有显式点击才显示并激活可输入窗口。
@@ -123,6 +101,7 @@ class DesktopPet(QObject):
         if enabled and self.paused:
             self.toggle_sleep()
         self.panel.voice_state(enabled)
+        self.ui.quick.voice_state(enabled)
         self.runtime.toggle_microphone(enabled, self.settings.input_device)
         if not enabled:
             self.busy = False
@@ -143,11 +122,14 @@ class DesktopPet(QObject):
         if text == "麦克风已关闭" or text.startswith("麦克风无法"):
             self.runtime.listening = False
             self.panel.voice_state(False)
+            self.ui.quick.voice_state(False)
         self.panel.status.setText(text)
+        self.ui.quick.status.setText(text)
 
     def on_state(self, epoch, text):
         if epoch == self.runtime.epoch:
             self.panel.status.setText(text)
+            self.ui.quick.status.setText(text)
 
     def on_finished(self, epoch):
         if epoch == self.runtime.epoch:
@@ -251,6 +233,7 @@ class DesktopPet(QObject):
         self.panel.status.setText("已保存；下次回应使用新设置")
 
     def _resources(self):
+        self.ui.refresh()
         state = desktop_state()
         available = psutil.virtual_memory().available / 2**30
         # 锁屏/切换用户/显示器不可用时常没有前景窗口，此时停止抓图。
@@ -285,6 +268,7 @@ class DesktopPet(QObject):
     def quit(self):
         self.resource_timer.stop()
         self.monitor.stop()
+        self.ui.close()
         self.tray.hide()
         self.avatar.hide()
         self.avatar.bubble.hide()
