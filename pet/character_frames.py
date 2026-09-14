@@ -5,20 +5,44 @@ import math
 import time
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPainter, QPixmap, QRegion
+from PySide6.QtGui import QImageReader, QPainter, QPixmap, QRegion
 
-from .config import ROOT
+from .appearance import DEFAULT_IMAGE, image_path
 
 LOG = logging.getLogger(__name__)
 STATES = ("idle", "thinking", "happy", "sleep", "walk_left", "walk_right")
 
 
-def build_frames(height):
+def load_pixmap(identifier=""):
+    path = image_path(identifier)
+    reader = QImageReader(str(path))
+    size = reader.size()
+    # 自定义图片应为导入器生成的小 PNG；被删除或损坏时仍显示默认角色。
+    original = QPixmap()
+    if size.isValid() and max(size.width(), size.height()) <= 1536:
+        original = QPixmap.fromImage(reader.read())
+    fallback = original.isNull() or QRegion(original.mask()).isEmpty()
+    if fallback:
+        LOG.warning("形象副本不可用，回退默认玄司")
+        original = QPixmap(str(DEFAULT_IMAGE))
+    if original.isNull():
+        raise RuntimeError("默认形象素材缺失，请检查 assets/xuansi/front.png")
+    return original, fallback
+
+
+def build_frames(height, identifier=""):
     started = time.perf_counter()
     width = round(height * 0.75)
-    original = QPixmap(str(ROOT / "assets/xuansi/front.png"))
-    if original.isNull():
-        raise RuntimeError("玄司形象素材缺失，请检查 assets/xuansi/front.png")
+    if identifier.endswith(".apng"):
+        from .native_animation import load_animation
+
+        loaded = load_animation(identifier, width, height)
+        if loaded is not None:
+            frames, durations = loaded
+            # 动图沿用原帧序，状态切换复用同一缓存，不额外扭曲原有动作。
+            return {state: frames for state in STATES}, durations, True
+        identifier = ""
+    original, _ = load_pixmap(identifier)
     sprite = original.scaled(
         width - 12,
         height - 12,
@@ -53,5 +77,10 @@ def build_frames(height):
             # QPixmap.mask() 会扫描像素，提前缓存，定时器只取帧和切换窗口区域。
             frames.append((canvas, QRegion(canvas.mask())))
         animations[state] = frames
-    LOG.info("玄司形象已加载 height=%s frames=%s elapsed=%.3fs", height, 48, time.perf_counter() - started)
-    return animations
+    LOG.info(
+        "桌宠形象已加载 custom=%s height=%s frames=48 elapsed=%.3fs",
+        bool(identifier),
+        height,
+        time.perf_counter() - started,
+    )
+    return animations, [180] * 8, False

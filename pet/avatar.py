@@ -2,9 +2,10 @@
 
 import logging
 import math
+import time
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QGuiApplication, QPainter
+from PySide6.QtGui import QCursor, QGuiApplication, QPainter, QRegion
 from PySide6.QtWidgets import QLabel, QWidget
 
 from .character_frames import build_frames
@@ -47,22 +48,25 @@ class Bubble(QLabel):
 class Avatar(QWidget):
     open_requested = Signal()
 
-    def __init__(self, size=160):
+    def __init__(self, size=160, image_id=""):
         super().__init__(None, PASSIVE)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.frames = {}
+        self.image_id = image_id
         self.animation = "idle"
         self.frame = 0
         self.follow = False
         self.paused = False
         self.drag_start = None
         self.move_start = None
+        self.last_follow_step = 0.0
         self.set_size(size)
         bounds = QGuiApplication.primaryScreen().availableGeometry()
         self.move(bounds.right() - self.width() - 32, bounds.bottom() - self.height() - 24)
         self.clock = QTimer(self)
-        self.clock.setInterval(180)
+        self.clock.setTimerType(Qt.TimerType.PreciseTimer)
+        self.clock.setInterval(self.durations[self.frame % len(self.durations)])
         self.clock.timeout.connect(self._tick)
         self.clock.start()
         self.bubble = Bubble()
@@ -71,7 +75,7 @@ class Avatar(QWidget):
     def set_size(self, size):
         if self.frames and self.height() == size:
             return
-        self.frames = build_frames(size)
+        self.frames, self.durations, self.native_animation = build_frames(size, self.image_id)
         self.setFixedSize(self.frames["idle"][0][0].size())
         self._shown_frame = None
         self._frame_mask()
@@ -84,7 +88,19 @@ class Avatar(QWidget):
 
     def set_animation(self, name):
         if name in self.frames and name != self.animation:
-            self.animation, self.frame = name, 0
+            self.animation = name
+            if not self.native_animation:
+                self.frame = 0
+        self._frame_mask()
+
+    def set_image(self, identifier, force=False):
+        if identifier == self.image_id and not force:
+            return
+        # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
+        frames, durations, native = build_frames(self.height(), identifier)
+        self.image_id, self.frames, self.durations = identifier, frames, durations
+        self.native_animation, self.frame = native, 0
+        self._shown_frame = None
         self._frame_mask()
 
     def _pixmap(self):
@@ -93,18 +109,29 @@ class Avatar(QWidget):
 
     def _frame_mask(self):
         # 原生窗口形状只覆盖非透明像素，外围矩形不会挡住下面的程序。
-        key = self.animation, self.frame % len(self.frames[self.animation])
+        key = "idle" if self.native_animation else self.animation, self.frame % len(self.durations)
         if key == self._shown_frame:
             return
         self._shown_frame = key
-        self.setMask(self.frames[key[0]][key[1]][1])
+        region = self.frames[key[0]][key[1]][1]
+        # 空区域在 Qt 表示“清除蒙版”；透明帧应使用窗外区域，不能挡住下层应用。
+        self.setMask(region if not region.isEmpty() else QRegion(-1, -1, 1, 1))
+        if hasattr(self, "clock"):
+            self.clock.setInterval(self.durations[key[1]])
         self.update()
 
     def _tick(self):
         if not self.isVisible():
             return
         self.frame += 1
-        if self.follow and not self.paused and self.drag_start is None:
+        now = time.monotonic()
+        if (
+            self.follow
+            and not self.paused
+            and self.drag_start is None
+            and now - self.last_follow_step >= 0.18
+        ):
+            self.last_follow_step = now
             target = QCursor.pos() + QPoint(70, 50)
             delta = target - self.pos()
             distance = math.hypot(delta.x(), delta.y())
@@ -125,6 +152,14 @@ class Avatar(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.drawPixmap(0, 0, self._pixmap())
+
+    def showEvent(self, event):
+        self.clock.start(self.durations[self.frame % len(self.durations)])
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        self.clock.stop()
+        super().hideEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

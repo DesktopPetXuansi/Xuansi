@@ -218,10 +218,16 @@ class Runtime(QObject):
                 await self.engine.stop()
                 await asyncio.to_thread(self.audio.unload)
 
-    def persist(self, settings: Settings):
+    def persist(self, settings: Settings, validate_models=True):
         def validate_files():
             settings.validate()
-            if not all(Path(p).is_file() for p in (settings.model_path, settings.projector_path)):
+            from .appearance import image_path
+
+            if settings.avatar_image and not image_path(settings.avatar_image).is_file():
+                raise ValueError("形象副本已丢失，请重新选择图片。")
+            if validate_models and not all(
+                Path(p).is_file() for p in (settings.model_path, settings.projector_path)
+            ):
                 raise ValueError("模型文件不存在，请在配置中选择配套的本地 GGUF 文件。")
 
         async def write():

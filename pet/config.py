@@ -18,6 +18,7 @@ class Settings:
     system_prompt: str = "回复简短自然，通常一到两句话。看不清或无法确认的事情要直说，不要编造。"
     interval: int = 20
     pet_size: int = 160
+    avatar_image: str = ""
     observe: bool = True
     capture_scope: str = "screen"
     speak_replies: bool = True
@@ -47,6 +48,9 @@ class Settings:
             raise ValueError("观察间隔为 10–300 秒，高度可选 64、96、128、160、224 或 288")
         if self.capture_scope not in ("screen", "nearby"):
             raise ValueError("观察范围需为整块屏幕或鼠标附近")
+        from .appearance import image_path
+
+        image_path(self.avatar_image)
         limit = 0 if self.tts_engine == "fast" else 102
         if (
             self.tts_engine not in ("fast", "natural")

@@ -2,6 +2,7 @@
 
 import logging
 import time
+from dataclasses import replace
 
 import psutil
 from PySide6.QtCore import QObject, QTimer
@@ -31,7 +32,7 @@ class DesktopPet(QObject):
         self.pending = None
         self.runtime = Runtime()
         self.runtime.audio_activity.start()
-        self.avatar = Avatar(self.settings.pet_size)
+        self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
         self.panel = Panel(self.settings)
         self.gate = ObservationGate(self.settings.interval)
@@ -223,11 +224,21 @@ class DesktopPet(QObject):
         if error:
             self.panel.status.setText(error)
             return
+        if replace(self.settings, avatar_image=settings.avatar_image) == settings:
+            # 仅更换外观不停止正在进行的对话，也不改写未保存的人设输入。
+            self.settings = self.panel.settings = settings
+            self.avatar.set_image(settings.avatar_image, force=True)
+            self.ui.refresh_icon()
+            self.panel.status.setText("形象已应用，重启后继续使用")
+            LOG.info("桌宠形象已应用 custom=%s", bool(settings.avatar_image))
+            return
         self.voice(False)
         self.runtime.cancel(release=True)
         self.settings = self.panel.settings = settings
         self.gate.interval = settings.interval
         self.avatar.set_size(settings.pet_size)
+        self.avatar.set_image(settings.avatar_image)
+        self.ui.refresh_icon()
         self.avatar.follow = settings.follow_mouse
         self.panel.title.setText(settings.name)
         self.panel.setWindowTitle(f"{settings.name} · 本地 AI 桌宠")

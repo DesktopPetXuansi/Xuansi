@@ -51,6 +51,7 @@ class Panel(QWidget):
     memory_requested = Signal(str)
     preview_requested = Signal(object)
     message_added = Signal(str, str)
+    appearance_requested = Signal()
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -70,6 +71,7 @@ class Panel(QWidget):
         configuration.addAction("人设与系统提示词", lambda: self.tabs.setCurrentIndex(1))
         configuration.addAction("语音与行为", lambda: self.tabs.setCurrentIndex(3))
         bar.addMenu("日志").addAction("运行日志", self.open_logs)
+        bar.addMenu("形象").addAction("更换桌宠形象…", self.appearance_requested.emit)
         layout.setMenuBar(bar)
         self.title = QLabel(settings.name)
         self.title.setObjectName("title")
