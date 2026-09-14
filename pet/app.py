@@ -31,6 +31,7 @@ class DesktopPet(QObject):
         self.observation_started = 0.0
         self.pending = None
         self.runtime = Runtime()
+        self.runtime.audio_activity.set_enabled(self.settings.audio_avoidance)
         self.runtime.audio_activity.start()
         self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
@@ -224,6 +225,17 @@ class DesktopPet(QObject):
         if error:
             self.panel.status.setText(error)
             return
+        if (
+            self.settings.audio_avoidance != settings.audio_avoidance
+            and replace(self.settings, audio_avoidance=settings.audio_avoidance) == settings
+        ):
+            # 只改声音策略就在线切换，保留当前文字任务、麦克风和其他表单草稿。
+            self.settings = self.panel.settings = settings
+            self.runtime.audio_activity.set_enabled(settings.audio_avoidance)
+            self.panel.audio_avoidance_action.setChecked(settings.audio_avoidance)
+            self.ui.refresh()
+            self.panel.status.setText("声音回避已开启" if settings.audio_avoidance else "声音回避已关闭")
+            return
         if replace(self.settings, avatar_image=settings.avatar_image) == settings:
             # 仅更换外观不停止正在进行的对话，也不改写未保存的人设输入。
             self.settings = self.panel.settings = settings
@@ -235,6 +247,8 @@ class DesktopPet(QObject):
         self.voice(False)
         self.runtime.cancel(release=True)
         self.settings = self.panel.settings = settings
+        self.runtime.audio_activity.set_enabled(settings.audio_avoidance)
+        self.panel.audio_avoidance_action.setChecked(settings.audio_avoidance)
         self.gate.interval = settings.interval
         self.avatar.set_size(settings.pet_size)
         self.avatar.set_image(settings.avatar_image)

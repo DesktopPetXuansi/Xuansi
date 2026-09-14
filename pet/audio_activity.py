@@ -17,15 +17,28 @@ class AudioActivity:
         self._snapshot = (False, float("-inf"), float("-inf"))
         self._stop = threading.Event()
         self.thread = None
+        self.enabled = True
+
+    def set_enabled(self, enabled: bool):
+        if self.enabled == enabled:
+            return
+        # 重新开启后等一份新电平，不能沿用关闭前的“安静”结果。
+        self.update(None)
+        self.enabled = enabled
+        LOG.info("声音回避开关 enabled=%s", enabled)
 
     @property
     def blocked(self):
+        if not self.enabled:
+            return False
         valid, checked, last_sound = self._snapshot
         now = self.clock()
         return not valid or now - checked > 0.6 or now - last_sound < 1.5
 
     @property
     def status(self):
+        if not self.enabled:
+            return "声音回避已关闭 · 允许同时播放"
         valid, checked, _ = self._snapshot
         if not valid or self.clock() - checked > 0.6:
             return "声音检测暂不可用 · 仅文字"
@@ -49,6 +62,13 @@ class AudioActivity:
         probe = None
         try:
             while not self._stop.is_set():
+                if not self.enabled:
+                    # 用户关闭时释放 COM 查询对象，停止轮询音频设备。
+                    if probe:
+                        probe.close()
+                        probe = None
+                    self._stop.wait(0.1)
+                    continue
                 try:
                     if probe is None:
                         probe = CoreAudioProbe()

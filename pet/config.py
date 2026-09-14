@@ -23,6 +23,7 @@ class Settings:
     capture_scope: str = "screen"
     speak_replies: bool = True
     speak_observations: bool = False
+    audio_avoidance: bool = True
     tts_engine: str = "fast"
     follow_mouse: bool = False
     speaker: int = 0
