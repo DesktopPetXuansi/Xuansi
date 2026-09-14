@@ -11,3 +11,12 @@ build/
 dist/
 .ruff_cache/
 *.lnk
+# 本机凭据与自行下载的模型不进入源代码发布。
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.gguf
+*.onnx
+models/

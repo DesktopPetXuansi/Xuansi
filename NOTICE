@@ -1,0 +1,18 @@
+Xuansi / 玄司 — Local AI Desktop Pet
+Copyright 2026 Xuansi contributors
+
+Original source code and documentation are licensed under the Apache License,
+Version 2.0. See LICENSE for the full terms.
+
+The Xuansi artwork in assets/xuansi/front.png, assets/xuansi/icon.png, and
+assets/xuansi/icon.ico is separately reserved and is NOT licensed under the
+Apache License. See assets/xuansi/LICENSE and assets/xuansi/README.md.
+
+Historical cat sprites, icons, and animation definitions originate from NekoAI:
+https://github.com/nucket/NekoAI
+Copyright (c) 2026 Naudy Castellanos
+These third-party assets retain their MIT license in assets/neko/LICENSE.
+
+Models, third-party libraries, and separately downloaded runtime components
+retain their respective licenses. See THIRD_PARTY.md for sources and scope.
+This NOTICE is informational and does not change any license terms.
