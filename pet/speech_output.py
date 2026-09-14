@@ -1,4 +1,4 @@
-"""整句朗读输出；声音被其他软件抢先时立即丢弃，绝不排队补播。"""
+"""单段音频输出；供试听和流式流水线共用，取消立即关闭播放设备。"""
 
 import asyncio
 import logging
@@ -14,8 +14,13 @@ async def speak(activity, synthesize, current, state):
         return
     state("准备朗读…")
     samples, rate = await asyncio.to_thread(synthesize)
+    if await play_samples(activity, samples, rate, current, state):
+        await asyncio.sleep(0.3)
+
+
+async def play_samples(activity, samples, rate, current, state):
     if not current() or not len(samples) or activity.blocked:
-        return
+        return False
     state("正在说话…")
     sd.play(samples, rate)
     waiting = asyncio.create_task(asyncio.to_thread(sd.wait))
@@ -27,7 +32,7 @@ async def speak(activity, synthesize, current, state):
                 break
             await asyncio.wait({waiting}, timeout=0.05)
         await asyncio.shield(waiting)
-        await asyncio.sleep(0.3)
+        return current() and not activity.blocked
     finally:
         # 取消协程时必须同时结束底层设备，避免迟到音频继续播放。
         sd.stop()

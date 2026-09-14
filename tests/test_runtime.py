@@ -34,7 +34,8 @@ def runtime(monkeypatch, tmp_path):
 def test_selected_voice_engine_reaches_synthesizer(runtime):
     seen = []
 
-    async def chat(*_):
+    async def chat(*_, on_chunk=None):
+        await on_chunk("你好")
         return "你好"
 
     def synthesize(text, speaker, speed, engine="fast"):
@@ -55,7 +56,7 @@ def test_clear_memory_cancels_old_request_and_history(runtime):
     started = threading.Event()
     stopped = threading.Event()
 
-    async def chat(*_):
+    async def chat(*_, on_chunk=None):
         started.set()
         try:
             await asyncio.sleep(60)
@@ -123,7 +124,7 @@ def test_changed_window_discards_observation_before_speech(runtime, monkeypatch)
         current = False
         return "现在的画面已经过期了"
 
-    monkeypatch.setattr("pet.runtime.observation_current", lambda _: current)
+    monkeypatch.setattr("pet.conversation.observation_current", lambda _: current)
     runtime.engine.chat = chat
     runtime.audio.synthesize = lambda *_: spoken.append(True)
     runtime.schedule(
@@ -159,7 +160,7 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
         images_seen.append(images)
         return "测试已看到整屏"
 
-    monkeypatch.setattr("pet.runtime.capture_screen", capture)
+    monkeypatch.setattr("pet.conversation.capture_screen", capture)
     runtime.engine.chat = chat
     for scope in ("screen", "nearby"):
         settings = replace(Settings(), speak_replies=False, capture_scope=scope)
@@ -167,3 +168,44 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
     assert [(x, y, scope) for x, y, scope, _ in captures] == [(-100, 50, "screen"), (-100, 50, "nearby")]
     assert all(thread != main_thread and thread != runtime.thread.ident for _, _, _, thread in captures)
     assert images_seen == [[b"synthetic-screen"], [b"synthetic-screen"]]
+
+
+def test_streaming_voice_plays_before_model_finishes_and_keeps_full_history(runtime, monkeypatch):
+    played = threading.Event()
+    heard = []
+    replies = []
+    runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
+
+    async def chat(*_, on_chunk=None):
+        await on_chunk("这是第一段。")
+        assert await asyncio.to_thread(played.wait, 1)
+        await on_chunk("后面还有第二段。")
+        return "这是第一段。后面还有第二段。"
+
+    def synthesize(text, *_):
+        heard.append(text)
+        return np.zeros(80, dtype=np.float32), 8000
+
+    runtime.engine.chat = chat
+    runtime.audio.synthesize = synthesize
+    monkeypatch.setattr("pet.runtime.sd.play", lambda *_: played.set())
+    runtime.schedule(runtime._conversation(0, Settings(), "聊两句", "chat", None, None)).result(3)
+    assert "".join(heard) == replies[0] == runtime.history[-1]["content"]
+
+
+def test_streaming_tts_failure_still_delivers_complete_text(runtime):
+    replies = []
+    runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
+
+    async def chat(*_, on_chunk=None):
+        await on_chunk("文字回复仍然可用。")
+        return "文字回复仍然可用。"
+
+    def fail(*_):
+        raise RuntimeError("synthetic tts failure")
+
+    runtime.engine.chat = chat
+    runtime.audio.synthesize = fail
+    runtime.schedule(runtime._conversation(0, Settings(), "你好", "chat", None, None)).result(3)
+    assert replies == ["文字回复仍然可用。"]
+    assert runtime.history[-1]["content"] == replies[0]

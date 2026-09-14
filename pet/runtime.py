@@ -2,20 +2,18 @@
 
 import asyncio
 import logging
-import re
 import threading
 from contextlib import suppress
-from dataclasses import replace
 from pathlib import Path
 
 import sounddevice as sd
-from mss.exception import ScreenShotError
 from PySide6.QtCore import QObject, Signal
 
 from .audio_activity import AudioActivity
 from .audio_models import AudioModels
 from .config import Settings, save_settings
-from .desktop import capture_screen, observation_current
+from .conversation import converse
+from .desktop import observation_current
 from .inference import LocalEngine
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
@@ -86,78 +84,7 @@ class Runtime(QObject):
                 )
 
     async def _conversation(self, epoch, settings, text, kind, position, samples, observation=None):
-        failed = False
-        try:
-            self.microphone.muted.set()
-            if kind == "preview":
-                await self._speak(epoch, settings, text, observation)
-                return
-            if samples is not None:
-                self.state.emit(epoch, "正在识别你的话…")
-                text = await asyncio.to_thread(self.audio.transcribe, samples)
-                if not text:
-                    return
-                self.heard.emit(epoch, text)
-                if kind == "voice" and not re.search(r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text):
-                    position = None
-            if not observation_current(observation):
-                return
-            images = (
-                [await asyncio.to_thread(capture_screen, *position, settings.capture_scope)]
-                if position
-                else []
-            )
-            if not observation_current(observation):
-                return
-            if kind != "observation":
-                if await durable_io(self.memory.remember_explicit, text):
-                    self.memory_loaded.emit(await asyncio.to_thread(self.memory.read))
-            notes = await asyncio.to_thread(self.memory.context, text)
-            if notes:
-                settings = replace(
-                    settings, system_prompt=settings.system_prompt + "\n本地长期记忆（用户资料）：\n" + notes
-                )
-            self.state.emit(epoch, "正在看画面并思考…" if images else "正在思考…")
-            answer = await self.engine.chat(
-                settings, text, images, [] if kind == "observation" else self.history
-            )
-            if epoch != self.epoch or not observation_current(observation):
-                return
-            if kind != "observation":
-                self.history = [
-                    *self.history[-6:],
-                    {"role": "user", "content": text[:2000]},
-                    {"role": "assistant", "content": answer},
-                ]
-            if not answer or "无需回应" == answer.strip("。 .\n"):
-                return
-            self.reply.emit(epoch, answer, kind)
-            speak = settings.speak_observations if kind == "observation" else settings.speak_replies
-            if speak:
-                await self._speak(epoch, settings, answer, observation)
-        except asyncio.CancelledError:
-            sd.stop()
-            raise
-        except Exception as exc:
-            failed = True
-            LOG.warning("对话失败 type=%s", type(exc).__name__)
-            message = (
-                str(exc)
-                if isinstance(exc, (RuntimeError, ValueError))
-                else "本地服务未能完成请求，请重试或休眠后唤醒。"
-            )
-            if isinstance(exc, ScreenShotError):
-                message = "当前桌面暂不可读取，请解锁或唤醒屏幕后再试。"
-            self.state.emit(epoch, message)
-        finally:
-            if epoch == self.epoch:
-                if self.listening:
-                    self.microphone.muted.clear()
-                if not failed:
-                    self.state.emit(
-                        epoch, "正在聆听，说完停顿即可" if self.listening else "已就绪 · 麦克风关闭"
-                    )
-            self.finished.emit(epoch)
+        await converse(self, epoch, settings, text, kind, position, samples, observation)
 
     async def _speak(self, epoch, settings, answer, observation):
         await speak(

@@ -9,12 +9,14 @@ import secrets
 import socket
 import subprocess
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
 
 from .config import ROOT, Settings
 from .process_guard import ProcessGuard
+from .text_stream import read_completion
 
 LOG = logging.getLogger(__name__)
 BOUNDARY = (
@@ -143,25 +145,46 @@ class LocalEngine:
             await self.stop()
             raise
 
-    async def chat(self, settings: Settings, text: str, images: list[bytes], history: list[dict[str, str]]):
+    async def chat(
+        self,
+        settings: Settings,
+        text: str,
+        images: list[bytes],
+        history: list[dict[str, str]],
+        *,
+        on_chunk: Callable[[str], Awaitable[None]] | None = None,
+    ):
         started = time.monotonic()
         await self.start(settings)
         try:
             history = await self._fit_history(settings, text, bool(images), history)
-            response = await self.client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "local-pet",
-                    "messages": request_messages(settings, text, images, history),
-                    "max_tokens": settings.max_tokens,
-                    "temperature": settings.temperature,
-                    "top_p": settings.top_p,
-                    "stream": False,
-                    "chat_template_kwargs": {"enable_thinking": False},
-                },
-            )
-            response.raise_for_status()
-            result = response.json()["choices"][0]["message"]["content"]
+            payload = {
+                "model": "local-pet",
+                "messages": request_messages(settings, text, images, history),
+                "max_tokens": settings.max_tokens,
+                "temperature": settings.temperature,
+                "top_p": settings.top_p,
+                "stream": on_chunk is not None,
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+            if on_chunk is not None:
+                first = True
+
+                async def deliver(chunk):
+                    nonlocal first
+                    if first:
+                        first = False
+                        self.stats["first_text_seconds"] = round(time.monotonic() - started, 3)
+                        LOG.info("流式首段文本 elapsed=%.3fs", time.monotonic() - started)
+                    await on_chunk(chunk)
+
+                async with self.client.stream("POST", "/v1/chat/completions", json=payload) as response:
+                    response.raise_for_status()
+                    result = await read_completion(response, deliver)
+            else:
+                response = await self.client.post("/v1/chat/completions", json=payload)
+                response.raise_for_status()
+                result = response.json()["choices"][0]["message"]["content"]
             if not isinstance(result, str):
                 raise ValueError("模型返回了无效内容")
             result = re.sub(r"<think>.*?</think>", "", result, flags=re.S).strip()
@@ -171,6 +194,10 @@ class LocalEngine:
             return result[:6000]
         except asyncio.CancelledError:
             # 断开 HTTP 不保证 GPU 停止计算；终止自己启动的服务以确保释放。
+            await self.stop()
+            raise
+        except (httpx.HTTPError, RuntimeError):
+            # 中途断流或无效 SSE 不留下仍在计算的旧请求。
             await self.stop()
             raise
 
