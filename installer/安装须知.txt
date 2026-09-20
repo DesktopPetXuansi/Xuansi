@@ -1,0 +1,13 @@
+﻿玄司 Xuansi 在线安装版
+
+需要 Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 与驱动，以及可访问 PyPI、GitHub 和 Hugging Face 的网络。
+安装包自带 Python 3.13，无需另装 Python 或 Git，不设置开机启动。
+
+模型目前固定保存在 D:\AI\Models\desktop-pet，需要 D 盘。请至少预留 15GB 磁盘空间，应用安装盘也需容纳 Python 依赖和推理引擎。
+首次安装会下载较大的模型；请保持联网，下载失败可以重新运行安装包续传。
+安装日志保存在安装目录 data\setup.log。日志含本机路径，分享前请脱敏。
+
+源代码采用 Apache-2.0；内置玄司图片保留版权。Python 和其他第三方组件分别适用各自许可证，详见 THIRD_PARTY.md 和各组件许可文件。
+
+卸载只删除安装包部署的文件与入口；用户设置、记忆、下载的环境和 D 盘模型会保留，需要时由你手动清理。
+本版本未使用付费代码签名证书。请从 DesktopPetXuansi/Xuansi 的 GitHub Releases 下载，并核对 SHA256SUMS.txt。
