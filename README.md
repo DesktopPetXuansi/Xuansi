@@ -28,6 +28,16 @@ TTS 按短段生成波形，后续文字生成、合成和播放组成流水线�
 
 ## 安装与启动
 
+### 下载在线安装包
+
+前往 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest)，下载 `Xuansi-0.1.0-windows-x64-setup.exe` 并运行。安装包自带 Python 3.13.15，不需要预先安装 Python 或 Git；依赖、推理引擎和模型在安装时联网下载，日常推理仍在本机进行。
+
+需要 **Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 和驱动、D 盘以及至少 15GB 可用空间**。模型仍固定保存到 `D:\AI\Models\desktop-pet`；应用安装盘也需要容纳依赖与推理引擎。下载需要访问 PyPI、GitHub 和 Hugging Face。安装器只按当前用户安装，不添加开机启动。
+
+安装完成后，在开始菜单打开“玄司 AI 桌宠”。可在安装时勾选创建“玄司 AI 桌宠（安装版）”桌面快捷方式；源码版已有入口不会被覆盖。网络失败时重新运行安装包，或选择开始菜单的“重新下载依赖与模型”。安装日志在应用目录 `data/setup.log`，分享前请清除本机路径等个人信息。
+
+安装包尚未做代码签名，可用 `Get-FileHash .\Xuansi-0.1.0-windows-x64-setup.exe -Algorithm SHA256` 与 Release 的 `SHA256SUMS.txt` 核对。卸载会保留用户数据、安装时下载的环境和 D 盘模型，确认不再需要后可手动清理。
+
 ### 环境
 
 - Windows 11 x64、Git、Python 3.13（安装后可运行 `py -3.13`）。
@@ -46,7 +56,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 
 安装脚本创建项目内的 `.venv`，按 [requirements.lock.txt](requirements.lock.txt) 安装依赖，下载并校验图文模型、语音模型和推理引擎，然后创建快捷方式。它目前会下载全部预设模型，包括可选的 Kokoro，不设置开机启动。上述执行策略参数仅作用于这次 PowerShell 进程。
 
-下载来源、固定版本和 SHA256 见 [assets-manifest.json](assets-manifest.json) 及 [实时识别下载脚本](scripts/download_realtime.py)。下载支持断点续传；网络中断后可以重新运行安装脚本。仓库不包含模型权重、虚拟环境、推理运行库或打包好的安装程序。
+下载来源、固定版本和 SHA256 见 [assets-manifest.json](assets-manifest.json) 及 [实时识别下载脚本](scripts/download_realtime.py)。下载支持断点续传；网络中断后可以重新运行安装脚本。Git 仓库不包含模型权重、虚拟环境、推理运行库或安装程序二进制；安装程序在 GitHub Releases 提供。
 
 安装完成后，双击桌面的 **“玄司 AI 桌宠”**、项目内的 **“启动桌宠.lnk”**，或 `启动桌宠.vbs`。也可以在项目目录执行：
 
@@ -156,6 +166,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 - **卡顿或显存不足**：先休眠释放资源，缩短上下文或调整 GPU 层数；CPU 卸载会影响速度，效果依设备而异。
 - **形象仍有白底或棋盘格**：源文件必须有真正的透明通道，软件不自动抠图。
 
+## 构建 Windows 安装包
+
+在 Windows 上安装 Git，将本次改动提交后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_installer.ps1`。脚本从 Git 提交导出源码，下载并校验固定版本的 Python NuGet 包和 Inno Setup 构建工具，输出 `dist/` 下的安装程序与 SHA256 清单。构建缓存位于 `build/`，不安装全局构建工具。
+
+版本由 [VERSION](VERSION) 维护；发布标签必须与此一致。安装目录的 `release.json` 记录安装包对应的源码提交。用户设置、记忆、日志、模型和本机虚拟环境不进入安装包，依赖和模型在用户安装时下载。构建来源与许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
 ## 许可与商用
 
 本项目原创源代码和文档按仓库现有 [Apache License 2.0](LICENSE) 发布，版权与来源声明见 [NOTICE](NOTICE)。该许可允许在遵守条款的前提下商业使用、修改和分发，包括用于闭源产品；他人也可以依该许可商业使用已发布的代码。分发时需要保留适用的许可与声明，并按条款标明修改，许可不授予商标权。以 [Apache 官方条款](https://www.apache.org/licenses/LICENSE-2.0) 为准。
@@ -168,4 +184,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 - PySide6/Qt 的 LGPL/GPL/商业许可义务取决于使用的组件和分发方式；源码开源不替代二进制分发义务，也不等于任何商用都必须购买 Qt。
 - 可选 Kokoro 模型的 Apache-2.0 标签不涵盖所有附带资源，尤其需要单独核对 eSpeak NG 数据及相关构建；CUDA 运行库遵循 NVIDIA 条款。
 
-完整来源、核对依据与范围见 [THIRD_PARTY.md](THIRD_PARTY.md)。当前提交是源代码发布，尚未完成商业安装包的逐组件分发许可审计。
+完整来源、核对依据与范围见 [THIRD_PARTY.md](THIRD_PARTY.md)。当前提供源代码及在线安装包，尚未完成商业安装包的逐组件分发许可审计。

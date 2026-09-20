@@ -47,6 +47,14 @@ NVIDIA CUDA 运行库是单独下载的第三方二进制组件，适用其实�
 
 ## 下载与发布范围
 
+### 2026-09-20 在线安装包新增组件
+
+安装包内置 [CPython 3.13.15 官方 NuGet 包](https://www.nuget.org/packages/python/3.13.15) 的 `tools/` 目录，保留其完整 `LICENSE.txt`（安装位置 `runtime/python/LICENSE.txt`）及随包第三方许可。该分发形式见 [Python 官方 Windows 文档](https://docs.python.org/3.13/using/windows.html#the-nuget-org-packages)。构建脚本固定版本与 SHA256；摘要来自本次 HTTPS 下载后的计算，不等于独立作者签名。
+
+安装外壳由 [Inno Setup 7.1.0](https://github.com/jrsoftware/issrc/releases/tag/is-7_1_0) 生成，保留原有版权标识，并将其许可证附于 `runtime/INNO-LICENSE.txt`。构建工具从 [Tools.InnoSetup 7.1.0](https://www.nuget.org/packages/Tools.InnoSetup/7.1.0) 解压使用；这是第三方维护的 Inno Setup 重打包，不是 JRSoftware 官方 NuGet 发布。构建脚本锁定包版本与本次下载的 SHA256。
+
+Release 的 `.exe` 包含源码、现有角色素材和 Python 运行时，不包含本机数据、PySide6、模型或 CUDA；这些依赖沿用现有脚本在用户安装时下载。Python 和 Inno Setup 的许可不改变项目代码、图片、模型和其他第三方组件各自的许可。当前在线包没有取得额外商业授权，也不代表上文所列商用分发事项已经完成审计。
+
 运行库、权重、虚拟环境和用户 `data/` 不进入 Git；公开仓库提供下载脚本和 [固定清单](assets-manifest.json)。实际下载及解压时保留包内原有许可文件，不把这些组件重新标为项目 Apache-2.0。
 
 Melo 历史 GitHub 发布包未提供作者 SHA256，清单里的值是首次 HTTPS 下载后计算并锁定的摘要，不是作者签名。其他摘要及版本由下载脚本和清单记录。AISHELL3 只在早期开发中测试过，未被当前应用采用，也不列入本次下载或发布内容。

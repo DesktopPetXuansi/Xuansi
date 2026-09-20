@@ -67,9 +67,15 @@ begin
   DependenciesReady := Started and (ExitCode = 0);
   Log(Format('依赖安装完成：started=%d, exit=%d', [Ord(Started), ExitCode]));
   if not DependenciesReady then begin
+    SuppressibleMsgBox('依赖或模型安装失败。请检查 data\setup.log，联网后重新运行安装包以继续下载。', mbError, MB_OK, IDOK);
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpFinished) and not DependenciesReady then begin
     WizardForm.FinishedHeadingLabel.Caption := '依赖或模型尚未安装完成';
     WizardForm.FinishedLabel.Caption := '程序文件已保存，但现在还不能使用。请检查应用目录 data\setup.log，在开始菜单选择“重新下载依赖与模型”或重新运行安装包。';
-    SuppressibleMsgBox('依赖或模型安装失败。请检查 data\setup.log，联网后重新运行安装包以继续下载。', mbError, MB_OK, IDOK);
   end;
 end;
 
