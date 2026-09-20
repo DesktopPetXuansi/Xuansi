@@ -1,6 +1,6 @@
 """原生控制面板：聊天、人设、长期记忆、偏好；只因明确点击而显示。"""
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -88,6 +88,11 @@ class Panel(QWidget):
         self.status.setObjectName("status")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.live_transcript = QLabel("")
+        self.live_transcript.setTextFormat(Qt.TextFormat.PlainText)
+        self.live_transcript.setWordWrap(True)
+        self.live_transcript.setObjectName("hint")
+        layout.addWidget(self.live_transcript)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
         self._chat_page()

@@ -66,7 +66,10 @@ class PreferencesPage(QWidget):
         self.speak.setChecked(settings.speak_replies)
         self.proactive = QCheckBox("也朗读主动观察的回应")
         self.proactive.setChecked(settings.speak_observations)
-        for widget in (self.observe, self.follow, self.speak, self.proactive):
+        self.realtime = QCheckBox("实时识别（说完后尽快回复）")
+        self.realtime.setChecked(settings.realtime_voice)
+        self.realtime.setToolTip("说话时识别文字，结束后才回复。关闭后使用原来的整句识别。")
+        for widget in (self.observe, self.follow, self.speak, self.proactive, self.realtime):
             form.addRow(widget)
         self.capture_scope = QComboBox()
         self.capture_scope.addItem("整块屏幕 · 鼠标所在显示器", "screen")
@@ -147,6 +150,7 @@ class PreferencesPage(QWidget):
             follow_mouse=self.follow.isChecked(),
             speak_replies=self.speak.isChecked(),
             speak_observations=self.proactive.isChecked(),
+            realtime_voice=self.realtime.isChecked(),
             interval=self.interval.value(),
             pet_size=self.size.currentData(),
             speaker=self.speaker.value(),

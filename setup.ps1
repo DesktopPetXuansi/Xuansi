@@ -9,5 +9,7 @@ if (-not (Test-Path -LiteralPath '.venv/Scripts/python.exe')) {
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 & '.venv/Scripts/python.exe' -X utf8 scripts/download_assets.py
 if ($LASTEXITCODE -ne 0) { throw 'Model verification failed.' }
+& '.venv/Scripts/python.exe' -X utf8 scripts/download_realtime.py
+if ($LASTEXITCODE -ne 0) { throw 'Realtime model verification failed.' }
 & './scripts/create_shortcuts.ps1'
 Write-Host 'Ready. Double-click the desktop shortcut or the VBS launcher.'

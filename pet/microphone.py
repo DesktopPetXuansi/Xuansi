@@ -8,15 +8,17 @@ from queue import Empty, Full, Queue
 import numpy as np
 import sounddevice as sd
 
+from .live_input import OnlineInput
 from .segmentation import Segmenter
 
 LOG = logging.getLogger(__name__)
 
 
 class Microphone:
-    def __init__(self, on_segment: Callable[[np.ndarray], None], on_state: Callable[[str], None]):
+    def __init__(self, on_segment: Callable[[np.ndarray], None], on_state: Callable[[str], None], on_update=None):
         self.on_segment = on_segment
         self.on_state = on_state
+        self.on_update = on_update
         self.stop_event = threading.Event()
         self.muted = threading.Event()
         self.thread: threading.Thread | None = None
@@ -52,6 +54,9 @@ class Microphone:
         segmenter = Segmenter()
         failed = False
         try:
+            online = OnlineInput(self._online_update) if self.on_update else None
+            if self.stop_event.is_set():
+                return
             while not self.frames.empty():
                 self.frames.get_nowait()
             with sd.InputStream(
@@ -62,7 +67,7 @@ class Microphone:
                 device=None if device == -1 else device,
                 callback=self._callback,
             ):
-                self.on_state("正在聆听，说完停顿即可")
+                self.on_state("实时聆听中 · 说完即可回复" if online else "正在聆听，说完停顿即可")
                 LOG.info("麦克风已开启")
                 while not self.stop_event.is_set():
                     try:
@@ -70,9 +75,16 @@ class Microphone:
                     except Empty:
                         if self.muted.is_set():
                             segmenter.reset()
+                            if online:
+                                online.reset()
                         continue
                     if self.muted.is_set():
                         segmenter.reset()
+                        if online:
+                            online.reset()
+                        continue
+                    if online:
+                        online.feed(samples, rate=16000)
                         continue
                     utterance = segmenter.feed(samples)
                     if utterance is not None:
@@ -81,8 +93,19 @@ class Microphone:
         except Exception as exc:
             failed = True
             LOG.warning("麦克风无法使用 type=%s", type(exc).__name__)
-            self.on_state("麦克风无法开启，请在设置中选择可用输入设备")
+            self.on_state(
+                "麦克风无法开启：" + str(exc) if isinstance(exc, RuntimeError)
+                else "麦克风无法开启，请在设置中选择可用输入设备"
+            )
         finally:
             if not failed:
                 self.on_state("麦克风已关闭")
             LOG.info("麦克风已关闭")
+
+    def _online_update(self, update):
+        if self.stop_event.is_set():
+            return
+        if update.final and update.text:
+            # 朗读期间暂停收音；保留完整话段，避免自身声音触发后续回复。
+            self.muted.set()
+        self.on_update(update)

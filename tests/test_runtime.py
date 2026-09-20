@@ -9,6 +9,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from pet.config import Settings
+from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
 
@@ -48,6 +49,71 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
         runtime._conversation(0, replace(Settings(), tts_engine="natural"), "你好", "chat", None, None)
     ).result(3)
     assert seen == ["natural"]
+
+
+def test_live_waits_for_endpoint_and_deduplicates(runtime):
+    calls = []
+
+    async def chat(settings, text, images, history, on_chunk=None):
+        calls.append(text)
+        return "记住了。"
+
+    runtime.engine.chat = chat
+    runtime.listening = True
+    settings = replace(Settings(), speak_replies=False)
+    for text in ("记住我喜欢", "记住我喜欢喝绿茶"):
+        runtime.accept_voice(0, VoiceUpdate(0, text), settings).result(2)
+    assert not calls and not runtime.memory.read() and not runtime.history
+    event = VoiceUpdate(0, "记住我喜欢喝绿茶", final=True)
+    runtime.accept_voice(0, event, settings).result(2)
+
+    async def wait_reply():
+        await runtime.job
+
+    runtime.schedule(wait_reply()).result(3)
+    runtime.accept_voice(0, event, settings).result(2)
+    assert "绿茶" in runtime.memory.read()
+    assert calls == [event.text]
+    assert runtime.history[-2]["content"] == event.text
+    runtime.microphone_epoch += 1
+    runtime.accept_voice(0, VoiceUpdate(1, "旧麦克风的话", final=True), settings).result(2)
+    assert len(calls) == 1
+
+
+def test_cancel_during_warmup_never_opens_microphone(runtime, monkeypatch):
+    started = threading.Event()
+    opened = []
+
+    async def prepare(_):
+        started.set()
+        await asyncio.sleep(30)
+
+    monkeypatch.setattr(runtime, "_prepare_voice", prepare)
+    monkeypatch.setattr("pet.runtime.Microphone", lambda *_: opened.append(True))
+    warming = runtime.toggle_microphone(True, realtime=True, settings=Settings())
+    assert started.wait(2)
+    runtime.toggle_microphone(False).result(3)
+    warming.result(3)
+    assert not opened and not runtime.listening
+
+
+def test_text_request_interrupting_warmup_clears_listening_state(runtime, monkeypatch):
+    started = threading.Event()
+
+    async def prepare(_):
+        started.set()
+        await asyncio.sleep(30)
+
+    async def chat(*_, **__):
+        return "文字回复继续正常工作。"
+
+    monkeypatch.setattr(runtime, "_prepare_voice", prepare)
+    runtime.engine.chat = chat
+    warming = runtime.toggle_microphone(True, realtime=True, settings=Settings())
+    assert started.wait(2)
+    runtime.ask(replace(Settings(), speak_replies=False), "你好")
+    warming.result(3)
+    assert not runtime.listening
 
 
 def test_clear_memory_cancels_old_request_and_history(runtime):

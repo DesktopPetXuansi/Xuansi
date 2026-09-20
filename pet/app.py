@@ -72,6 +72,7 @@ class DesktopPet(QObject):
         self.runtime.finished.connect(self.on_finished)
         self.runtime.microphone_state.connect(self.on_microphone_state)
         self.runtime.segment.connect(self.on_segment)
+        self.runtime.voice_update.connect(self.on_voice_update)
         self.runtime.shutdown_done.connect(self.application.quit)
         self.monitor.event.connect(self.on_mouse)
 
@@ -104,8 +105,12 @@ class DesktopPet(QObject):
             self.toggle_sleep()
         self.panel.voice_state(enabled)
         self.ui.quick.voice_state(enabled)
-        self.runtime.toggle_microphone(enabled, self.settings.input_device)
+        self.runtime.toggle_microphone(
+            enabled, self.settings.input_device, self.settings.realtime_voice, self.settings
+        )
         if not enabled:
+            self.panel.live_transcript.clear()
+            self.ui.quick.live_transcript.clear()
             self.busy = False
             self.avatar.set_animation("idle")
 
@@ -127,6 +132,25 @@ class DesktopPet(QObject):
             self.ui.quick.voice_state(False)
         self.panel.status.setText(text)
         self.ui.quick.status.setText(text)
+
+    def on_voice_update(self, microphone_epoch, update):
+        if microphone_epoch != self.runtime.microphone_epoch or not self.runtime.listening or self.paused:
+            return
+        text = "" if update.final else "正在听：" + update.text[-100:]
+        self.panel.live_transcript.setText(text)
+        self.ui.quick.live_transcript.setText(text)
+        if update.final and update.text:
+            self.panel.append("你", update.text)
+        if update.text and update.final:
+            import re
+
+            self._begin()
+            with_screen = self.panel.with_screen.isChecked() or re.search(
+                r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", update.text
+            )
+            self.runtime.accept_voice(
+                microphone_epoch, update, self.settings, self.last_external if with_screen else None
+            )
 
     def on_state(self, epoch, text):
         if epoch == self.runtime.epoch:

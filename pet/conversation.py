@@ -29,8 +29,10 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
             if not text:
                 return
             runtime.heard.emit(epoch, text)
-            if kind == "voice" and not re.search(r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text):
-                position = None
+        if kind == "voice" and not re.search(
+            r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text
+        ):
+            position = None
         if not observation_current(observation):
             return
         images = (
@@ -68,7 +70,8 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
                 runtime.microphone.muted.clear()
             if not failed:
                 runtime.state.emit(
-                    epoch, "正在聆听，说完停顿即可" if runtime.listening else "已就绪 · 麦克风关闭"
+                    epoch, ("实时聆听中 · 说完即可回复" if settings.realtime_voice else "正在聆听，说完停顿即可")
+                    if runtime.listening else "已就绪 · 麦克风关闭"
                 )
         runtime.finished.emit(epoch)
 

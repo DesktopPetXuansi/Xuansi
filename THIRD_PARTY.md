@@ -12,6 +12,7 @@
 | GGUF 及视觉组件 | [unsloth/Qwen3.5-4B-GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF)，提交 `e87f176479d0855a907a41277aca2f8ee7a09523` | 上述模型的转换，按 HF LFS 摘要校验，不因格式转换获得新的无限制许可 |
 | 推理引擎 | [llama.cpp](https://github.com/ggml-org/llama.cpp)，b10930 Windows CUDA 12.4 | 引擎 MIT；随下载包提供的 CUDA 运行库另受 NVIDIA 条款约束，不能把整个二进制包统称 MIT |
 | 语音识别权重 | [SenseVoiceSmall](https://huggingface.co/FunAudioLLM/SenseVoiceSmall)，sherpa-onnx int8 2025-09-09 转换 | 模型卡指向 [FunASR Model License](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE)，不是 Apache-2.0；模型目录中保留 `MODEL_LICENSE` |
+| 默认实时识别权重 | [sherpa-onnx-streaming-paraformer-bilingual-zh-en](https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en)，固定提交 `8e40c43232a1c5c66c82111efc5820d3accca11b` | 转换仓库模型卡标注 Apache-2.0，并指向 ModelScope 的 `damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online`。该标签是转换仓库声明，商业分发仍需核对原始权重许可与来源；本次未获得新的商业授权。encoder/decoder int8 使用 HF LFS SHA256，tokens 固定版本并校验实际下载摘要 |
 | 默认朗读权重 | [MeloTTS](https://github.com/myshell-ai/MeloTTS)、[MeloTTS-Chinese](https://huggingface.co/myshell-ai/MeloTTS-Chinese)，sherpa `vits-melo-tts-zh_en` | MIT；已下载包自带 MyShell.ai 的 LICENSE。中英、44100Hz、单音色 |
 | 可选朗读权重 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh)，sherpa int8 multi-lang v1_1 | 模型 Apache-2.0；包内其他语音处理资源需要分别核对，不能只看模型标签 |
 | Kokoro 语音处理资源 | 模型包的 `espeak-ng-data`，供当前 Kokoro 初始化使用 | [eSpeak NG 上游 COPYING](https://github.com/espeak-ng/espeak-ng/blob/master/COPYING) 为 GPL-3.0；具体数据文件、链接方式和实际二进制构建的分发义务需单独审计 |
@@ -51,3 +52,5 @@ NVIDIA CUDA 运行库是单独下载的第三方二进制组件，适用其实�
 Melo 历史 GitHub 发布包未提供作者 SHA256，清单里的值是首次 HTTPS 下载后计算并锁定的摘要，不是作者签名。其他摘要及版本由下载脚本和清单记录。AISHELL3 只在早期开发中测试过，未被当前应用采用，也不列入本次下载或发布内容。
 
 历史说明：2026-09-13 本项目只在开发电脑集成，尚未发布；2026-09-14 用户授权发布到 `DesktopPetXuansi/Xuansi`，本文件据此更新许可范围与公开文档。实际推送和核验结果见 [开源发布验收](开源发布验收.md)，不将历史的本机安装记录当成商业发行验收。
+
+2026-09-20 增量：默认语音输入改为上述在线 Paraformer，SenseVoice 保留为可选整句模式。在线模型的固定 URL、摘要见 `scripts/download_realtime.py`；未将权重上传仓库。本次使用已有 sherpa-onnx，不增加回声消除依赖。

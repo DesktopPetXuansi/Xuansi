@@ -15,6 +15,7 @@ from .config import Settings, save_settings
 from .conversation import converse
 from .desktop import observation_current
 from .inference import LocalEngine
+from .live_dialogue import LiveDialogue
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
 from .speech_output import speak
@@ -29,6 +30,7 @@ class Runtime(QObject):
     finished = Signal(int)
     microphone_state = Signal(int, str)
     segment = Signal(int, object)
+    voice_update = Signal(int, object)
     settings_saved = Signal(object, str)
     memory_loaded = Signal(str)
     memory_saved = Signal(str)
@@ -50,6 +52,7 @@ class Runtime(QObject):
         self.control = asyncio.Lock()
         self.microphone_control = asyncio.Lock()
         self.storage_control = asyncio.Lock()
+        self.live = LiveDialogue(self)
         self.microphone = self._new_microphone(0)
         self.thread = threading.Thread(target=self._run, daemon=True, name="pet-runtime")
         self.thread.start()
@@ -94,24 +97,41 @@ class Runtime(QObject):
             lambda text: self.state.emit(epoch, text),
         )
 
+    def accept_voice(self, mic_epoch, update, settings, position=None):
+        return self.schedule(self.live.accept(mic_epoch, update, settings, position))
+
     def _new_microphone(self, epoch):
         return Microphone(
             lambda samples: self.segment.emit(epoch, samples),
             lambda text: self.microphone_state.emit(epoch, text),
         )
 
-    def toggle_microphone(self, enabled: bool, device=-1):
+    def toggle_microphone(self, enabled: bool, device=-1, realtime=False, settings=None):
         self.microphone_epoch += 1
         epoch = self.microphone_epoch
         self.listening = enabled
         self.microphone.stop()
         if not enabled:
             self.cancel()
-        return self.schedule(self._configure_microphone(epoch, enabled, device))
+        return self.schedule(self._configure_microphone(epoch, enabled, device, realtime, settings))
 
-    async def _configure_microphone(self, epoch, enabled, device):
+    async def _prepare_voice(self, settings):
+        # 开麦时预热；预热合成只进内存，不调用播放接口，也不写入对话历史。
+        await self.engine.start(settings)
+        if settings.speak_replies:
+            pending = asyncio.create_task(asyncio.to_thread(
+                self.audio.synthesize, "你好。", settings.speaker, settings.speed, settings.tts_engine
+            ))
+            try:
+                await asyncio.shield(pending)
+            finally:
+                await asyncio.gather(pending, return_exceptions=True)
+        LOG.info("实时对话模型预热完成")
+
+    async def _configure_microphone(self, epoch, enabled, device, realtime=False, settings=None):
         # 必须先关闭旧声卡，再检查代次；旧线程的消息不能改变新会话。
         async with self.microphone_control:
+            self.live.reset()
             closed = await asyncio.to_thread(self.microphone.join)
             if epoch != self.microphone_epoch:
                 return
@@ -123,6 +143,30 @@ class Runtime(QObject):
                 return
             self.microphone_state.emit(epoch, "正在准备本地语音…")
             try:
+                if realtime:
+                    if settings is not None:
+                        async with self.control:
+                            if epoch != self.microphone_epoch:
+                                return
+                            if not self.job or self.job.done():
+                                self.job = asyncio.create_task(self._prepare_voice(settings))
+                            pending = self.job
+                        try:
+                            await asyncio.shield(pending)
+                        except asyncio.CancelledError:
+                            if epoch == self.microphone_epoch and self.listening:
+                                self.listening = False
+                                self.microphone_state.emit(epoch, "麦克风无法开启：准备被新请求中断，请重新开启")
+                            return
+                        if epoch != self.microphone_epoch:
+                            return
+                    self.microphone = Microphone(
+                        lambda samples: self.segment.emit(epoch, samples),
+                        lambda text: self.microphone_state.emit(epoch, text),
+                        on_update=lambda update: self.voice_update.emit(epoch, update),
+                    )
+                    self.microphone.start(device)
+                    return
                 await asyncio.to_thread(self.audio.prepare_recognition)
                 if epoch != self.microphone_epoch:
                     return
@@ -139,6 +183,7 @@ class Runtime(QObject):
         return self.schedule(self._suspend(release))
 
     async def _suspend(self, release):
+        self.live.reset()
         async with self.control:
             await self._cancel()
             if release:
@@ -196,6 +241,7 @@ class Runtime(QObject):
 
         async def write():
             try:
+                self.live.reset()
                 async with self.control:
                     await self._cancel()
                     # 编辑记忆后丢弃短期上下文，避免“忘记”后继续引用旧资料。
