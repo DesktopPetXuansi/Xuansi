@@ -11,6 +11,15 @@ import sherpa_onnx
 from .config import MODELS
 
 LOG = logging.getLogger(__name__)
+_CJK_TEXT = re.compile(r"[\u3400-\u9fff]")
+_LATIN_WORD = re.compile(r"[A-Za-z]+")
+
+
+def select_tts_engine(text: str, requested: str):
+    """让纯英文默认使用带 G2P 的 Kokoro，避免 Melo 词典外单词按字母处理。"""
+    if requested != "fast" or _CJK_TEXT.search(text):
+        return requested
+    return "natural" if len("".join(_LATIN_WORD.findall(text))) >= 2 else requested
 
 
 class AudioModels:
@@ -102,14 +111,26 @@ class AudioModels:
 
     def synthesize(self, text: str, speaker: int, speed: float, engine="fast"):
         with self.lock:
-            if self.tts is None or engine != self.tts_engine:
-                self.tts = None
-                self._load_fast_tts() if engine == "fast" else self._load_tts()
-                self.tts_engine = engine
             # 去除 Markdown 装饰，保留加粗/斜体中的正文，避免整句变成静音。
             clean = re.sub(r"[`#*_]", "", text).strip()[:240]
             if not clean:
                 return np.empty(0, dtype=np.float32), 24000
+            selected_engine = select_tts_engine(clean, engine)
+            automatic_english = engine == "fast" and selected_engine == "natural"
+            if self.tts is None or selected_engine != self.tts_engine:
+                self.tts = None
+                try:
+                    self._load_fast_tts() if selected_engine == "fast" else self._load_tts()
+                except Exception as exc:
+                    if not automatic_english:
+                        raise
+                    # 可选 Kokoro 缺失时保留原有 Melo 朗读能力，并记录可诊断原因。
+                    LOG.warning("英文 G2P 语音不可用，回退 Melo type=%s", type(exc).__name__)
+                    self._load_fast_tts()
+                    selected_engine = "fast"
+                self.tts_engine = selected_engine
+                if automatic_english and selected_engine == "natural":
+                    LOG.info("纯英文回复自动使用 Kokoro G2P 语音")
             started = time.monotonic()
             result = self.tts.generate(clean, sid=speaker, speed=speed)
             LOG.info(
