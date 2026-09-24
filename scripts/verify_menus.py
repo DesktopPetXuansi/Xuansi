@@ -36,7 +36,7 @@ def main():
     pet = DesktopPet(app, settings)
     report = {}
 
-    async def chat(config, text, images, history):
+    async def chat(config, text, images, history, **_kwargs):
         report["request_uses_saved_sampling"] = config.temperature == 0.4 and config.max_tokens == 256
         return "这是快捷对话验收回复。"
 

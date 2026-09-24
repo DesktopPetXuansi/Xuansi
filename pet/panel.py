@@ -117,6 +117,7 @@ class Panel(QWidget):
         self.logs.setWindowTitle(f"{settings.name} · 运行日志")
         self.audio_status = QLabel("声音回避已开启")
         self.audio_status.setObjectName("hint")
+        self.audio_status.setWordWrap(True)
         layout.addWidget(self.audio_status)
         self.footer = QLabel("仅本机处理 · 双击托盘也能打开面板")
         self.footer.setObjectName("hint")

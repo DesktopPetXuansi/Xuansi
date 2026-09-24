@@ -36,11 +36,13 @@ class Runtime(QObject):
     memory_saved = Signal(str)
     shutdown_done = Signal()
     devices_loaded = Signal(object)
+    speech_changed = Signal()
 
     def __init__(self):
         super().__init__()
         self.epoch = 0
         self.listening = False
+        self.speech_override: bool | None = None
         self.microphone_epoch = 0
         self.engine = LocalEngine()
         self.audio = AudioModels()
@@ -90,12 +92,29 @@ class Runtime(QObject):
         await converse(self, epoch, settings, text, kind, position, samples, observation)
 
     async def _speak(self, epoch, settings, answer, observation):
+        if self.speech_override is False:
+            return
         await speak(
             self.audio_activity,
             lambda: self.audio.synthesize(answer, settings.speaker, settings.speed, settings.tts_engine),
-            lambda: epoch == self.epoch and observation_current(observation),
+            lambda: epoch == self.epoch and self.speech_override is not False and observation_current(observation),
             lambda text: self.state.emit(epoch, text),
         )
+
+    def should_speak(self, settings, kind="chat"):
+        if self.speech_override is False:
+            return False
+        if kind == "observation":
+            return settings.speak_observations
+        return settings.speak_replies if self.speech_override is None else self.speech_override
+
+    def set_speech_enabled(self, enabled: bool | None):
+        # 仅控制输出，不能关闭或偷偷开启麦克风；None 恢复已保存的偏好。
+        self.speech_override = enabled
+        if enabled is False:
+            sd.stop()
+        self.speech_changed.emit()
+        LOG.info("本次运行朗读开关 enabled=%s", enabled)
 
     def accept_voice(self, mic_epoch, update, settings, position=None):
         return self.schedule(self.live.accept(mic_epoch, update, settings, position))
@@ -118,7 +137,7 @@ class Runtime(QObject):
     async def _prepare_voice(self, settings):
         # 开麦时预热；预热合成只进内存，不调用播放接口，也不写入对话历史。
         await self.engine.start(settings)
-        if settings.speak_replies:
+        if self.should_speak(settings):
             pending = asyncio.create_task(asyncio.to_thread(
                 self.audio.synthesize, "你好。", settings.speaker, settings.speed, settings.tts_engine
             ))

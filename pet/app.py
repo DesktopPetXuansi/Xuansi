@@ -260,7 +260,10 @@ class DesktopPet(QObject):
             self.ui.refresh()
             self.panel.status.setText("声音回避已开启" if settings.audio_avoidance else "声音回避已关闭")
             return
-        if replace(self.settings, avatar_image=settings.avatar_image) == settings:
+        if (
+            self.settings.avatar_image != settings.avatar_image
+            and replace(self.settings, avatar_image=settings.avatar_image) == settings
+        ):
             # 仅更换外观不停止正在进行的对话，也不改写未保存的人设输入。
             self.settings = self.panel.settings = settings
             self.avatar.set_image(settings.avatar_image, force=True)
@@ -271,6 +274,7 @@ class DesktopPet(QObject):
         self.voice(False)
         self.runtime.cancel(release=True)
         self.settings = self.panel.settings = settings
+        self.runtime.set_speech_enabled(None)
         self.runtime.audio_activity.set_enabled(settings.audio_avoidance)
         self.panel.audio_avoidance_action.setChecked(settings.audio_avoidance)
         self.gate.interval = settings.interval

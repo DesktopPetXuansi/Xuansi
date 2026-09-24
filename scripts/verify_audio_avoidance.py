@@ -48,7 +48,7 @@ def main():
     started, release = threading.Event(), threading.Event()
     report = {}
 
-    async def chat(*_):
+    async def chat(*_, **_kwargs):
         started.set()
         while not release.is_set():
             await asyncio.sleep(0.02)

@@ -57,6 +57,7 @@ class QuickChat(QWidget):
         layout.addWidget(self.voice)
         self.audio_status = QLabel("声音回避已开启")
         self.audio_status.setObjectName("hint")
+        self.audio_status.setWordWrap(True)
         layout.addWidget(self.audio_status)
         self.escape = QShortcut(QKeySequence("Esc"), self)
         self.escape.activated.connect(self.hide)

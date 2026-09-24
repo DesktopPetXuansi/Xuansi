@@ -37,6 +37,7 @@ class CompanionUI:
         owner.panel.settings_requested.connect(self.save)
         owner.panel.audio_avoidance_action.triggered.connect(self.toggle_avoidance)
         owner.runtime.settings_saved.connect(self.saved)
+        owner.runtime.speech_changed.connect(self.refresh)
         self.appearance = AppearanceDialog(owner.panel)
         self.appearance.apply_requested.connect(self.save_appearance)
         owner.panel.appearance_requested.connect(self.open_appearance)
@@ -137,6 +138,8 @@ class CompanionUI:
 
     def refresh(self):
         status = self.owner.runtime.audio_activity.status
+        speech = "回复朗读已开启" if self.owner.runtime.should_speak(self.owner.settings) else "回复朗读已关闭"
+        status = speech + " · " + status
         if self.hotkey.active is None:
             status += " · 热键不可用，请到配置更改"
         self.owner.panel.audio_status.setText(status)

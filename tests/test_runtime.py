@@ -35,7 +35,7 @@ def runtime(monkeypatch, tmp_path):
 def test_selected_voice_engine_reaches_synthesizer(runtime):
     seen = []
 
-    async def chat(*_, on_chunk=None):
+    async def chat(*_, on_chunk=None, **_kwargs):
         await on_chunk("你好")
         return "你好"
 
@@ -54,7 +54,7 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
 def test_live_waits_for_endpoint_and_deduplicates(runtime):
     calls = []
 
-    async def chat(settings, text, images, history, on_chunk=None):
+    async def chat(settings, text, images, history, on_chunk=None, **_kwargs):
         calls.append(text)
         return "记住了。"
 
@@ -122,7 +122,7 @@ def test_clear_memory_cancels_old_request_and_history(runtime):
     started = threading.Event()
     stopped = threading.Event()
 
-    async def chat(*_, on_chunk=None):
+    async def chat(*_, on_chunk=None, **_kwargs):
         started.set()
         try:
             await asyncio.sleep(60)
@@ -222,7 +222,7 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
         captures.append((x, y, scope, threading.get_ident()))
         return b"synthetic-screen"
 
-    async def chat(_settings, _text, images, _history):
+    async def chat(_settings, _text, images, _history, **_kwargs):
         images_seen.append(images)
         return "测试已看到整屏"
 
@@ -242,7 +242,7 @@ def test_streaming_voice_plays_before_model_finishes_and_keeps_full_history(runt
     replies = []
     runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_chunk=None):
+    async def chat(*_, on_chunk=None, **_kwargs):
         await on_chunk("这是第一段。")
         assert await asyncio.to_thread(played.wait, 1)
         await on_chunk("后面还有第二段。")
@@ -263,7 +263,7 @@ def test_streaming_tts_failure_still_delivers_complete_text(runtime):
     replies = []
     runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_chunk=None):
+    async def chat(*_, on_chunk=None, **_kwargs):
         await on_chunk("文字回复仍然可用。")
         return "文字回复仍然可用。"
 
