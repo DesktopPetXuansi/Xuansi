@@ -30,13 +30,13 @@ TTS 按短段生成波形，后续文字生成、合成和播放组成流水线�
 
 ### 下载在线安装包
 
-前往 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest)，下载 `Xuansi-0.1.0-windows-x64-setup.exe` 并运行。安装包自带 Python 3.13.15，不需要预先安装 Python 或 Git；依赖、推理引擎和模型在安装时联网下载，日常推理仍在本机进行。
+前往 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest)，下载 `Xuansi-0.2.0-windows-x64-setup.exe` 并运行。安装包自带 Python 3.13.15，不需要预先安装 Python 或 Git；依赖、推理引擎和模型在安装时联网下载，日常推理仍在本机进行。
 
 需要 **Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 和驱动、D 盘以及至少 15GB 可用空间**。模型仍固定保存到 `D:\AI\Models\desktop-pet`；应用安装盘也需要容纳依赖与推理引擎。下载需要访问 PyPI、GitHub 和 Hugging Face。安装器只按当前用户安装，不添加开机启动。
 
 安装完成后，在开始菜单打开“玄司 AI 桌宠”。可在安装时勾选创建“玄司 AI 桌宠（安装版）”桌面快捷方式；源码版已有入口不会被覆盖。网络失败时重新运行安装包，或选择开始菜单的“重新下载依赖与模型”。安装日志在应用目录 `data/setup.log`，分享前请清除本机路径等个人信息。
 
-安装包尚未做代码签名，可用 `Get-FileHash .\Xuansi-0.1.0-windows-x64-setup.exe -Algorithm SHA256` 与 Release 的 `SHA256SUMS.txt` 核对。卸载会保留用户数据、安装时下载的环境和 D 盘模型，确认不再需要后可手动清理。
+安装包尚未做代码签名，可用 `Get-FileHash .\Xuansi-0.2.0-windows-x64-setup.exe -Algorithm SHA256` 与 Release 的 `SHA256SUMS.txt` 核对。卸载会保留用户数据、安装时下载的环境和 D 盘模型，确认不再需要后可手动清理。
 
 ### 环境
 
