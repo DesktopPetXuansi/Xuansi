@@ -10,12 +10,14 @@ import socket
 import subprocess
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 
 from .config import ROOT, Settings
 from .process_guard import ProcessGuard
+from .speech_control import SPEECH_GRAMMAR, SpeechDirective, speech_prompt
 from .text_stream import read_completion
 
 LOG = logging.getLogger(__name__)
@@ -153,10 +155,19 @@ class LocalEngine:
         history: list[dict[str, str]],
         *,
         on_chunk: Callable[[str], Awaitable[None]] | None = None,
+        on_speech: Callable[[bool], None] | None = None,
+        speech_enabled: bool = True,
     ):
         started = time.monotonic()
         await self.start(settings)
         try:
+            directive = SpeechDirective(on_speech) if on_speech is not None else None
+            if directive is not None:
+                # 控制提示和头部 token 一起进入上下文预算，不额外调用一次分类模型。
+                settings = replace(
+                    settings, system_prompt=settings.system_prompt + speech_prompt(speech_enabled),
+                    max_tokens=settings.max_tokens + 16,
+                )
             history = await self._fit_history(settings, text, bool(images), history)
             payload = {
                 "model": "local-pet",
@@ -167,11 +178,17 @@ class LocalEngine:
                 "stream": on_chunk is not None,
                 "chat_template_kwargs": {"enable_thinking": False},
             }
+            if directive is not None:
+                payload["grammar"] = SPEECH_GRAMMAR
             if on_chunk is not None:
                 first = True
 
                 async def deliver(chunk):
                     nonlocal first
+                    if directive is not None:
+                        chunk = directive.feed(chunk)
+                    if not chunk:
+                        return
                     if first:
                         first = False
                         self.stats["first_text_seconds"] = round(time.monotonic() - started, 3)
@@ -188,6 +205,10 @@ class LocalEngine:
             if not isinstance(result, str):
                 raise ValueError("模型返回了无效内容")
             result = re.sub(r"<think>.*?</think>", "", result, flags=re.S).strip()
+            if directive is not None:
+                if on_chunk is None:
+                    directive.feed(result)
+                result = directive.finish()
             self.last_used = time.monotonic()
             self.stats["last_response_seconds"] = round(self.last_used - started, 2)
             LOG.info("推理完成 images=%d elapsed=%.2fs", len(images), self.last_used - started)
