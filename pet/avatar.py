@@ -3,20 +3,53 @@
 import logging
 import math
 import time
+from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QGuiApplication, QPainter, QRegion
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtGui import QCursor, QGuiApplication, QPainter, QRegion, QSurfaceFormat
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
+from PySide6.QtWidgets import QLabel
 
 from .character_frames import build_frames
 
 LOG = logging.getLogger(__name__)
+LIVE2D_MODEL = Path(__file__).resolve().parents[1] / "assets/xuansi/rigging/xuansi.model3.json"
+LIVE2D_PARAMETERS = (
+    "ParamEyeBallX",
+    "ParamEyeBallY",
+    "ParamEyeLOpen",
+    "ParamEyeROpen",
+    "ParamMouthOpenY",
+    "ParamHairBack",
+    "ParamBodyAngleX",
+)
+SWAY_PERIOD_SECONDS = 2.8
+MAX_SWAY_FRAME_SECONDS = 0.1
+CLOTH_SWAY_PHASE_OFFSET = math.pi / 2
 PASSIVE = (
     Qt.WindowType.Tool
     | Qt.WindowType.FramelessWindowHint
     | Qt.WindowType.WindowStaysOnTopHint
     | Qt.WindowType.WindowDoesNotAcceptFocus
 )
+
+
+def _gaze_axis(position, origin, low, high, minimum_span):
+    """按眼睛到鼠标所在方向的屏幕边缘映射，避免在桌宠附近就锁死视线。"""
+    distance = position - origin
+    span = origin - low if distance < 0 else high - origin
+    return max(-1.0, min(1.0, distance / max(1.0, minimum_span, span)))
+
+
+def _advance_sway_phase(phase, elapsed):
+    """以有限步长推进连续摆动相位，避免卡顿后角色瞬间甩动。"""
+    step = max(0.0, min(float(elapsed), MAX_SWAY_FRAME_SECONDS))
+    return (phase + math.tau * step / SWAY_PERIOD_SECONDS) % math.tau
+
+
+def _sway_parameters(phase):
+    """生成错相的头发与衣摆值；两者范围匹配模型中的绑定参数。"""
+    return math.sin(phase), 10.0 * math.sin(phase + CLOTH_SWAY_PHASE_OFFSET)
 
 
 class Bubble(QLabel):
@@ -45,11 +78,18 @@ class Bubble(QLabel):
         self.timer.start(10000)
 
 
-class Avatar(QWidget):
+class Avatar(QOpenGLWidget):
     open_requested = Signal()
 
     def __init__(self, size=160, image_id=""):
         super().__init__(None, PASSIVE)
+        surface = QSurfaceFormat()
+        surface.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
+        # Cubism 渲染器使用 GLSL 1.20，因此请求兼容模式上下文。
+        surface.setVersion(2, 1)
+        surface.setAlphaBufferSize(8)
+        surface.setDepthBufferSize(24)
+        self.setFormat(surface)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.frames = {}
@@ -58,6 +98,18 @@ class Avatar(QWidget):
         self.frame = 0
         self.follow = False
         self.paused = False
+        self._live2d_requested = not bool(image_id)
+        self._live2d_active = False
+        self._live2d_failed = False
+        self._live2d_ready = False
+        self._live2d_module = None
+        self._live2d_model = None
+        self._mouth_target = 0.0
+        self._mouth_level = 0.0
+        self._sway_phase = 0.0
+        self._gaze_x = 0.0
+        self._gaze_y = 0.0
+        self._last_render = time.monotonic()
         self.drag_start = None
         self.move_start = None
         self.last_follow_step = 0.0
@@ -69,6 +121,9 @@ class Avatar(QWidget):
         self.clock.setInterval(self.durations[self.frame % len(self.durations)])
         self.clock.timeout.connect(self._tick)
         self.clock.start()
+        self.render_clock = QTimer(self)
+        self.render_clock.setInterval(33)
+        self.render_clock.timeout.connect(self.update)
         self.bubble = Bubble()
         self.setToolTip("点击打开对话 · 拖动调整位置")
 
@@ -78,7 +133,10 @@ class Avatar(QWidget):
         self.frames, self.durations, self.native_animation = build_frames(size, self.image_id)
         self.setFixedSize(self.frames["idle"][0][0].size())
         self._shown_frame = None
-        self._frame_mask()
+        if self._live2d_active:
+            self.setMask(self.frames["idle"][0][1])
+        else:
+            self._frame_mask()
         # 增大形象后仍完整留在当前工作区，不伸进任务栏或屏幕外。
         bounds = self.screen().availableGeometry()
         self.move(
@@ -91,6 +149,20 @@ class Avatar(QWidget):
             self.animation = name
             if not self.native_animation:
                 self.frame = 0
+        if self._live2d_active:
+            model = self._live2d_model
+            if model is not None:
+                sleeping = self.animation == "sleep"
+                model.SetAutoBlinkEnable(not sleeping)
+                if not sleeping:
+                    model.SetParameterValue("ParamEyeLOpen", 1.0)
+                    model.SetParameterValue("ParamEyeROpen", 1.0)
+                else:
+                    model.SetParameterValue("ParamEyeLOpen", 0.0)
+                    model.SetParameterValue("ParamEyeROpen", 0.0)
+            self._mouth_target = 0.0
+            self.update()
+            return
         self._frame_mask()
 
     def set_image(self, identifier, force=False):
@@ -100,8 +172,154 @@ class Avatar(QWidget):
         frames, durations, native = build_frames(self.height(), identifier)
         self.image_id, self.frames, self.durations = identifier, frames, durations
         self.native_animation, self.frame = native, 0
+        self._live2d_requested = not bool(identifier)
         self._shown_frame = None
+        if self._live2d_requested and self._live2d_ready:
+            self.makeCurrent()
+            try:
+                self._ensure_live2d()
+            finally:
+                self.doneCurrent()
+        self._live2d_active = self._live2d_requested and self._live2d_model is not None
+        self._set_render_mode()
         self._frame_mask()
+
+    def set_mouth_level(self, level):
+        """接收当前语音包络值；跨线程信号会由 Qt 自动排入界面线程。"""
+        self._mouth_target = min(1.0, max(0.0, float(level)))
+
+    def initializeGL(self):
+        self._live2d_ready = True
+        if self._live2d_requested:
+            self._ensure_live2d()
+        self._live2d_active = self._live2d_requested and self._live2d_model is not None
+        self._set_render_mode()
+        if self.context() is not None:
+            self.context().aboutToBeDestroyed.connect(self._release_live2d)
+
+    def _ensure_live2d(self):
+        if self._live2d_model is not None or self._live2d_failed:
+            return
+        try:
+            if not LIVE2D_MODEL.is_file():
+                raise FileNotFoundError(LIVE2D_MODEL)
+            LOG.info("玄司 Live2D 渲染器初始化开始")
+            import live2d.v3 as live2d
+
+            live2d.enableLog(True)
+            live2d.init()
+            LOG.info("Live2D Cubism 核心初始化完成")
+            live2d.glInit()
+            LOG.info("Live2D OpenGL 渲染器初始化完成")
+            model = live2d.LAppModel()
+            LOG.info("Live2D 模型加载开始 file=%s", LIVE2D_MODEL.name)
+            model.LoadModelJson(str(LIVE2D_MODEL))
+            LOG.info("Live2D 模型文件已读取")
+            parameter_ids = set(model.GetParamIds())
+            missing = set(LIVE2D_PARAMETERS) - parameter_ids
+            if missing:
+                raise ValueError(f"模型缺少绑定参数：{', '.join(sorted(missing))}")
+            model.SetAutoBlinkEnable(True)
+            model.SetAutoBreathEnable(False)
+            if self.animation == "sleep":
+                model.SetAutoBlinkEnable(False)
+                model.SetParameterValue("ParamEyeLOpen", 0.0)
+                model.SetParameterValue("ParamEyeROpen", 0.0)
+            self._live2d_module = live2d
+            self._live2d_model = model
+            self._last_render = time.monotonic()
+            LOG.info("玄司 Live2D 模型已加载 parameters=%s", len(parameter_ids))
+            LOG.info("Live2D 视线跟随已启用：按桌宠所在屏幕范围平滑映射")
+            LOG.info("玄司头发与衣摆持续摆动已启用 period=%.1fs", SWAY_PERIOD_SECONDS)
+        except Exception:
+            self._live2d_failed = True
+            self._live2d_model = None
+            self._live2d_module = None
+            LOG.exception("玄司 Live2D 加载失败，继续使用原 PNG 形象")
+
+    def _set_render_mode(self):
+        self._live2d_active = self._live2d_requested and self._live2d_model is not None
+        if self._live2d_active:
+            # 以原图轮廓作为系统窗口点击蒙版，透明画布仍能穿透桌面。
+            self.setMask(self.frames["idle"][0][1])
+            if self.isVisible():
+                self.render_clock.start()
+        else:
+            self.render_clock.stop()
+            self._shown_frame = None
+            self._frame_mask()
+        self.update()
+
+    def resizeGL(self, width, height):
+        if self._live2d_model is not None:
+            scale = self.devicePixelRatioF()
+            self._live2d_model.Resize(round(width * scale), round(height * scale))
+
+    def paintGL(self):
+        if self._live2d_active and self._live2d_model is not None:
+            live2d = self._live2d_module
+            live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
+            now = time.monotonic()
+            elapsed = max(0.0, min(0.1, now - self._last_render))
+            self._last_render = now
+            self._update_gaze(elapsed)
+            self._mouth_level += (self._mouth_target - self._mouth_level) * min(1.0, elapsed * 14.0)
+            model = self._live2d_model
+            if self.animation == "sleep":
+                model.SetParameterValue("ParamEyeLOpen", 0.0)
+                model.SetParameterValue("ParamEyeROpen", 0.0)
+                model.SetParameterValue("ParamMouthOpenY", 0.0)
+            else:
+                model.SetParameterValue("ParamEyeBallX", self._gaze_x)
+                model.SetParameterValue("ParamEyeBallY", self._gaze_y)
+                model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
+            self._update_sway(elapsed)
+            # 先设置当帧参数，再由 Cubism 计算网格变形并绘制。
+            model.Update()
+            model.Draw()
+            return
+        # Live2D 与 PNG 回退都由 QOpenGLWidget 的绘制流程显示。
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, self._pixmap())
+
+    def _update_sway(self, elapsed):
+        """复用当前绘制帧推进局部头发和衣摆参数，不创建额外计时器。"""
+        self._sway_phase = _advance_sway_phase(self._sway_phase, elapsed)
+        hair, cloth = _sway_parameters(self._sway_phase)
+        self._live2d_model.SetParameterValue("ParamHairBack", hair)
+        self._live2d_model.SetParameterValue("ParamBodyAngleX", cloth)
+
+    def _update_gaze(self, elapsed):
+        if self.animation == "sleep":
+            target_x, target_y = 0.0, 0.0
+        else:
+            cursor = QCursor.pos()
+            center = self.mapToGlobal(QPoint(self.width() // 2, round(self.height() * 0.38)))
+            # 固定使用桌宠所在屏幕，避免越过边缘时在多个屏幕的范围之间切换。
+            bounds = self.screen().geometry()
+            target_x = _gaze_axis(cursor.x(), center.x(), bounds.left(), bounds.right(), self.width() * 0.5)
+            # 屏幕 Y 轴向下，Live2D 眼球 Y 轴向上；临近边缘时保留最小过渡距离。
+            target_y = -_gaze_axis(cursor.y(), center.y(), bounds.top(), bounds.bottom(), self.height() * 0.3)
+        smoothing = min(1.0, elapsed * 9.0)
+        self._gaze_x += (target_x - self._gaze_x) * smoothing
+        self._gaze_y += (target_y - self._gaze_y) * smoothing
+
+    def _release_live2d(self):
+        if self._live2d_model is None or self._live2d_module is None:
+            return
+        self.makeCurrent()
+        try:
+            self._live2d_model.DestroyRenderer()
+            self._live2d_module.glRelease()
+            self._live2d_module.dispose()
+            LOG.info("玄司 Live2D 渲染资源已释放")
+        except Exception:
+            LOG.exception("玄司 Live2D 渲染资源释放失败")
+        finally:
+            self.doneCurrent()
+            self._live2d_model = None
+            self._live2d_module = None
+            self._live2d_active = False
 
     def _pixmap(self):
         frames = self.frames[self.animation]
@@ -109,6 +327,8 @@ class Avatar(QWidget):
 
     def _frame_mask(self):
         # 原生窗口形状只覆盖非透明像素，外围矩形不会挡住下面的程序。
+        if self._live2d_active:
+            return
         key = "idle" if self.native_animation else self.animation, self.frame % len(self.durations)
         if key == self._shown_frame:
             return
@@ -123,7 +343,6 @@ class Avatar(QWidget):
     def _tick(self):
         if not self.isVisible():
             return
-        self.frame += 1
         now = time.monotonic()
         if (
             self.follow
@@ -147,18 +366,20 @@ class Avatar(QWidget):
                 self.animation = "walk_right" if delta.x() > 0 else "walk_left"
             elif self.animation.startswith("walk"):
                 self.animation = "idle"
+        if self._live2d_active:
+            return
+        self.frame += 1
         self._frame_mask()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.drawPixmap(0, 0, self._pixmap())
 
     def showEvent(self, event):
         self.clock.start(self.durations[self.frame % len(self.durations)])
+        if self._live2d_active:
+            self.render_clock.start()
         super().showEvent(event)
 
     def hideEvent(self, event):
         self.clock.stop()
+        self.render_clock.stop()
         super().hideEvent(event)
 
     def mousePressEvent(self, event):

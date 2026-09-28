@@ -53,6 +53,7 @@ class DesktopPet(QObject):
 
     def _connect(self):
         self.avatar.open_requested.connect(self.open_panel)
+        self.runtime.mouth_level.connect(self.avatar.set_mouth_level)
         self.panel.send_requested.connect(self.send)
         self.panel.voice_requested.connect(self.voice)
         self.panel.look_requested.connect(self.look)

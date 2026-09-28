@@ -1,0 +1,45 @@
+# 玄司 Live2D 制作规格
+
+更新日期：2026-09-29。
+
+## 目标与实现
+
+在现有玄司桌宠中加入基础 Live2D 动态，同时保留原聊天、语音、记忆、透明窗口和自定义图片能力。用户选择使用原有玄司立绘，并授权用本机脚本拆层、组装 PSD。
+
+以 `assets/xuansi/front.png` 为源图制作 8 个绑定图层、PSD、可编辑 Cubism 工程和运行时模型。原 PNG 未修改，SHA256 为 `32d772af97c79d15d086a2895c58beec397d2667bedd4af53936b7cc12138d34`。模型以 Cubism 5.3.04 建立，导出目标为 SDK 5.0。
+
+## 运行时行为
+
+- 默认玄司加载 `assets/xuansi/rigging/xuansi.model3.json`；加载失败时回退原 PNG 动画，不阻断桌宠。
+- 双眼随机眨动，休眠时闭眼；眼球平滑跟随鼠标位置。
+- TTS 播放时，每 50 ms 取一段实际输出波形的 RMS 幅度驱动嘴部；音频停止、取消、静音或休眠时闭嘴。
+- 后发尾部和衣摆边缘按错开的 2.8 秒周期局部摆动；复用现有 30 FPS 绘制帧，不新增线程、定时器或物理模拟。
+- 用户导入的 PNG、JPG、BMP 和动图仍走原有自定义形象流程。
+- Live2D 绘制经 `QOpenGLWidget.paintGL` 完成；隐藏时停止刷新，继续使用透明无焦点窗口和原点击、拖动行为。
+
+## 可编辑文件与绑定参数
+
+- `assets/xuansi/rigging/xuansi-layers.psd`、`layers/*.png`：眼睛、嘴部、头部和身体的素材层。
+- `assets/xuansi/rigging/xuansi.cmo3`：Cubism 工程。
+- `assets/xuansi/rigging/xuansi.moc3`、`xuansi.model3.json`、`xuansi.cdi3.json`、`xuansi.1024/texture_00.png`：运行时模型、参数和纹理。
+- `ParamEyeBallX/Y`：鼠标视线；`ParamEyeLOpen/ROpen`：眨眼与睡眠闭眼；`ParamMouthOpenY`：语音响度口型；`ParamHairBack`：局部后发摆动；`ParamBodyAngleX`：局部衣摆摆动。
+
+单张立绘不足以还原全套角色结构。本版没有逐束发丝、衣物和手臂独立分层；头发与衣摆通过合并 ArtMesh 的局部网格关键形摆动，不是 Cubism 物理模拟。当前没有头部转动、身体呼吸或摄像头面捕；口型是响度驱动，不是音素级口型。绑定只针对当前 1024 × 1536 立绘坐标。
+
+## 验收记录
+
+- 用本机预览检查了中性、闭眼和张嘴状态；运行时模型成功加载，嘴部参数改变可见开口。
+- 检查了自动视线与睡眠状态；原始 PNG 哈希与拆层记录相符。
+- 2026-09-27 补充：原验收遗漏自动眨眼的连续播放；修复 `model3.json` 中缺失的 `EyeBlink` 参数组后，实际预览中的眼睛开合值覆盖 0 到 1，闭眼帧可见。转头、倾斜和呼吸参数虽列在模型中，但没有对应变形。
+- 2026-09-28 补充：将眼球关键形位移从水平 ±7/垂直 ±5 提高到 ±18/±10 原画布像素，并按桌宠所在屏幕的边界映射鼠标。160/384 像素高度下检查九个视线方向，中立渲染逐像素保持一致；单屏环境已运行，跨屏与混合 DPI 尚未实机验收。
+- 2026-09-29 补充：仅在后发和衣摆网格区域绑定独立摆动参数。Cubism 极值工程检查及运行时 OpenGL 预览覆盖中性、头发左右极值、衣摆左右极值；160/384 窗口下运动可见，原图、脸部、手臂和靴子保持稳定。数值单元测试验证周期、帧时间上限、参数幅度与参数写入。
+- `ruff`、Python 编译、应用 `--smoke` 启动冒烟和 PSD 复读检查通过；预览中确认嘴部参数可见地改变口型。
+- Live2D 运动定向测试及音频／运行时回归测试均通过；完整测试套件会在 v0.3.0 发布前再次运行。
+- Cubism Core 许可须与 `live2d-py` 原生扩展的发行边界一起核对；本仓库不复制 SDK 核心二进制。细节见 [第三方许可记录](THIRD_PARTY.md)。
+
+## 官方与上游参考
+
+- [Cubism 导出和版本选择](https://docs.live2d.com/en/cubism-editor-manual/target-version-selection/)
+- [Cubism Core 官方说明与许可入口](https://docs.live2d.com/cubism-sdk-manual/cubism-core/)
+- [live2d-py 上游说明](https://github.com/EasyLive2D/live2d-py)
+- [Qt `QOpenGLWidget` 官方文档](https://doc.qt.io/qt-6/qopenglwidget.html)

@@ -1,0 +1,91 @@
+{
+  "source_sha256": "32d772af97c79d15d086a2895c58beec397d2667bedd4af53936b7cc12138d34",
+  "size": [
+    1024,
+    1536
+  ],
+  "layers": [
+    {
+      "name": "Body",
+      "bounds": [
+        78,
+        735,
+        843,
+        1502
+      ],
+      "visible": true
+    },
+    {
+      "name": "HeadBase",
+      "bounds": [
+        99,
+        26,
+        1021,
+        1191
+      ],
+      "visible": true
+    },
+    {
+      "name": "EyeWhiteL",
+      "bounds": [
+        479,
+        536,
+        639,
+        642
+      ],
+      "visible": true
+    },
+    {
+      "name": "EyeBallL",
+      "bounds": [
+        510,
+        556,
+        591,
+        632
+      ],
+      "visible": true
+    },
+    {
+      "name": "EyeWhiteR",
+      "bounds": [
+        264,
+        563,
+        393,
+        661
+      ],
+      "visible": true
+    },
+    {
+      "name": "EyeBallR",
+      "bounds": [
+        297,
+        586,
+        373,
+        652
+      ],
+      "visible": true
+    },
+    {
+      "name": "MouthOpen",
+      "bounds": [
+        409,
+        667,
+        475,
+        724
+      ],
+      "visible": false
+    },
+    {
+      "name": "MouthClosed",
+      "bounds": [
+        409,
+        667,
+        475,
+        724
+      ],
+      "visible": true
+    }
+  ],
+  "repaired_alpha_pixels": 475,
+  "note": "分层素材来自原图；参数与关键形保存在 xuansi.cmo3 和 moc3，PSD 本身不含运行时绑定。"
+}

@@ -102,6 +102,7 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
                         ),
                         lambda: current() and runtime.should_speak(settings, kind),
                         lambda message: runtime.state.emit(epoch, message),
+                        runtime.mouth_level.emit,
                     )
                 )
             await speech.feed(part)

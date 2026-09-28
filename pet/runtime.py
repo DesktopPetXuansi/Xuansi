@@ -37,6 +37,8 @@ class Runtime(QObject):
     shutdown_done = Signal()
     devices_loaded = Signal(object)
     speech_changed = Signal()
+    # 用 TTS 播放响度驱动口型；麦克风输入不会触发此信号。
+    mouth_level = Signal(float)
 
     def __init__(self):
         super().__init__()
@@ -99,6 +101,7 @@ class Runtime(QObject):
             lambda: self.audio.synthesize(answer, settings.speaker, settings.speed, settings.tts_engine),
             lambda: epoch == self.epoch and self.speech_override is not False and observation_current(observation),
             lambda text: self.state.emit(epoch, text),
+            self.mouth_level.emit,
         )
 
     def should_speak(self, settings, kind="chat"):

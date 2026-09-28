@@ -1,0 +1,6 @@
+# Optional local tooling for rebuilding assets/xuansi/rigging/xuansi-layers.psd.
+attrs==26.1.0
+numpy==2.5.3
+Pillow==12.3.0
+psd-tools==1.19.0
+typing_extensions==4.16.0

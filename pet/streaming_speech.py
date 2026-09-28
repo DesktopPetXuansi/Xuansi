@@ -42,9 +42,10 @@ class SpeechChunks:
 
 
 class SpeechStream:
-    def __init__(self, activity, synthesize, current, state):
+    def __init__(self, activity, synthesize, current, state, mouth_level=None):
         self.activity, self.synthesize = activity, synthesize
         self.current, self.state = current, state
+        self.mouth_level = mouth_level
         self.chunks = SpeechChunks()
         self.texts = asyncio.Queue(maxsize=8)
         self.clips = asyncio.Queue(maxsize=1)
@@ -138,6 +139,7 @@ class SpeechStream:
                     *clip,
                     self._allowed,
                     lambda _: self.state("正在流式朗读…"),
+                    self.mouth_level,
                 )
                 if not played:
                     self._silence("本轮仅文字 · 流式朗读已停止")

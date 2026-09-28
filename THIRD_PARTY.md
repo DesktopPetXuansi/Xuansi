@@ -1,13 +1,13 @@
 # 第三方来源与许可范围
 
-核对日期：2026-09-14。本项目原创源代码及文档采用根目录 [Apache-2.0](LICENSE)，不改变第三方代码、模型、数据和图片各自的许可。以下记录来源与已发现的分发边界，不是商业安装包的完整许可审计。
+核对日期：2026-09-29。本项目原创源代码及文档采用根目录 [Apache-2.0](LICENSE)，不改变第三方代码、模型、数据和图片各自的许可。以下记录来源与已发现的分发边界，不是商业安装包的完整许可审计。
 
 ## 主要组件
 
 | 组件 | 来源与版本 | 许可及范围 |
 | --- | --- | --- |
 | 历史猫精灵、图标、动画定义 | [NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT，Copyright (c) 2026 Naudy Castellanos；原文保留于 [assets/neko/LICENSE](assets/neko/LICENSE)，当前默认形象不再加载。开发时的 `upstream-nekoai/` 副本不随本仓库发布 |
-| 当前玄司立绘与头像 | 用户角色参考图，经图像工具及授权的本机处理制作，见 [素材来源](assets/xuansi/README.md) | 用户明确要求保留版权，见 [单独声明](assets/xuansi/LICENSE)；不属于 Apache-2.0 或 NekoAI 的 MIT 范围 |
+| 当前玄司立绘、头像及 Live2D 派生素材 | 用户角色参考图，经图像工具及授权的本机处理制作，见 [素材来源](assets/xuansi/README.md) | 用户明确要求保留版权，见 [单独声明](assets/xuansi/LICENSE)；不属于 Apache-2.0 或 NekoAI 的 MIT 范围 |
 | 图文基础模型 | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | Apache-2.0；模型许可仍应随实际分发保留 |
 | GGUF 及视觉组件 | [unsloth/Qwen3.5-4B-GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF)，提交 `e87f176479d0855a907a41277aca2f8ee7a09523` | 上述模型的转换，按 HF LFS 摘要校验，不因格式转换获得新的无限制许可 |
 | 推理引擎 | [llama.cpp](https://github.com/ggml-org/llama.cpp)，b10930 Windows CUDA 12.4 | 引擎 MIT；随下载包提供的 CUDA 运行库另受 NVIDIA 条款约束，不能把整个二进制包统称 MIT |
@@ -18,6 +18,8 @@
 | Kokoro 语音处理资源 | 模型包的 `espeak-ng-data`，供当前 Kokoro 初始化使用 | [eSpeak NG 上游 COPYING](https://github.com/espeak-ng/espeak-ng/blob/master/COPYING) 为 GPL-3.0；具体数据文件、链接方式和实际二进制构建的分发义务需单独审计 |
 | 语音运行时 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)，1.13.8 | 主项目 Apache-2.0；依赖、转换权重和声音资源不因此自动采用相同许可 |
 | 界面与绑定 | [Qt for Python / PySide6](https://doc.qt.io/qtforpython-6/licenses.html)，6.11.2 Essentials；Shiboken6 | LGPL-3.0 / GPL-3.0 / 商业许可体系；当前从 pip 动态加载，分发需根据实际组件和方式满足相应义务 |
+| OpenGL Python 绑定 | [PyOpenGL](https://github.com/mcfletch/pyopengl)，3.1.10 | BSD 风格许可；保留对应上游版权和二进制分发声明 |
+| Live2D Python 封装 | [live2d-py](https://github.com/EasyLive2D/live2d-py)，0.8.0.9 | PyPI 元数据将 Python 包标为 MIT；Windows wheel 内含原生 `_v3cpp.pyd`。上游说明其源码仓库不含 Cubism Core/Framework，源码构建需自行从 Live2D 官方 SDK 获取；不要将 MIT 元数据误当作原生扩展内所有内容的独立许可 |
 | Windows 音频会话接口 | [pycaw](https://github.com/AndreMiras/pycaw)，20251023 | MIT；只使用查询和通知接口 |
 | Windows COM 桥接 | [comtypes](https://github.com/enthought/comtypes)，1.4.16 | MIT |
 
@@ -30,6 +32,12 @@
 Apache-2.0 允许满足其条款的商业使用及分发，也允许将原创代码用于闭源产品。相关复制、分发、修改标识、NOTICE 和专利条件以 [Apache 官方原文](https://www.apache.org/licenses/LICENSE-2.0) 为准。选择 Apache-2.0 也意味着其他人获得该许可授予的商业使用权；它不授予商标权。
 
 玄司图片按用户 2026-09-14 的明确选择单独保留版权。代码的商业许可不包含图片商业分发授权。使用者可通过软件形象菜单换成自己有相应权利的图片；向外分发产品时还需检查打包目录是否仍包含未获授权的默认图片。历史 NekoAI 素材保留原 MIT 声明，不改写为本项目原创。
+
+### Live2D SDK 核心
+
+本机安装的 `live2d-py` wheel 有 MIT 包元数据，但安装内容还含编译后的 `_v3cpp.pyd`。上游项目说明 Core 与 Framework 因许可限制不在其源码仓库内，并要求从 Live2D 官方站点取得 SDK；Live2D 官方也说明 Cubism Core 通过 SDK 包提供，适用 Proprietary Software License。当前仓库只含玄司模型工程与导出模型，没有复制该原生扩展或 Cubism Core 二进制；项目环境由 pip 按锁文件下载 wheel。该 wheel 中原生代码的组成与 Core 再分发依据没有单独列在 PyPI 元数据里，因此不能仅凭 MIT 字段确认整份 wheel 的许可范围。若制作离线安装包、再发布原生扩展，或用于需发行授权的商业产品，应先依据 [Live2D 官方 Core 说明](https://docs.live2d.com/cubism-sdk-manual/cubism-core/) 和 SDK 中的许可文件核实使用与再分发权限；本记录不代替许可确认。
+
+2026-09-29 补充：Live2D 当前 [SDK Release License 页面](https://www.live2d.com/en/sdk/license/) 说明，个人和小规模企业通常可免发行授权与费用，但“Expandable Applications”除外；AI／聊天机器人也须按应用类型判断适用方案。玄司的公开在线安装器不包含 Cubism Core 或 `live2d-py` 原生 wheel，安装时仍通过锁文件下载 `live2d-py`。本记录没有替 Live2D 判定玄司是否属于可豁免的应用，也没有对 wheel 内原生代码的来源和授权作出结论；如转为企业发行、商业化或离线捆绑，须先向 Live2D 核实适用许可。
 
 ### SenseVoice 模型
 
