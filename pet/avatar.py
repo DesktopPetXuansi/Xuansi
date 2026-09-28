@@ -26,6 +26,7 @@ LIVE2D_PARAMETERS = (
 SWAY_PERIOD_SECONDS = 2.8
 MAX_SWAY_FRAME_SECONDS = 0.1
 CLOTH_SWAY_PHASE_OFFSET = math.pi / 2
+LIVE2D_MASK_PADDING_RATIO = 0.03125
 PASSIVE = (
     Qt.WindowType.Tool
     | Qt.WindowType.FramelessWindowHint
@@ -50,6 +51,22 @@ def _advance_sway_phase(phase, elapsed):
 def _sway_parameters(phase):
     """生成错相的头发与衣摆值；两者范围匹配模型中的绑定参数。"""
     return math.sin(phase), 10.0 * math.sin(phase + CLOTH_SWAY_PHASE_OFFSET)
+
+
+def _expand_mask_region(region, padding):
+    """扩展 Live2D 点击区域，给模型移动后的抗锯齿发丝留出空间。"""
+    padding = max(0, int(padding))
+    if padding == 0 or region.isEmpty():
+        return region
+
+    horizontal = QRegion()
+    for offset in range(-padding, padding + 1):
+        horizontal = horizontal.united(region.translated(offset, 0))
+
+    expanded = QRegion()
+    for offset in range(-padding, padding + 1):
+        expanded = expanded.united(horizontal.translated(0, offset))
+    return expanded
 
 
 class Bubble(QLabel):
@@ -134,7 +151,7 @@ class Avatar(QOpenGLWidget):
         self.setFixedSize(self.frames["idle"][0][0].size())
         self._shown_frame = None
         if self._live2d_active:
-            self.setMask(self.frames["idle"][0][1])
+            self.setMask(self._live2d_window_mask())
         else:
             self._frame_mask()
         # 增大形象后仍完整留在当前工作区，不伸进任务栏或屏幕外。
@@ -231,6 +248,8 @@ class Avatar(QOpenGLWidget):
             LOG.info("玄司 Live2D 模型已加载 parameters=%s", len(parameter_ids))
             LOG.info("Live2D 视线跟随已启用：按桌宠所在屏幕范围平滑映射")
             LOG.info("玄司头发与衣摆持续摆动已启用 period=%.1fs", SWAY_PERIOD_SECONDS)
+            padding = max(2, round(self.height() * LIVE2D_MASK_PADDING_RATIO))
+            LOG.info("Live2D 发丝窗口边界缓冲已启用 padding=%dpx", padding)
         except Exception:
             self._live2d_failed = True
             self._live2d_model = None
@@ -240,8 +259,8 @@ class Avatar(QOpenGLWidget):
     def _set_render_mode(self):
         self._live2d_active = self._live2d_requested and self._live2d_model is not None
         if self._live2d_active:
-            # 以原图轮廓作为系统窗口点击蒙版，透明画布仍能穿透桌面。
-            self.setMask(self.frames["idle"][0][1])
+            # 小幅扩展系统窗口点击蒙版，避免裁切摆动后移出原图轮廓的发丝。
+            self.setMask(self._live2d_window_mask())
             if self.isVisible():
                 self.render_clock.start()
         else:
@@ -249,6 +268,11 @@ class Avatar(QOpenGLWidget):
             self._shown_frame = None
             self._frame_mask()
         self.update()
+
+    def _live2d_window_mask(self):
+        """按窗口高度扩展原图点击轮廓，避免高 DPI 或改尺寸后缓冲失衡。"""
+        padding = max(2, round(self.height() * LIVE2D_MASK_PADDING_RATIO))
+        return _expand_mask_region(self.frames["idle"][0][1], padding)
 
     def resizeGL(self, width, height):
         if self._live2d_model is not None:
