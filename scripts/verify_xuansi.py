@@ -76,7 +76,8 @@ def main():
             report["idle_blade_interrupt_fades"] = (
                 0.0 < avatar._idle_blade_effect.opacity() < 1.0
             )
-            QTest.qWait(120)
+            # 动画淡出需要 180ms；额外等待数帧，避免系统调度抖动造成假失败。
+            QTest.qWait(240)
             report["idle_blade_interrupt_restored"] = (
                 avatar._idle_blade_started is None
                 and not avatar._idle_blade_overlay.isVisible()

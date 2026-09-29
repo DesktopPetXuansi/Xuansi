@@ -31,7 +31,8 @@ LIVE2D_PARAMETERS = (
     *HAIR_SWAY_PARAMETER_IDS,
     "ParamBodyAngleX",
 )
-SWAY_PERIOD_SECONDS = 2.8
+HAIR_SWAY_PERIOD_SECONDS = 2.8
+CLOTH_SWAY_PERIOD_SECONDS = 4.2
 MAX_SWAY_FRAME_SECONDS = 0.1
 SWAY_INTEGRATION_STEP_SECONDS = 1 / 60
 CLOTH_SWAY_PHASE_OFFSET = math.pi / 2
@@ -63,10 +64,10 @@ def _gaze_axis(position, origin, low, high, minimum_span):
     return max(-1.0, min(1.0, distance / max(1.0, minimum_span, span)))
 
 
-def _advance_sway_phase(phase, elapsed):
-    """以有限步长推进连续摆动相位，避免卡顿后角色瞬间甩动。"""
+def _advance_sway_phase(phase, elapsed, period_seconds=HAIR_SWAY_PERIOD_SECONDS):
+    """按独立周期推进摆动相位，并限制单帧步长以避免卡顿后突然甩动。"""
     step = max(0.0, min(float(elapsed), MAX_SWAY_FRAME_SECONDS))
-    return (phase + math.tau * step / SWAY_PERIOD_SECONDS) % math.tau
+    return (phase + math.tau * step / period_seconds) % math.tau
 
 
 def _hair_wind_force(phase):
@@ -193,7 +194,8 @@ class Avatar(QOpenGLWidget):
         self._live2d_model = None
         self._mouth_target = 0.0
         self._mouth_level = 0.0
-        self._sway_phase = 0.0
+        self._hair_sway_phase = 0.0
+        self._cloth_sway_phase = 0.0
         self._hair_sway = HairSwayState()
         self._gaze_x = 0.0
         self._gaze_y = 0.0
@@ -341,8 +343,9 @@ class Avatar(QOpenGLWidget):
             LOG.info("玄司 Live2D 模型已加载 parameters=%s", len(parameter_ids))
             LOG.info("Live2D 视线跟随已启用：按桌宠所在屏幕范围平滑映射")
             LOG.info(
-                "玄司三段头发弹簧链与衣摆摆动已启用 period=%.1fs integration_hz=60",
-                SWAY_PERIOD_SECONDS,
+                "玄司发丝与衣摆独立摆动已启用 hair_period=%.1fs cloth_period=%.1fs integration_hz=60",
+                HAIR_SWAY_PERIOD_SECONDS,
+                CLOTH_SWAY_PERIOD_SECONDS,
             )
             padding = max(2, round(self.height() * LIVE2D_MASK_PADDING_RATIO))
             LOG.info("Live2D 发丝窗口边界缓冲已启用 padding=%dpx", padding)
@@ -505,11 +508,20 @@ class Avatar(QOpenGLWidget):
             self._idle_blade_overlay.raise_()
 
     def _update_sway(self, elapsed):
-        """在现有绘制帧推进三段头发弹簧链与衣摆，不创建额外计时器。"""
-        self._sway_phase = _advance_sway_phase(self._sway_phase, elapsed)
+        """以不同自然频率推进发丝与衣摆，不创建额外计时器。"""
+        self._hair_sway_phase = _advance_sway_phase(
+            self._hair_sway_phase,
+            elapsed,
+            HAIR_SWAY_PERIOD_SECONDS,
+        )
+        self._cloth_sway_phase = _advance_sway_phase(
+            self._cloth_sway_phase,
+            elapsed,
+            CLOTH_SWAY_PERIOD_SECONDS,
+        )
         self._hair_sway = _advance_hair_sway(
             self._hair_sway,
-            _hair_wind_force(self._sway_phase),
+            _hair_wind_force(self._hair_sway_phase),
             elapsed,
         )
         hair_values = (
@@ -521,7 +533,7 @@ class Avatar(QOpenGLWidget):
             self._live2d_model.SetParameterValue(parameter, value)
         self._live2d_model.SetParameterValue(
             "ParamBodyAngleX",
-            _cloth_sway_parameter(self._sway_phase),
+            _cloth_sway_parameter(self._cloth_sway_phase),
         )
 
     def _update_gaze(self, elapsed):

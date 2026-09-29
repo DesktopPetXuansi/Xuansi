@@ -7,9 +7,10 @@ from PySide6.QtCore import QPoint, QRect
 from PySide6.QtGui import QRegion
 
 from pet.avatar import (
+    CLOTH_SWAY_PERIOD_SECONDS,
     HAIR_SWAY_PARAMETER_IDS,
+    HAIR_SWAY_PERIOD_SECONDS,
     MAX_SWAY_FRAME_SECONDS,
-    SWAY_PERIOD_SECONDS,
     Avatar,
     HairSwayState,
     _advance_hair_sway,
@@ -22,12 +23,23 @@ from pet.avatar import (
 
 def test_sway_phase_advances_at_a_fixed_period():
     """按设定周期连续前进，并在完整周期后回到起点。"""
-    assert _advance_sway_phase(0.0, 0.1) == pytest.approx(math.tau * 0.1 / SWAY_PERIOD_SECONDS)
+    assert _advance_sway_phase(0.0, 0.1) == pytest.approx(
+        math.tau * 0.1 / HAIR_SWAY_PERIOD_SECONDS
+    )
 
     phase = 0.0
-    for _ in range(round(SWAY_PERIOD_SECONDS / MAX_SWAY_FRAME_SECONDS)):
+    for _ in range(round(HAIR_SWAY_PERIOD_SECONDS / MAX_SWAY_FRAME_SECONDS)):
         phase = _advance_sway_phase(phase, MAX_SWAY_FRAME_SECONDS)
     assert phase == pytest.approx(0.0)
+
+
+def test_clothing_uses_a_slower_frequency_than_hair():
+    """衣摆周期长于头发；等长时间推进时，衣摆相位变化更小。"""
+    hair_phase = _advance_sway_phase(0.0, 0.1, HAIR_SWAY_PERIOD_SECONDS)
+    cloth_phase = _advance_sway_phase(0.0, 0.1, CLOTH_SWAY_PERIOD_SECONDS)
+
+    assert CLOTH_SWAY_PERIOD_SECONDS > HAIR_SWAY_PERIOD_SECONDS
+    assert hair_phase > cloth_phase > 0.0
 
 
 def test_sway_phase_caps_slow_frames_and_ignores_negative_time():
@@ -104,12 +116,15 @@ def test_avatar_writes_both_sway_values_to_the_model():
         def __init__(self):
             """提供摆动更新所需的最小对象状态。"""
             self._live2d_model = RecordingModel()
-            self._sway_phase = 0.0
+            self._hair_sway_phase = 0.0
+            self._cloth_sway_phase = 0.0
             self._hair_sway = HairSwayState()
 
     avatar = SwayHarness()
     Avatar._update_sway(avatar, 0.1)
-    cloth = _cloth_sway_parameter(avatar._sway_phase)
+    cloth = _cloth_sway_parameter(avatar._cloth_sway_phase)
+    hair_phase = math.tau * 0.1 / HAIR_SWAY_PERIOD_SECONDS
+    cloth_phase = math.tau * 0.1 / CLOTH_SWAY_PERIOD_SECONDS
 
     expected = dict(
         zip(
@@ -120,6 +135,8 @@ def test_avatar_writes_both_sway_values_to_the_model():
     )
     expected["ParamBodyAngleX"] = pytest.approx(cloth)
     assert avatar._live2d_model.values == expected
+    assert avatar._hair_sway_phase == pytest.approx(hair_phase)
+    assert avatar._cloth_sway_phase == pytest.approx(cloth_phase)
 
 
 def test_expanded_window_mask_keeps_rendered_hair_inside_click_region():
