@@ -13,6 +13,7 @@ from .companion_ui import CompanionUI
 from .config import Settings, load_settings
 from .desktop import cursor_position, desktop_state, point_is_own_window
 from .events import MouseEvent, ObservationGate
+from .idle_action import IdleActionTimer
 from .mouse_monitor import MouseMonitor
 from .panel import Panel
 from .runtime import Runtime
@@ -33,6 +34,7 @@ class DesktopPet(QObject):
         self.runtime = Runtime()
         self.runtime.audio_activity.set_enabled(self.settings.audio_avoidance)
         self.runtime.audio_activity.start()
+        self.idle_action = IdleActionTimer()
         self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
         self.panel = Panel(self.settings)
@@ -76,6 +78,12 @@ class DesktopPet(QObject):
         self.runtime.voice_update.connect(self.on_voice_update)
         self.runtime.shutdown_done.connect(self.application.quit)
         self.monitor.event.connect(self.on_mouse)
+        self.monitor.activity.connect(self._on_system_activity)
+
+    def _on_system_activity(self):
+        """键鼠活动同时重置久置时间，并淡回实时 Live2D。"""
+        self.idle_action.record_input(time.monotonic())
+        self.avatar.interrupt_idle_blade()
 
     def open_panel(self):
         # 只有显式点击才显示并激活可输入窗口。
@@ -310,6 +318,7 @@ class DesktopPet(QObject):
         if available < 2 and not self.paused:
             self.toggle_sleep()
             self.panel.status.setText("可用内存偏低，已自动休眠")
+        self._update_idle_action(state, time.monotonic())
         if (
             not self.busy
             and not self.runtime.listening
@@ -321,6 +330,27 @@ class DesktopPet(QObject):
             f"仅本机处理 · 可用内存 {available:.1f} GB · 麦克风"
             + ("开启" if self.runtime.listening else "关闭")
         )
+
+    def _update_idle_action(self, state, now):
+        """仅在桌面可用且默认 Live2D 空闲时推进五分钟待机计时。"""
+        eligible = (
+            self.monitor.input_monitor_available
+            and self.avatar.supports_idle_blade
+            and self.avatar.animation == "idle"
+            and not self.paused
+            and not self.busy
+            and not self.fullscreen
+            and not state.fullscreen
+            and bool(state.hwnd)
+            and not self.runtime.listening
+        )
+        if not eligible:
+            self.idle_action.poll(now, eligible=False)
+            self.avatar.interrupt_idle_blade(fade=not self.paused and not self.fullscreen)
+            return
+
+        if self.idle_action.poll(now, eligible=True) and self.avatar.start_idle_blade():
+            LOG.info("系统连续空闲达到五分钟，开始玄司拔刀待机动作")
 
     def quit(self):
         self.resource_timer.stop()

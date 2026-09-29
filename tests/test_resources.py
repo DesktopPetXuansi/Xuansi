@@ -6,6 +6,7 @@ import pytest
 
 from pet.app import DesktopPet
 from pet.desktop import DesktopState
+from pet.idle_action import IdleActionTimer
 
 
 @pytest.mark.parametrize("state", [DesktopState(0, False, False), DesktopState(123, False, True)])
@@ -21,8 +22,15 @@ def test_unavailable_or_fullscreen_desktop_releases_model(monkeypatch, state):
         paused=False,
         busy=False,
         avatar=SimpleNamespace(
-            hide=lambda: hidden.append("pet"), bubble=SimpleNamespace(hide=lambda: hidden.append("bubble"))
+            hide=lambda: hidden.append("pet"),
+            bubble=SimpleNamespace(hide=lambda: hidden.append("bubble")),
+            supports_idle_blade=False,
+            animation="idle",
+            interrupt_idle_blade=lambda fade=True: None,
         ),
+        monitor=SimpleNamespace(input_monitor_available=False),
+        idle_action=IdleActionTimer(),
+        _update_idle_action=lambda _state, _now: None,
         voice=lambda enabled: actions.append(("voice", enabled)),
         runtime=SimpleNamespace(
             cancel=lambda release: actions.append(("release", release)),

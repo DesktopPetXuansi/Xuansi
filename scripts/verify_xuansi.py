@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pet.avatar import Avatar
 from pet.config import ROOT, Settings
 from pet.desktop import USER32
+from pet.idle_blade_animation import idle_blade_pose
 from pet.panel import Panel
 from pet.quick_chat import QuickChat
 
@@ -51,6 +52,78 @@ def main():
         focus = USER32.GetForegroundWindow()
         avatar.show()
         QTest.qWait(200)
+        report["idle_blade_assets_preloaded"] = len(avatar._idle_blade_frames) == 4
+        report["idle_blade_live2d_supported"] = avatar.supports_idle_blade
+        if avatar.start_idle_blade():
+            before = time.process_time()
+            started = time.perf_counter()
+            QTest.qWait(1450)
+            report["idle_blade_cpu_one_core_percent"] = round(
+                100 * (time.process_time() - before) / (time.perf_counter() - started),
+                2,
+            )
+            report["idle_blade_cache_megabytes"] = round(
+                sum(frame.width() * frame.height() * 4 for frame in avatar._idle_blade_frames) / 2**20,
+                2,
+            )
+            report["idle_blade_frame_at_160"] = idle_blade_pose(
+                time.monotonic() - avatar._idle_blade_started
+            )
+            avatar.grab().save(str(output / "xuansi-idle-blade-drawn-160.png"))
+            report["idle_blade_pose_rendered"] = avatar._idle_blade_started is not None
+            avatar.interrupt_idle_blade()
+            QTest.qWait(100)
+            report["idle_blade_interrupt_fades"] = (
+                0.0 < avatar._idle_blade_effect.opacity() < 1.0
+            )
+            QTest.qWait(120)
+            report["idle_blade_interrupt_restored"] = (
+                avatar._idle_blade_started is None
+                and not avatar._idle_blade_overlay.isVisible()
+                and avatar.mask() == avatar._live2d_window_mask()
+            )
+            avatar.set_size(288)
+            QTest.qWait(150)
+            if avatar.start_idle_blade():
+                visual_calls = []
+                original_visual = avatar._idle_blade_visual
+
+                def trace_visual(now):
+                    visual = original_visual(now)
+                    if visual is not None:
+                        visual_calls.append(visual[0])
+                    return visual
+
+                avatar._idle_blade_visual = trace_visual
+                QTest.qWait(1450)
+                elapsed = time.monotonic() - avatar._idle_blade_started
+                report["idle_blade_large_pose_frame"] = idle_blade_pose(elapsed)
+                report["idle_blade_large_visual_reached_renderer"] = bool(visual_calls)
+                report["idle_blade_last_rendered_pose"] = visual_calls[-1] if visual_calls else -1
+                avatar.grab().save(str(output / "xuansi-idle-blade-drawn-288.png"))
+                report["idle_blade_large_pose_rendered"] = avatar._idle_blade_started is not None
+                avatar._idle_blade_visual = original_visual
+                avatar.interrupt_idle_blade(fade=False)
+            else:
+                report["idle_blade_large_pose_rendered"] = False
+            avatar.set_size(160)
+            QTest.qWait(100)
+            avatar.start_idle_blade()
+            QTest.qWait(250)
+            report["idle_blade_visible_before_hide"] = avatar._idle_blade_overlay.isVisible()
+            avatar.hide()
+            report["idle_blade_hidden_immediately"] = (
+                avatar._idle_blade_started is None and avatar._idle_blade_overlay.isHidden()
+            )
+            avatar.show()
+            QTest.qWait(100)
+            report["idle_blade_stays_hidden_after_show"] = not avatar._idle_blade_overlay.isVisible()
+        else:
+            report["idle_blade_pose_rendered"] = False
+            report["idle_blade_interrupt_restored"] = False
+            report["idle_blade_visible_before_hide"] = False
+            report["idle_blade_hidden_immediately"] = False
+            report["idle_blade_stays_hidden_after_show"] = False
         avatar.bubble.present("玄司在这里。", avatar)
         QTest.qWait(200)
         report["avatar_and_bubble_preserve_focus"] = USER32.GetForegroundWindow() == focus

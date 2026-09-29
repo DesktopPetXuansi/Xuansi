@@ -9,9 +9,15 @@ from pathlib import Path
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QGuiApplication, QPainter, QRegion, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QGraphicsOpacityEffect, QLabel
 
 from .character_frames import build_frames
+from .idle_blade_animation import (
+    IDLE_BLADE_FADE_SECONDS,
+    idle_blade_opacity,
+    idle_blade_pose,
+    load_idle_blade_frames,
+)
 
 LOG = logging.getLogger(__name__)
 LIVE2D_MODEL = Path(__file__).resolve().parents[1] / "assets/xuansi/rigging/xuansi.model3.json"
@@ -191,6 +197,21 @@ class Avatar(QOpenGLWidget):
         self._hair_sway = HairSwayState()
         self._gaze_x = 0.0
         self._gaze_y = 0.0
+        self._idle_blade_frames = ()
+        self._idle_blade_mask = QRegion()
+        self._idle_blade_started = None
+        self._idle_blade_fade_out = None
+        self._idle_blade_visible_pose = None
+        self._idle_blade_visible_opacity = -1.0
+        self._idle_blade_overlay = QLabel(self)
+        self._idle_blade_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._idle_blade_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._idle_blade_overlay.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._idle_blade_overlay.setStyleSheet("background: transparent; border: none;")
+        self._idle_blade_effect = QGraphicsOpacityEffect(self._idle_blade_overlay)
+        self._idle_blade_effect.setOpacity(0.0)
+        self._idle_blade_overlay.setGraphicsEffect(self._idle_blade_effect)
+        self._idle_blade_overlay.hide()
         self._last_render = time.monotonic()
         self.drag_start = None
         self.move_start = None
@@ -212,8 +233,11 @@ class Avatar(QOpenGLWidget):
     def set_size(self, size):
         if self.frames and self.height() == size:
             return
+        self.interrupt_idle_blade(fade=False)
         self.frames, self.durations, self.native_animation = build_frames(size, self.image_id)
         self.setFixedSize(self.frames["idle"][0][0].size())
+        self._idle_blade_overlay.setGeometry(self.rect())
+        self._load_idle_blade_frames()
         self._shown_frame = None
         if self._live2d_active:
             self.setMask(self._live2d_window_mask())
@@ -227,6 +251,8 @@ class Avatar(QOpenGLWidget):
         )
 
     def set_animation(self, name):
+        if name != "idle":
+            self.interrupt_idle_blade()
         if name in self.frames and name != self.animation:
             self.animation = name
             if not self.native_animation:
@@ -250,11 +276,13 @@ class Avatar(QOpenGLWidget):
     def set_image(self, identifier, force=False):
         if identifier == self.image_id and not force:
             return
+        self.interrupt_idle_blade(fade=False)
         # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
         frames, durations, native = build_frames(self.height(), identifier)
         self.image_id, self.frames, self.durations = identifier, frames, durations
         self.native_animation, self.frame = native, 0
         self._live2d_requested = not bool(identifier)
+        self._load_idle_blade_frames()
         self._shown_frame = None
         if self._live2d_requested and self._live2d_ready:
             self.makeCurrent()
@@ -350,7 +378,6 @@ class Avatar(QOpenGLWidget):
     def paintGL(self):
         if self._live2d_active and self._live2d_model is not None:
             live2d = self._live2d_module
-            live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
             now = time.monotonic()
             elapsed = max(0.0, min(0.1, now - self._last_render))
             self._last_render = now
@@ -367,12 +394,115 @@ class Avatar(QOpenGLWidget):
                 model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
             self._update_sway(elapsed)
             # 先设置当帧参数，再由 Cubism 计算网格变形并绘制。
+            overlay = self._idle_blade_visual(now)
+            live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
             model.Update()
             model.Draw()
+            self._present_idle_blade(overlay)
             return
         # Live2D 与 PNG 回退都由 QOpenGLWidget 的绘制流程显示。
         painter = QPainter(self)
         painter.drawPixmap(0, 0, self._pixmap())
+
+    @property
+    def supports_idle_blade(self):
+        """只有默认 Live2D 模型和完整透明动作帧才允许播放。"""
+        return bool(self._live2d_active and self._live2d_model is not None and self._idle_blade_frames)
+
+    def _load_idle_blade_frames(self):
+        """按当前桌宠尺寸预缩放动作帧，避免空闲动画中途读盘或解码。"""
+        if not self._live2d_requested:
+            self._idle_blade_frames = ()
+            self._idle_blade_mask = QRegion()
+            return
+        try:
+            self._idle_blade_frames, self._idle_blade_mask = load_idle_blade_frames(self.width(), self.height())
+            padding = max(2, round(self.height() * 0.01))
+            self._idle_blade_mask = _expand_mask_region(self._idle_blade_mask, padding)
+        except (OSError, ValueError):
+            self._idle_blade_frames = ()
+            self._idle_blade_mask = QRegion()
+            LOG.exception("玄司久置拔刀素材不可用，已禁用该待机动作")
+
+    def start_idle_blade(self):
+        """进入一次透明关键帧演出，Live2D 模型仍在底层正常更新。"""
+        if not self.supports_idle_blade or self._idle_blade_started is not None:
+            return False
+        self._idle_blade_fade_out = None
+        self._idle_blade_started = time.monotonic()
+        self.setMask(self._idle_blade_mask)
+        self.update()
+        LOG.info("玄司久置待机拔刀动作开始")
+        return True
+
+    def interrupt_idle_blade(self, fade=True):
+        """中断拔刀动作；用户仍在操作时短暂淡回实时 Live2D。"""
+        if self._idle_blade_started is None:
+            if not fade and self._idle_blade_fade_out is not None:
+                self._idle_blade_fade_out = None
+                if self._live2d_active:
+                    self.setMask(self._live2d_window_mask())
+                self._present_idle_blade(None)
+            return
+
+        now = time.monotonic()
+        elapsed = now - self._idle_blade_started
+        pose = idle_blade_pose(elapsed)
+        opacity = idle_blade_opacity(elapsed)
+        self._idle_blade_started = None
+        if fade and pose is not None and opacity > 0.0:
+            self._idle_blade_fade_out = (pose, opacity, now)
+        else:
+            self._idle_blade_fade_out = None
+            if self._live2d_active:
+                self.setMask(self._live2d_window_mask())
+            self._present_idle_blade(None)
+        LOG.info("玄司久置待机拔刀动作已中断")
+        self.update()
+
+    def _idle_blade_visual(self, now):
+        """返回当前预缓存姿态和透明度；每帧不访问磁盘或输出日志。"""
+        pose, opacity = None, 0.0
+        if self._idle_blade_started is not None:
+            elapsed = now - self._idle_blade_started
+            pose = idle_blade_pose(elapsed)
+            opacity = idle_blade_opacity(elapsed)
+            if pose is None:
+                self._idle_blade_started = None
+                if self._live2d_active:
+                    self.setMask(self._live2d_window_mask())
+                LOG.info("玄司久置待机拔刀动作结束")
+        elif self._idle_blade_fade_out is not None:
+            pose, initial_opacity, started = self._idle_blade_fade_out
+            opacity = initial_opacity * max(0.0, 1.0 - (now - started) / IDLE_BLADE_FADE_SECONDS)
+            if opacity <= 0.0:
+                self._idle_blade_fade_out = None
+                self.setMask(self._live2d_window_mask())
+                return None
+
+        if pose is None or opacity <= 0.0:
+            return None
+        return pose, opacity
+
+    def _present_idle_blade(self, visual):
+        """用透明子控件覆盖 GL 帧缓冲，避免在 Cubism 绘制后混用 OpenGL 状态。"""
+        if visual is None:
+            if not self._idle_blade_overlay.isHidden():
+                self._idle_blade_overlay.hide()
+            self._idle_blade_visible_pose = None
+            self._idle_blade_visible_opacity = -1.0
+            return
+
+        pose, opacity = visual
+        if pose != self._idle_blade_visible_pose:
+            self._idle_blade_overlay.setPixmap(self._idle_blade_frames[pose])
+            self._idle_blade_visible_pose = pose
+        if abs(opacity - self._idle_blade_visible_opacity) >= 0.01:
+            self._idle_blade_effect.setOpacity(opacity)
+            self._idle_blade_visible_opacity = opacity
+        if not self._idle_blade_overlay.isVisible():
+            self._idle_blade_overlay.show()
+            self._idle_blade_overlay.raise_()
 
     def _update_sway(self, elapsed):
         """在现有绘制帧推进三段头发弹簧链与衣摆，不创建额外计时器。"""
@@ -483,6 +613,7 @@ class Avatar(QOpenGLWidget):
         super().showEvent(event)
 
     def hideEvent(self, event):
+        self.interrupt_idle_blade(fade=False)
         self.clock.stop()
         self.render_clock.stop()
         super().hideEvent(event)
