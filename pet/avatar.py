@@ -3,6 +3,7 @@
 import logging
 import math
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
@@ -14,17 +15,19 @@ from .character_frames import build_frames
 
 LOG = logging.getLogger(__name__)
 LIVE2D_MODEL = Path(__file__).resolve().parents[1] / "assets/xuansi/rigging/xuansi.model3.json"
+HAIR_SWAY_PARAMETER_IDS = ("ParamHairFront", "ParamHairSide", "ParamHairBack")
 LIVE2D_PARAMETERS = (
     "ParamEyeBallX",
     "ParamEyeBallY",
     "ParamEyeLOpen",
     "ParamEyeROpen",
     "ParamMouthOpenY",
-    "ParamHairBack",
+    *HAIR_SWAY_PARAMETER_IDS,
     "ParamBodyAngleX",
 )
 SWAY_PERIOD_SECONDS = 2.8
 MAX_SWAY_FRAME_SECONDS = 0.1
+SWAY_INTEGRATION_STEP_SECONDS = 1 / 60
 CLOTH_SWAY_PHASE_OFFSET = math.pi / 2
 LIVE2D_MASK_PADDING_RATIO = 0.03125
 PASSIVE = (
@@ -33,6 +36,18 @@ PASSIVE = (
     | Qt.WindowType.WindowStaysOnTopHint
     | Qt.WindowType.WindowDoesNotAcceptFocus
 )
+
+
+@dataclass(frozen=True, slots=True)
+class HairSwayState:
+    """保存发根、发中、发梢的位移与速度，供连续的轻量弹簧链使用。"""
+
+    root: float = 0.0
+    middle: float = 0.0
+    tip: float = 0.0
+    root_velocity: float = 0.0
+    middle_velocity: float = 0.0
+    tip_velocity: float = 0.0
 
 
 def _gaze_axis(position, origin, low, high, minimum_span):
@@ -48,9 +63,58 @@ def _advance_sway_phase(phase, elapsed):
     return (phase + math.tau * step / SWAY_PERIOD_SECONDS) % math.tau
 
 
-def _sway_parameters(phase):
-    """生成错相的头发与衣摆值；两者范围匹配模型中的绑定参数。"""
-    return math.sin(phase), 10.0 * math.sin(phase + CLOTH_SWAY_PHASE_OFFSET)
+def _hair_wind_force(phase):
+    """用两个低频分量形成持续但不完全匀速的轻风驱动。"""
+    return math.sin(phase) + 0.13 * math.sin(2.0 * phase + 0.9)
+
+
+def _cloth_sway_parameter(phase):
+    """衣摆保持原有周期和参数范围，继续与头发错相运动。"""
+    return 10.0 * math.sin(phase + CLOTH_SWAY_PHASE_OFFSET)
+
+
+def _advance_spring_component(position, velocity, target, elapsed, stiffness, damping):
+    """以半隐式欧拉推进单段弹簧；小步积分保持桌宠绘制帧稳定。"""
+    acceleration = (target - position) * stiffness - velocity * damping
+    velocity += acceleration * elapsed
+    position += velocity * elapsed
+    return position, velocity
+
+
+def _advance_hair_sway(state, wind_force, elapsed):
+    """逐段推进带阻尼的三段发束，越靠近发梢越晚跟随、位移越大。"""
+    step = max(0.0, min(float(elapsed), MAX_SWAY_FRAME_SECONDS))
+    if step == 0.0:
+        return state
+
+    substeps = math.ceil(step / SWAY_INTEGRATION_STEP_SECONDS)
+    substep = step / substeps
+    root, middle, tip = state.root, state.middle, state.tip
+    root_velocity = state.root_velocity
+    middle_velocity = state.middle_velocity
+    tip_velocity = state.tip_velocity
+
+    for _ in range(substeps):
+        root, root_velocity = _advance_spring_component(
+            root, root_velocity, wind_force * 0.10, substep, 30.0, 10.0
+        )
+        middle_target = root + wind_force * 0.22
+        middle, middle_velocity = _advance_spring_component(
+            middle, middle_velocity, middle_target, substep, 18.0, 7.0
+        )
+        tip_target = middle + wind_force * 0.45
+        tip, tip_velocity = _advance_spring_component(
+            tip, tip_velocity, tip_target, substep, 12.0, 5.0
+        )
+
+    return HairSwayState(
+        root=max(-1.0, min(1.0, root)),
+        middle=max(-1.0, min(1.0, middle)),
+        tip=max(-1.0, min(1.0, tip)),
+        root_velocity=root_velocity,
+        middle_velocity=middle_velocity,
+        tip_velocity=tip_velocity,
+    )
 
 
 def _expand_mask_region(region, padding):
@@ -124,6 +188,7 @@ class Avatar(QOpenGLWidget):
         self._mouth_target = 0.0
         self._mouth_level = 0.0
         self._sway_phase = 0.0
+        self._hair_sway = HairSwayState()
         self._gaze_x = 0.0
         self._gaze_y = 0.0
         self._last_render = time.monotonic()
@@ -247,7 +312,10 @@ class Avatar(QOpenGLWidget):
             self._last_render = time.monotonic()
             LOG.info("玄司 Live2D 模型已加载 parameters=%s", len(parameter_ids))
             LOG.info("Live2D 视线跟随已启用：按桌宠所在屏幕范围平滑映射")
-            LOG.info("玄司头发与衣摆持续摆动已启用 period=%.1fs", SWAY_PERIOD_SECONDS)
+            LOG.info(
+                "玄司三段头发弹簧链与衣摆摆动已启用 period=%.1fs integration_hz=60",
+                SWAY_PERIOD_SECONDS,
+            )
             padding = max(2, round(self.height() * LIVE2D_MASK_PADDING_RATIO))
             LOG.info("Live2D 发丝窗口边界缓冲已启用 padding=%dpx", padding)
         except Exception:
@@ -307,11 +375,24 @@ class Avatar(QOpenGLWidget):
         painter.drawPixmap(0, 0, self._pixmap())
 
     def _update_sway(self, elapsed):
-        """复用当前绘制帧推进局部头发和衣摆参数，不创建额外计时器。"""
+        """在现有绘制帧推进三段头发弹簧链与衣摆，不创建额外计时器。"""
         self._sway_phase = _advance_sway_phase(self._sway_phase, elapsed)
-        hair, cloth = _sway_parameters(self._sway_phase)
-        self._live2d_model.SetParameterValue("ParamHairBack", hair)
-        self._live2d_model.SetParameterValue("ParamBodyAngleX", cloth)
+        self._hair_sway = _advance_hair_sway(
+            self._hair_sway,
+            _hair_wind_force(self._sway_phase),
+            elapsed,
+        )
+        hair_values = (
+            self._hair_sway.root,
+            self._hair_sway.middle,
+            self._hair_sway.tip,
+        )
+        for parameter, value in zip(HAIR_SWAY_PARAMETER_IDS, hair_values, strict=True):
+            self._live2d_model.SetParameterValue(parameter, value)
+        self._live2d_model.SetParameterValue(
+            "ParamBodyAngleX",
+            _cloth_sway_parameter(self._sway_phase),
+        )
 
     def _update_gaze(self, elapsed):
         if self.animation == "sleep":

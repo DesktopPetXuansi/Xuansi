@@ -7,12 +7,16 @@ from PySide6.QtCore import QPoint, QRect
 from PySide6.QtGui import QRegion
 
 from pet.avatar import (
+    HAIR_SWAY_PARAMETER_IDS,
     MAX_SWAY_FRAME_SECONDS,
     SWAY_PERIOD_SECONDS,
     Avatar,
+    HairSwayState,
+    _advance_hair_sway,
     _advance_sway_phase,
+    _cloth_sway_parameter,
     _expand_mask_region,
-    _sway_parameters,
+    _hair_wind_force,
 )
 
 
@@ -33,16 +37,55 @@ def test_sway_phase_caps_slow_frames_and_ignores_negative_time():
     assert _advance_sway_phase(0.25, -1.0) == pytest.approx(0.25)
 
 
-def test_sway_parameters_are_bounded_and_out_of_phase():
-    """头发使用归一化幅度，衣摆使用模型参数范围并错相运动。"""
-    for phase in (0.0, math.pi / 2, math.pi, math.tau):
-        hair, cloth = _sway_parameters(phase)
-        assert -1.0 <= hair <= 1.0
-        assert -10.0 <= cloth <= 10.0
+def test_hair_spring_chain_delays_and_amplifies_motion_toward_the_tips():
+    """发根先动、发中跟随、发梢滞后且振幅逐段增加。"""
+    state = HairSwayState()
+    samples = []
+    phase = 0.0
 
-    hair, cloth = _sway_parameters(0.0)
-    assert hair == pytest.approx(0.0)
-    assert cloth > 0.0
+    for frame in range(300):
+        phase = _advance_sway_phase(phase, 1 / 30)
+        state = _advance_hair_sway(state, _hair_wind_force(phase), 1 / 30)
+        if frame >= 216:
+            samples.append((state.root, state.middle, state.tip))
+
+    peak_amplitudes = [max(abs(sample[index]) for sample in samples) for index in range(3)]
+    peak_frames = [max(range(len(samples)), key=lambda frame: samples[frame][index]) for index in range(3)]
+    assert peak_amplitudes[0] < peak_amplitudes[1] < peak_amplitudes[2] <= 1.0
+    assert peak_frames[0] < peak_frames[1] < peak_frames[2]
+
+
+def test_hair_spring_chain_returns_to_neutral_after_the_sway_stops():
+    """风力停止后，三段发束靠阻尼逐渐回到中立位置。"""
+    state = HairSwayState()
+    for _ in range(90):
+        state = _advance_hair_sway(state, 1.0, 1 / 30)
+    peak_tip = abs(state.tip)
+
+    for _ in range(90):
+        state = _advance_hair_sway(state, 0.0, 1 / 30)
+
+    assert peak_tip > 0.1
+    assert abs(state.tip) < peak_tip * 0.1
+    assert abs(state.tip_velocity) < 0.1
+
+
+def test_hair_spring_chain_caps_stalled_frames_and_ignores_negative_time():
+    """长卡顿最多推进 100 毫秒，负时间不改变头发状态。"""
+    initial = HairSwayState(root=0.1, middle=0.2, tip=0.3)
+
+    assert _advance_hair_sway(initial, 0.5, -1.0) == initial
+    assert _advance_hair_sway(initial, 0.5, 5.0) == _advance_hair_sway(
+        initial, 0.5, MAX_SWAY_FRAME_SECONDS
+    )
+
+
+def test_cloth_sway_stays_bounded_and_out_of_phase():
+    """衣摆仍使用模型参数范围，并与头发主驱动错相。"""
+    for phase in (0.0, math.pi / 2, math.pi, math.tau):
+        assert -10.0 <= _cloth_sway_parameter(phase) <= 10.0
+
+    assert _cloth_sway_parameter(0.0) > 0.0
 
 
 def test_avatar_writes_both_sway_values_to_the_model():
@@ -62,15 +105,21 @@ def test_avatar_writes_both_sway_values_to_the_model():
             """提供摆动更新所需的最小对象状态。"""
             self._live2d_model = RecordingModel()
             self._sway_phase = 0.0
+            self._hair_sway = HairSwayState()
 
     avatar = SwayHarness()
     Avatar._update_sway(avatar, 0.1)
-    hair, cloth = _sway_parameters(avatar._sway_phase)
+    cloth = _cloth_sway_parameter(avatar._sway_phase)
 
-    assert avatar._live2d_model.values == {
-        "ParamHairBack": pytest.approx(hair),
-        "ParamBodyAngleX": pytest.approx(cloth),
-    }
+    expected = dict(
+        zip(
+            HAIR_SWAY_PARAMETER_IDS,
+            (avatar._hair_sway.root, avatar._hair_sway.middle, avatar._hair_sway.tip),
+            strict=True,
+        )
+    )
+    expected["ParamBodyAngleX"] = pytest.approx(cloth)
+    assert avatar._live2d_model.values == expected
 
 
 def test_expanded_window_mask_keeps_rendered_hair_inside_click_region():
