@@ -17,7 +17,7 @@ import httpx
 
 from .config import ROOT, Settings
 from .process_guard import ProcessGuard
-from .speech_control import SPEECH_GRAMMAR, SpeechDirective, speech_prompt
+from .speech_control import DEFAULT_ACTION_IDS, SpeechDirective, speech_grammar, speech_prompt
 from .text_stream import read_completion
 
 LOG = logging.getLogger(__name__)
@@ -163,10 +163,12 @@ class LocalEngine:
         try:
             directive = SpeechDirective(on_speech) if on_speech is not None else None
             if directive is not None:
-                # 控制提示和头部 token 一起进入上下文预算，不额外调用一次分类模型。
+                # 动作能力和控制头随本轮对话传入，不额外调用分类模型。
+                available_motions = getattr(on_speech, "available_motions", DEFAULT_ACTION_IDS)
                 settings = replace(
-                    settings, system_prompt=settings.system_prompt + speech_prompt(speech_enabled),
-                    max_tokens=settings.max_tokens + 16,
+                    settings,
+                    system_prompt=settings.system_prompt + speech_prompt(speech_enabled, available_motions),
+                    max_tokens=settings.max_tokens + 32,
                 )
             history = await self._fit_history(settings, text, bool(images), history)
             payload = {
@@ -179,7 +181,7 @@ class LocalEngine:
                 "chat_template_kwargs": {"enable_thinking": False},
             }
             if directive is not None:
-                payload["grammar"] = SPEECH_GRAMMAR
+                payload["grammar"] = speech_grammar(available_motions)
             if on_chunk is not None:
                 first = True
 

@@ -56,6 +56,8 @@ class DesktopPet(QObject):
     def _connect(self):
         self.avatar.open_requested.connect(self.open_panel)
         self.runtime.mouth_level.connect(self.avatar.set_mouth_level)
+        self.runtime.motion_requested.connect(self._execute_motion)
+        self.avatar.motion_capabilities_changed.connect(self.runtime.set_motion_actions)
         self.panel.send_requested.connect(self.send)
         self.panel.voice_requested.connect(self.voice)
         self.panel.look_requested.connect(self.look)
@@ -84,6 +86,7 @@ class DesktopPet(QObject):
         """键鼠活动同时重置久置时间，并淡回实时 Live2D。"""
         self.idle_action.record_input(time.monotonic())
         self.avatar.interrupt_idle_blade()
+        self.avatar.cancel_motion()
 
     def open_panel(self):
         # 只有显式点击才显示并激活可输入窗口。
@@ -94,8 +97,15 @@ class DesktopPet(QObject):
     def _begin(self):
         if self.paused:
             self.toggle_sleep()
+        self.avatar.cancel_motion()
         self.busy = True
         self.avatar.set_animation("thinking")
+
+    def _execute_motion(self, epoch, motion):
+        """Qt 将后台决策排入界面线程后，再校验代次和桌宠状态。"""
+        if epoch != self.runtime.epoch or self.paused or self.fullscreen or not self.avatar.isVisible():
+            return
+        self.avatar.play_motion(motion)
 
     def send(self, text, with_screen=False):
         self._begin()

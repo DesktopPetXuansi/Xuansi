@@ -39,12 +39,14 @@ class Runtime(QObject):
     speech_changed = Signal()
     # 用 TTS 播放响度驱动口型；麦克风输入不会触发此信号。
     mouth_level = Signal(float)
+    motion_requested = Signal(int, str)
 
     def __init__(self):
         super().__init__()
         self.epoch = 0
         self.listening = False
         self.speech_override: bool | None = None
+        self.motion_actions: tuple[str, ...] = ()
         self.microphone_epoch = 0
         self.engine = LocalEngine()
         self.audio = AudioModels()
@@ -118,6 +120,14 @@ class Runtime(QObject):
             sd.stop()
         self.speech_changed.emit()
         LOG.info("本次运行朗读开关 enabled=%s", enabled)
+
+    def set_motion_actions(self, actions: tuple[str, ...]):
+        """由界面线程更新模型当前确有原生绑定的动作白名单。"""
+        actions = tuple(actions)
+        if actions == self.motion_actions:
+            return
+        self.motion_actions = actions
+        LOG.info("当前 Live2D 可用动作=%s", ",".join(self.motion_actions) or "无")
 
     def accept_voice(self, mic_epoch, update, settings, position=None):
         return self.schedule(self.live.accept(mic_epoch, update, settings, position))

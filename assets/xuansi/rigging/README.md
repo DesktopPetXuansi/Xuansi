@@ -36,4 +36,6 @@
 
 本模型是原单图拆出的基础绑定：没有逐束发丝、手臂和衣物独立图层；头发与衣摆使用现有 ArtMesh 的局部网格变形，不是逐束头发或 Cubism 物理模拟。没有头部转动、身体呼吸或摄像头面捕。张嘴补绘和脸部局部透明修复可能不与原图逐像素相同；原始 `front.png` 保持原样。`scripts/prepare_xuansi_live2d.py` 仅针对原图 1024 × 1536 的坐标，尺寸或立绘变化后需重新校准。要重建 PSD，请在项目环境安装 `requirements-rigging.lock.txt` 后运行该脚本；此可选依赖不用于桌宠运行。
 
+2026-09-29 动作控制接入：对话模型与朗读控制共用同一轮受限控制头，当前只公布已绑定的 `blink`。本工程尚无 `ParamArmRA` 和手臂关键形，因此 `raise_hand` 未开放；需先拆分画面左侧（角色右臂）素材、补齐被遮挡的躯干，再在 Cubism Editor 中建立并检查中立/抬手关键形，导出 SDK 5.0 目标模型后才能启用。
+
 Editor 使用 Cubism 5.3.04，模型目标版本选为 SDK 5.0，使当前绑定数据能被锁定的运行时加载。更换导出目标前，需按 [Cubism 官方目标版本说明](https://docs.live2d.com/en/cubism-editor-manual/target-version-selection/) 和运行时兼容性重新验证。工程与运行时模型均保留在本目录；构建应用前还需核对运行库中 Cubism Core 的适用许可，详见根目录 [第三方许可记录](../../../THIRD_PARTY.md)。

@@ -11,6 +11,7 @@ from mss.exception import ScreenShotError
 
 from .desktop import capture_screen, observation_current
 from .memory import durable_io
+from .speech_control import ControlCallbacks
 from .streaming_speech import SpeechStream
 
 LOG = logging.getLogger(__name__)
@@ -88,6 +89,16 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
             if current():
                 runtime.set_speech_enabled(enabled)
 
+        def dispatch_motion(motion):
+            if current():
+                runtime.motion_requested.emit(epoch, motion)
+
+        controls = ControlCallbacks(
+            change_speech,
+            dispatch_motion,
+            runtime.motion_actions,
+        )
+
         async def deliver(part):
             nonlocal speech
             if not current() or not runtime.should_speak(settings, kind):
@@ -111,7 +122,7 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
         if kind != "observation":
             answer = await runtime.engine.chat(
                 settings, text, images, runtime.history, on_chunk=deliver,
-                on_speech=change_speech, speech_enabled=runtime.should_speak(settings),
+                on_speech=controls, speech_enabled=runtime.should_speak(settings),
             )
         else:
             answer = await runtime.engine.chat(settings, text, images, [])

@@ -37,6 +37,14 @@ MAX_SWAY_FRAME_SECONDS = 0.1
 SWAY_INTEGRATION_STEP_SECONDS = 1 / 60
 CLOTH_SWAY_PHASE_OFFSET = math.pi / 2
 LIVE2D_MASK_PADDING_RATIO = 0.03125
+BLINK_CLOSE_SECONDS = 0.075
+BLINK_HOLD_SECONDS = 0.025
+BLINK_OPEN_SECONDS = 0.12
+ARM_RAISE_VALUE = 30.0
+ARM_RAISE_SECONDS = 0.45
+ARM_HOLD_SECONDS = 0.7
+# 只有在 CMO3 中建立并验收原生手臂关键形后才启用这项能力。
+ARM_RAISE_BINDING_VERIFIED = False
 PASSIVE = (
     Qt.WindowType.Tool
     | Qt.WindowType.FramelessWindowHint
@@ -78,6 +86,12 @@ def _hair_wind_force(phase):
 def _cloth_sway_parameter(phase):
     """衣摆保持原有周期和参数范围，继续与头发错相运动。"""
     return 10.0 * math.sin(phase + CLOTH_SWAY_PHASE_OFFSET)
+
+
+def _smoothstep(value):
+    """动作关键阶段使用平滑插值，避免眨眼和抬手突然跳变。"""
+    value = max(0.0, min(1.0, value))
+    return value * value * (3.0 - 2.0 * value)
 
 
 def _advance_spring_component(position, velocity, target, elapsed, stiffness, damping):
@@ -168,6 +182,7 @@ class Bubble(QLabel):
 
 class Avatar(QOpenGLWidget):
     open_requested = Signal()
+    motion_capabilities_changed = Signal(object)
 
     def __init__(self, size=160, image_id=""):
         super().__init__(None, PASSIVE)
@@ -192,6 +207,10 @@ class Avatar(QOpenGLWidget):
         self._live2d_ready = False
         self._live2d_module = None
         self._live2d_model = None
+        self._live2d_parameter_ids = frozenset()
+        self._motion_capabilities = ()
+        self._motion_name = None
+        self._motion_started = None
         self._mouth_target = 0.0
         self._mouth_level = 0.0
         self._hair_sway_phase = 0.0
@@ -255,6 +274,8 @@ class Avatar(QOpenGLWidget):
     def set_animation(self, name):
         if name != "idle":
             self.interrupt_idle_blade()
+        if name == "sleep":
+            self.cancel_motion()
         if name in self.frames and name != self.animation:
             self.animation = name
             if not self.native_animation:
@@ -263,13 +284,13 @@ class Avatar(QOpenGLWidget):
             model = self._live2d_model
             if model is not None:
                 sleeping = self.animation == "sleep"
-                model.SetAutoBlinkEnable(not sleeping)
-                if not sleeping:
-                    model.SetParameterValue("ParamEyeLOpen", 1.0)
-                    model.SetParameterValue("ParamEyeROpen", 1.0)
-                else:
+                model.SetAutoBlinkEnable(not sleeping and self._motion_name != "blink")
+                if sleeping:
                     model.SetParameterValue("ParamEyeLOpen", 0.0)
                     model.SetParameterValue("ParamEyeROpen", 0.0)
+                elif self._motion_name != "blink":
+                    model.SetParameterValue("ParamEyeLOpen", 1.0)
+                    model.SetParameterValue("ParamEyeROpen", 1.0)
             self._mouth_target = 0.0
             self.update()
             return
@@ -278,6 +299,7 @@ class Avatar(QOpenGLWidget):
     def set_image(self, identifier, force=False):
         if identifier == self.image_id and not force:
             return
+        self.cancel_motion()
         self.interrupt_idle_blade(fade=False)
         # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
         frames, durations, native = build_frames(self.height(), identifier)
@@ -299,6 +321,93 @@ class Avatar(QOpenGLWidget):
     def set_mouth_level(self, level):
         """接收当前语音包络值；跨线程信号会由 Qt 自动排入界面线程。"""
         self._mouth_target = min(1.0, max(0.0, float(level)))
+
+    @property
+    def available_motions(self):
+        """仅向模型公布当前默认 Live2D 中已验证的原生动作。"""
+        if not self._live2d_active or self._live2d_model is None:
+            return ()
+        actions = []
+        if {"ParamEyeLOpen", "ParamEyeROpen"}.issubset(self._live2d_parameter_ids):
+            actions.append("blink")
+        if ARM_RAISE_BINDING_VERIFIED and "ParamArmRA" in self._live2d_parameter_ids:
+            actions.append("raise_hand")
+        return tuple(actions)
+
+    def play_motion(self, motion):
+        """在现有 Live2D 绘制帧上启动一次白名单动作。"""
+        if motion not in self.available_motions:
+            LOG.warning("忽略未绑定的玄司动作 action=%s", motion)
+            return False
+        self.cancel_motion()
+        self._motion_name = motion
+        self._motion_started = time.monotonic()
+        if motion == "blink":
+            self._live2d_model.SetAutoBlinkEnable(False)
+        LOG.info("玄司动作开始 action=%s", motion)
+        self.update()
+        return True
+
+    def cancel_motion(self):
+        """取消动作并把参数恢复到中立值；休眠时继续保持闭眼。"""
+        motion, self._motion_name = self._motion_name, None
+        self._motion_started = None
+        if motion is None:
+            return False
+        model = self._live2d_model
+        if model is not None:
+            if motion == "blink":
+                if self.animation != "sleep":
+                    model.SetParameterValue("ParamEyeLOpen", 1.0)
+                    model.SetParameterValue("ParamEyeROpen", 1.0)
+                model.SetAutoBlinkEnable(self.animation != "sleep")
+            elif motion == "raise_hand" and "ParamArmRA" in self._live2d_parameter_ids:
+                model.SetParameterValue("ParamArmRA", 0.0)
+        LOG.info("玄司动作已中断 action=%s", motion)
+        self.update()
+        return True
+
+    def _motion_parameter_values(self, now):
+        """按单调时钟推进一次性动作；返回值由本帧 Live2D 参数写入。"""
+        if self._motion_name is None or self._motion_started is None:
+            return {}
+        elapsed = max(0.0, now - self._motion_started)
+        if self._motion_name == "blink":
+            close_end = BLINK_CLOSE_SECONDS
+            hold_end = close_end + BLINK_HOLD_SECONDS
+            finish = hold_end + BLINK_OPEN_SECONDS
+            if elapsed >= finish:
+                self._motion_name = None
+                self._motion_started = None
+                self._live2d_model.SetAutoBlinkEnable(self.animation != "sleep")
+                LOG.info("玄司动作结束 action=blink")
+                eye_open = 1.0
+            elif elapsed < close_end:
+                eye_open = 1.0 - _smoothstep(elapsed / close_end)
+            elif elapsed < hold_end:
+                eye_open = 0.0
+            else:
+                eye_open = _smoothstep((elapsed - hold_end) / BLINK_OPEN_SECONDS)
+            return {"ParamEyeLOpen": eye_open, "ParamEyeROpen": eye_open}
+
+        if self._motion_name == "raise_hand":
+            lower_start = ARM_RAISE_SECONDS + ARM_HOLD_SECONDS
+            finish = lower_start + ARM_RAISE_SECONDS
+            if elapsed >= finish:
+                self._motion_name = None
+                self._motion_started = None
+                LOG.info("玄司动作结束 action=raise_hand")
+                arm_value = 0.0
+            elif elapsed < ARM_RAISE_SECONDS:
+                arm_value = ARM_RAISE_VALUE * _smoothstep(elapsed / ARM_RAISE_SECONDS)
+            elif elapsed < lower_start:
+                arm_value = ARM_RAISE_VALUE
+            else:
+                arm_value = ARM_RAISE_VALUE * (
+                    1.0 - _smoothstep((elapsed - lower_start) / ARM_RAISE_SECONDS)
+                )
+            return {"ParamArmRA": arm_value}
+        return {}
 
     def initializeGL(self):
         self._live2d_ready = True
@@ -339,6 +448,7 @@ class Avatar(QOpenGLWidget):
                 model.SetParameterValue("ParamEyeROpen", 0.0)
             self._live2d_module = live2d
             self._live2d_model = model
+            self._live2d_parameter_ids = frozenset(parameter_ids)
             self._last_render = time.monotonic()
             LOG.info("玄司 Live2D 模型已加载 parameters=%s", len(parameter_ids))
             LOG.info("Live2D 视线跟随已启用：按桌宠所在屏幕范围平滑映射")
@@ -353,6 +463,7 @@ class Avatar(QOpenGLWidget):
             self._live2d_failed = True
             self._live2d_model = None
             self._live2d_module = None
+            self._live2d_parameter_ids = frozenset()
             LOG.exception("玄司 Live2D 加载失败，继续使用原 PNG 形象")
 
     def _set_render_mode(self):
@@ -366,7 +477,16 @@ class Avatar(QOpenGLWidget):
             self.render_clock.stop()
             self._shown_frame = None
             self._frame_mask()
+        self._refresh_motion_capabilities()
         self.update()
+
+    def _refresh_motion_capabilities(self):
+        actions = self.available_motions
+        if actions == self._motion_capabilities:
+            return
+        self._motion_capabilities = actions
+        self.motion_capabilities_changed.emit(actions)
+        LOG.info("玄司原生动作能力已更新 actions=%s", ",".join(actions) or "无")
 
     def _live2d_window_mask(self):
         """按窗口高度扩展原图点击轮廓，避免高 DPI 或改尺寸后缓冲失衡。"""
@@ -384,6 +504,12 @@ class Avatar(QOpenGLWidget):
             now = time.monotonic()
             elapsed = max(0.0, min(0.1, now - self._last_render))
             self._last_render = now
+            overlay = self._idle_blade_visual(now)
+            if overlay is not None:
+                # 拔刀图包含完整角色；该帧只显示姿态图，避免底层模型透出形成重影。
+                live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
+                self._present_idle_blade(overlay)
+                return
             self._update_gaze(elapsed)
             self._mouth_level += (self._mouth_target - self._mouth_level) * min(1.0, elapsed * 14.0)
             model = self._live2d_model
@@ -396,12 +522,13 @@ class Avatar(QOpenGLWidget):
                 model.SetParameterValue("ParamEyeBallY", self._gaze_y)
                 model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
             self._update_sway(elapsed)
+            for parameter, value in self._motion_parameter_values(now).items():
+                model.SetParameterValue(parameter, value)
             # 先设置当帧参数，再由 Cubism 计算网格变形并绘制。
-            overlay = self._idle_blade_visual(now)
             live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
             model.Update()
             model.Draw()
-            self._present_idle_blade(overlay)
+            self._present_idle_blade(None)
             return
         # Live2D 与 PNG 回退都由 QOpenGLWidget 的绘制流程显示。
         painter = QPainter(self)
@@ -428,7 +555,7 @@ class Avatar(QOpenGLWidget):
             LOG.exception("玄司久置拔刀素材不可用，已禁用该待机动作")
 
     def start_idle_blade(self):
-        """进入一次透明关键帧演出，Live2D 模型仍在底层正常更新。"""
+        """进入一次透明关键帧演出；姿态显示期间暂停 Live2D 绘制。"""
         if not self.supports_idle_blade or self._idle_blade_started is not None:
             return False
         self._idle_blade_fade_out = None
@@ -474,7 +601,7 @@ class Avatar(QOpenGLWidget):
                 self._idle_blade_started = None
                 if self._live2d_active:
                     self.setMask(self._live2d_window_mask())
-                LOG.info("玄司久置待机拔刀动作结束")
+                LOG.info("玄司久置待机拔刀动作结束，Live2D 绘制已恢复")
         elif self._idle_blade_fade_out is not None:
             pose, initial_opacity, started = self._idle_blade_fade_out
             opacity = initial_opacity * max(0.0, 1.0 - (now - started) / IDLE_BLADE_FADE_SECONDS)
@@ -567,6 +694,8 @@ class Avatar(QOpenGLWidget):
             self._live2d_model = None
             self._live2d_module = None
             self._live2d_active = False
+            self._live2d_parameter_ids = frozenset()
+            self._refresh_motion_capabilities()
 
     def _pixmap(self):
         frames = self.frames[self.animation]
@@ -626,6 +755,7 @@ class Avatar(QOpenGLWidget):
 
     def hideEvent(self, event):
         self.interrupt_idle_blade(fade=False)
+        self.cancel_motion()
         self.clock.stop()
         self.render_clock.stop()
         super().hideEvent(event)
