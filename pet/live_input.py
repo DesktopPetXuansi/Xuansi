@@ -69,7 +69,13 @@ class OnlineInput:
             self.silence = 0.0
         else:
             self.silence += duration
-        text = self._decode(samples, rate)
+        text = self._decode(samples, rate)[-2000:]
+        if text and text != self.last_text:
+            # 轻声也可能被正确识别；新文字是说话证据，不能只依赖固定音量门限。
+            if not self.voiced:
+                LOG.info("检测到轻声转写，开始等待话段结束 chars=%d", len(text))
+            self.voiced = True
+            self.silence = 0.0
         endpoint = self.voiced and self.silence >= 0.35
         if endpoint:
             # Paraformer 有前瞻窗口；补尾部静音才能取到最后几个字。

@@ -43,3 +43,35 @@ def test_continuous_speech_does_not_trigger_at_15_seconds():
     for _ in range(160):
         online.feed(np.ones(4800, dtype=np.float32) * 0.03)
     assert not any(event.final for event in events)
+
+
+def test_recognized_quiet_speech_submits_after_pause():
+    """真实转写是轻声输入的证据，不能被固定音量门限吞掉。"""
+    online, events = fake_online()
+    online.feed(np.full(4800, 0.003, dtype=np.float32))
+    for _ in range(4):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    final = [event for event in events if event.final]
+    assert len(final) == 1
+    assert final[0].text == "用户还在继续说话"
+
+
+def test_quiet_speech_new_words_keep_turn_open():
+    """持续出现新识别文字时，低音量不能造成句中抢答。"""
+    online, events = fake_online()
+    for index in range(20):
+        online._decode = lambda *_, index=index: "轻声说话" + str(index)
+        online.feed(np.full(4800, 0.003, dtype=np.float32))
+    assert not any(event.final for event in events)
+    for _ in range(4):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    assert sum(event.final for event in events) == 1
+
+
+def test_silence_without_recognized_text_never_submits():
+    """无声音且无转写时不凭空创建一轮回复。"""
+    online, events = fake_online()
+    online._decode = lambda *_: ""
+    for _ in range(160):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    assert events == []
