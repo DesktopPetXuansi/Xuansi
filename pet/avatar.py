@@ -479,6 +479,7 @@ class Avatar(QOpenGLWidget):
             self._frame_mask()
         self._refresh_motion_capabilities()
         self.update()
+        LOG.info("桌宠绘制模式已同步 mode=%s", "Live2D" if self._live2d_active else "图片")
 
     def _refresh_motion_capabilities(self):
         actions = self.available_motions
@@ -531,6 +532,10 @@ class Avatar(QOpenGLWidget):
             self._present_idle_blade(None)
             return
         # Live2D 与 PNG 回退都由 QOpenGLWidget 的绘制流程显示。
+        # Qt 不会替重写的 paintGL 清空缓冲；透明图片和透明动图帧必须先清除旧像素。
+        functions = self.context().functions()
+        functions.glClearColor(0.0, 0.0, 0.0, 0.0)
+        functions.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT，仅清当前窗口的颜色缓冲。
         painter = QPainter(self)
         painter.drawPixmap(0, 0, self._pixmap())
 

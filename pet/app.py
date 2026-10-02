@@ -331,7 +331,7 @@ class DesktopPet(QObject):
         self.ui.refresh()
         LOG.info("退出休眠 enabled=%s resume_now=%s", self.voice_enabled, resume_voice)
 
-    def apply_settings(self, settings: Settings, error: str):
+    def apply_settings(self, settings: Settings, error: str, *, appearance_only=False):
         if error:
             self.panel.status.setText(error)
             return
@@ -346,11 +346,11 @@ class DesktopPet(QObject):
             self.ui.refresh()
             self.panel.status.setText("声音回避已开启" if settings.audio_avoidance else "声音回避已关闭")
             return
-        if (
+        if appearance_only or (
             self.settings.avatar_image != settings.avatar_image
             and replace(self.settings, avatar_image=settings.avatar_image) == settings
         ):
-            # 仅更换外观不停止正在进行的对话，也不改写未保存的人设输入。
+            # 重导入相同标识也刷新缓存；外观保存不停止对话或改写其他表单草稿。
             self.settings = self.panel.settings = settings
             self.avatar.set_image(settings.avatar_image, force=True)
             self.ui.refresh_icon()

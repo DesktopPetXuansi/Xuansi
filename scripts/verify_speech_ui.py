@@ -61,6 +61,7 @@ def main():
         try:
             pet.panel.show()
             pet.ui.quick.show()
+            pet.voice_enabled = True  # 与用户开启选择一致；仍使用模拟输入，不启麦。
             pet.runtime.listening = True
             pet.panel.voice_state(True)
             pet.ui.quick.voice_state(True)

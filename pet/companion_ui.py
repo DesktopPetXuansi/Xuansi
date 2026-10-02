@@ -111,6 +111,7 @@ class CompanionUI:
                 self.hotkey.stage(settings.chat_hotkey)
         except ValueError as exc:
             self.owner.panel.form.complete(str(exc))
+            self.quick.status.setText(str(exc))
             return
         self.saving = True
         self.appearance_only = appearance_only
@@ -118,6 +119,7 @@ class CompanionUI:
         self.owner.panel.saving(True)
         self.owner.panel.audio_avoidance_action.setEnabled(False)
         self.owner.panel.status.setText("正在保存配置…")
+        self.quick.status.setText("正在保存配置…")
         self.owner.runtime.persist(settings, validate_models=not (appearance_only or avoidance_only))
 
     def saved(self, settings, error):
@@ -133,8 +135,10 @@ class CompanionUI:
                 self.hotkey.commit()
         if not error:
             self.quick.setWindowTitle(f"{settings.name} · 快捷对话")
-        self.owner.apply_settings(settings, error)
+        # 保留本次保存的用途，不能仅凭字段差异判断；相同图片仍需重新加载。
+        self.owner.apply_settings(settings, error, appearance_only=self.appearance_only)
         self.owner.panel.form.complete(error)
+        self.quick.status.setText(self.owner.panel.status.text())
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
             self.appearance.saved(error)

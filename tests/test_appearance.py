@@ -7,6 +7,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from pet.appearance import image_path, import_image
+from pet.companion_ui import CompanionUI
 from pet.config import Settings, load_settings, save_settings
 
 
@@ -27,6 +28,52 @@ def test_shape_change_preserves_live_conversation_and_other_settings():
     DesktopPet.apply_settings(owner, new, "")
     assert owner.settings == new and applied == [new.avatar_image]
     assert owner.runtime.listening and owner.busy
+
+
+@pytest.mark.parametrize("identifier", ["a" * 64 + ".png", "b" * 64 + ".png", ""])
+def test_appearance_save_refreshes_even_same_image_without_resetting_voice(identifier):
+    """从形象窗口完成保存；相同标识也刷新，不进入完整配置的停麦路径。"""
+    from pet.app import DesktopPet
+
+    old = replace(Settings(), avatar_image="a" * 64 + ".png", persona="保留我的人设")
+    applied, icons, completed = [], [], []
+    statuses = {"panel": "", "quick": ""}
+    panel = SimpleNamespace(
+        settings=old,
+        saving=lambda _: None,
+        status=SimpleNamespace(
+            setText=lambda text: statuses.update(panel=text), text=lambda: statuses["panel"],
+        ),
+        audio_avoidance_action=SimpleNamespace(setEnabled=lambda _: None, setChecked=lambda _: None),
+        form=SimpleNamespace(complete=lambda _: None),
+    )
+    owner = SimpleNamespace(
+        settings=old, panel=panel, busy=True, voice_enabled=True, paused=False,
+        runtime=SimpleNamespace(listening=True),
+        avatar=SimpleNamespace(set_image=lambda image, **kwargs: applied.append((image, kwargs))),
+    )  # 不提供关麦和取消接口；任何外观保存都不应调用它们。
+    ui = SimpleNamespace(
+        owner=owner, saving=True, closed=False, appearance_only=True, hotkey_staged=False,
+        quick=SimpleNamespace(
+            setWindowTitle=lambda _: None,
+            status=SimpleNamespace(setText=lambda text: statuses.update(quick=text)),
+        ),
+        appearance=SimpleNamespace(saved=completed.append),
+        refresh_icon=lambda: icons.append(owner.settings.avatar_image),
+    )
+    owner.ui = ui
+    owner.apply_settings = lambda settings, error, **kwargs: DesktopPet.apply_settings(
+        owner, settings, error, **kwargs
+    )
+
+    settings = replace(old, avatar_image=identifier)
+    CompanionUI.saved(ui, settings, "")
+
+    assert owner.settings == panel.settings == settings
+    assert applied == [(identifier, {"force": True})] and icons == [identifier]
+    assert completed == [""] and not ui.saving
+    assert owner.runtime.listening and owner.busy and owner.voice_enabled
+    assert statuses["panel"] == statuses["quick"] and "已应用" in statuses["quick"]
 
 
 def test_import_keeps_alpha_and_survives_source_removal(tmp_path):

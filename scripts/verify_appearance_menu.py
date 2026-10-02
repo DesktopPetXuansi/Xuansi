@@ -13,6 +13,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 from PySide6.QtCore import QPoint, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog
 
@@ -28,6 +29,28 @@ from pet.avatar import Avatar
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.desktop import USER32, DesktopState
 from pet.memory import MemoryStore
+
+
+def render_custom_shape(avatar, path):
+    """读取实际 GPU 画面；人工角色头部为绿色，上方应完全透明，不能残留玄司。"""
+    avatar.frame = 0
+    avatar.repaint()
+    rendered = avatar.grabFramebuffer()
+    rendered.save(str(path))
+    return (
+        not rendered.isNull()
+        and rendered.pixelColor(rendered.width() // 2, rendered.height() // 3).name() == "#52786b"
+        and all(
+            rendered.pixelColor(x, y).alpha() == 0
+            for y in range(rendered.height() // 8) for x in range(rendered.width())
+        )
+    )
+
+
+def tray_matches_avatar(pet):
+    """托盘应使用当前形象的首个可见帧，不接受仅有旧图标的保存成功状态。"""
+    frame = next(frame for frame, region in pet.avatar.frames["idle"] if not region.isEmpty())
+    return pet.tray.icon().pixmap(frame.size()).toImage() == frame.toImage()
 
 
 def main():
@@ -109,6 +132,11 @@ def main():
                 )
                 report["original_timing_loaded"] = pet.avatar.durations == [80, 160, 100]
                 report["settings_persisted"] = load_settings(setting_path).avatar_image == identifier
+                report["tray_uses_custom_frame"] = tray_matches_avatar(pet)
+                report["appearance_status_synchronized"] = pet.panel.status.text() == pet.ui.quick.status.text()
+                report["custom_image_reaches_rendered_window"] = render_custom_shape(
+                    pet.avatar, output / "appearance-custom-avatar.png"
+                )
                 dialog.close()
                 report["hidden_preview_stops"] = not dialog.preview.timer.isActive()
                 source.unlink()
@@ -124,11 +152,16 @@ def main():
                 assets.image_path(identifier).unlink()
                 restarted.set_image(identifier, force=True)
                 report["missing_copy_falls_back"] = not restarted.native_animation
+                pet.avatar.set_image(identifier, force=True)
                 frames[0].save(
                     source, save_all=True, append_images=frames[1:], duration=[80, 160, 100], loop=0
                 )
                 pet.ui.open_appearance()
                 previous_cache = pet.avatar.frames
+                # 模拟已开启的连续对话，验证换形象不会关麦；不创建真实输入设备。
+                pet.voice_enabled = pet.runtime.listening = True
+                pet._sync_voice_state()
+                previous_epoch = pet.runtime.epoch
                 dialog.import_file(str(source))
                 assert wait_until(lambda: not dialog.loading)
                 assert dialog.candidate == identifier and dialog.apply_button.isEnabled()
@@ -137,12 +170,30 @@ def main():
                 report["reimport_same_image_refreshes"] = (
                     pet.avatar.native_animation and pet.avatar.frames is not previous_cache
                 )
+                report["reimport_keeps_continuous_voice"] = (
+                    pet.voice_enabled and pet.runtime.listening and pet.runtime.epoch == previous_epoch
+                    and pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+                )
+                report["reimport_refreshes_tray"] = tray_matches_avatar(pet)
+                report["reimport_reaches_rendered_window"] = render_custom_shape(
+                    pet.avatar, output / "appearance-reimported-avatar.png"
+                )
+                pet.voice_enabled = pet.runtime.listening = False
+                pet._sync_voice_state()
                 dialog.close()
 
                 pet.avatar.clock.stop()
                 pet.avatar.frame = 2
                 pet.avatar._frame_mask()
                 QTest.qWait(50)
+                rendered = pet.avatar.grabFramebuffer()
+                report["transparent_frame_clears_previous_shape"] = (
+                    not rendered.isNull()
+                    and all(
+                        rendered.pixelColor(x, y).alpha() == 0
+                        for y in range(rendered.height()) for x in range(rendered.width())
+                    )
+                )
                 rect = wintypes.RECT()
                 USER32.GetWindowRect(int(pet.avatar.winId()), ctypes.byref(rect))
                 hwnd = USER32.WindowFromPoint(
@@ -165,6 +216,7 @@ def main():
                     pet.settings.avatar_image == identifier
                     and pet.avatar.image_id == identifier
                     and load_settings(setting_path).avatar_image == identifier
+                    and pet.panel.status.text() == pet.ui.quick.status.text()
                 )
                 runtime_module.save_settings = normal_save
                 dialog.apply_button.click()
@@ -173,6 +225,11 @@ def main():
                     pet.settings.avatar_image == ""
                     and not pet.avatar.native_animation
                     and load_settings(setting_path).avatar_image == ""
+                )
+                default_icon = QIcon(str(ROOT / "assets/xuansi/icon.png"))
+                report["restore_default_updates_tray_and_motions"] = (
+                    pet.tray.icon().pixmap(64, 64).toImage() == default_icon.pixmap(64, 64).toImage()
+                    and pet.avatar.available_motions == pet.runtime.motion_actions
                 )
                 report["microphone_stays_off"] = not pet.runtime.listening
                 dialog.close()

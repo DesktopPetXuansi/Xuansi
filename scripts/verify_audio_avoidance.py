@@ -77,6 +77,7 @@ def main():
             assert wait_until(started.is_set)
             epoch = pet.runtime.epoch
             # 只模拟监听状态，不打开真实输入设备。
+            pet.voice_enabled = True
             pet.runtime.listening = True
             pet.panel.voice_state(True)
             pet.ui.quick.voice_state(True)
