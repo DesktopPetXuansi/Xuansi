@@ -67,9 +67,13 @@ class CompanionUI:
         if self.owner.settings.avatar_image:
             frames = self.owner.avatar.frames["idle"]
             pixmap = next(pix for pix, region in frames if not region.isEmpty())
-            self.tray.setIcon(QIcon(pixmap))
+            icon = QIcon(pixmap)
         else:
-            self.tray.setIcon(QIcon(str(ROOT / "assets/xuansi/icon.png")))
+            icon = QIcon(str(ROOT / "assets/xuansi/icon.png"))
+        # 任务栏取窗口图标；更新应用默认图标，让已有及随后打开的窗口一起继承。
+        self.owner.application.setWindowIcon(icon)
+        self.tray.setIcon(icon)
+        LOG.info("窗口与托盘图标已同步 custom=%s", bool(self.owner.settings.avatar_image))
 
     def _tray(self):
         pet = self.owner

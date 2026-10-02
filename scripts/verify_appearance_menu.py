@@ -13,7 +13,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 from PySide6.QtCore import QPoint, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QImage
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog
 
@@ -53,6 +53,38 @@ def tray_matches_avatar(pet):
     return pet.tray.icon().pixmap(frame.size()).toImage() == frame.toImage()
 
 
+def window_icons_match_tray(pet):
+    """应用默认图标覆盖后续窗口，已有窗口也必须同步，不能只更新通知区。"""
+    expected = pet.tray.icon().pixmap(64, 64).toImage()
+    windows = (pet.application, pet.panel, pet.ui.quick, pet.panel.logs, pet.ui.appearance)
+    return all(window.windowIcon().pixmap(64, 64).toImage() == expected for window in windows)
+
+
+def native_window_icon_matches_tray(pet):
+    """从 Windows 获取任务栏使用的大图标，校验实际 HICON 中的像素。"""
+    send_message = USER32.SendMessageW
+    send_message.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+    send_message.restype = ctypes.c_ssize_t
+    handle = send_message(int(pet.panel.winId()), 0x007F, 1, 0)  # WM_GETICON / ICON_BIG
+    if not handle:
+        logging.warning("窗口未返回原生大图标")
+        return False
+    actual = QImage.fromHICON(handle)
+    expected = pet.tray.icon().pixmap(actual.size()).toImage()
+    suffix = "custom" if pet.settings.avatar_image else "default"
+    actual.save(str(ROOT / f"data/verification/taskbar-native-{suffix}.png"))
+    expected.save(str(ROOT / f"data/verification/taskbar-expected-{suffix}.png"))
+    logging.info("原生图标尺寸 actual=%s expected=%s", actual.size(), expected.size())
+    pixel_format = QImage.Format.Format_ARGB32_Premultiplied
+    actual_pixels = actual.convertToFormat(pixel_format)
+    expected_pixels = expected.convertToFormat(pixel_format)
+    # HICON 往返会使半透明边缘的预乘颜色发生一级舍入；尺寸和所有像素仍需匹配。
+    return not actual.isNull() and actual.size() == expected.size() and all(
+        abs(left - right) <= 1
+        for left, right in zip(actual_pixels.constBits(), expected_pixels.constBits(), strict=True)
+    )
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     USER32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
@@ -86,6 +118,7 @@ def main():
         def inspect():
             restarted = None
             try:
+                pet.open_panel()  # 先创建真实任务栏窗口，再检查更换后的原生图标。
                 frames = []
                 for offset in (0, 14, 0):
                     frame = Image.new("RGBA", (140, 180))
@@ -133,6 +166,8 @@ def main():
                 report["original_timing_loaded"] = pet.avatar.durations == [80, 160, 100]
                 report["settings_persisted"] = load_settings(setting_path).avatar_image == identifier
                 report["tray_uses_custom_frame"] = tray_matches_avatar(pet)
+                report["custom_shape_updates_all_window_icons"] = window_icons_match_tray(pet)
+                report["custom_shape_updates_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
                 report["appearance_status_synchronized"] = pet.panel.status.text() == pet.ui.quick.status.text()
                 report["custom_image_reaches_rendered_window"] = render_custom_shape(
                     pet.avatar, output / "appearance-custom-avatar.png"
@@ -141,6 +176,10 @@ def main():
                 report["hidden_preview_stops"] = not dialog.preview.timer.isActive()
                 source.unlink()
                 restarted = Avatar(settings.pet_size, load_settings(setting_path).avatar_image)
+                report["new_window_inherits_current_icon"] = (
+                    restarted.windowIcon().pixmap(64, 64).toImage()
+                    == pet.tray.icon().pixmap(64, 64).toImage()
+                )
                 report["reload_without_original"] = restarted.native_animation and restarted.durations == [
                     80,
                     160,
@@ -175,6 +214,7 @@ def main():
                     and pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
                 )
                 report["reimport_refreshes_tray"] = tray_matches_avatar(pet)
+                report["reimport_refreshes_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
                 report["reimport_reaches_rendered_window"] = render_custom_shape(
                     pet.avatar, output / "appearance-reimported-avatar.png"
                 )
@@ -231,6 +271,8 @@ def main():
                     pet.tray.icon().pixmap(64, 64).toImage() == default_icon.pixmap(64, 64).toImage()
                     and pet.avatar.available_motions == pet.runtime.motion_actions
                 )
+                report["restore_default_updates_all_window_icons"] = window_icons_match_tray(pet)
+                report["restore_default_updates_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
                 report["microphone_stays_off"] = not pet.runtime.listening
                 dialog.close()
                 # 后台导入尚未返回时按 Esc，迟到结果不得替换当前形象。
