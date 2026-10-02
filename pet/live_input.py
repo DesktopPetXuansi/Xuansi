@@ -72,10 +72,10 @@ class OnlineInput:
         else:
             self.silence += duration
         text = self._decode(samples, rate)[-2000:]
-        if text and 0 < rms <= 0.008 and not self.quiet:
-            # 已识别的话段后半句也可能变轻；低幅度输入尚在持续时延长等待。
+        if self.voiced and 0 < rms <= 0.008 and not self.quiet:
+            # 首批文字也需要分块前瞻；话段已开始后变轻，不能在转写到达前截句。
             self.quiet = True
-            LOG.info("话段含低音量输入，延长结束等待")
+            LOG.info("话段含低音量输入，延长结束等待 first_transcript=%s", bool(text))
         if text and text != self.last_text:
             # 轻声也可能被正确识别；新文字是说话证据，不能只依赖固定音量门限。
             if not self.voiced:

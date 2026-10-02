@@ -94,6 +94,25 @@ def test_normal_voice_becoming_quiet_does_not_submit_mid_sentence():
     assert sum(event.final for event in events) == 1
 
 
+def test_low_volume_continuation_waits_before_first_recognizer_text():
+    """首批转写尚未到达时，响声后的轻声也不能被当作结束静音。"""
+    online, events = fake_online()
+    # 对齐真实识别器：短输入尚无结果，提前补尾部静音只能得到第一个字。
+    online._decode = lambda samples, _: "你" if len(samples) > 4800 else ""
+    online.feed(np.full(4800, 0.03, dtype=np.float32))
+    for _ in range(5):
+        online.feed(np.full(4800, 0.003, dtype=np.float32))
+    assert not any(event.final for event in events)
+
+    online._decode = lambda *_: "你好，请用一句话介绍一下自己"
+    online.feed(np.full(4800, 0.003, dtype=np.float32))
+    for _ in range(8):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    final = [event for event in events if event.final]
+    assert len(final) == 1
+    assert final[0].text.endswith("介绍一下自己")
+
+
 def test_silence_without_recognized_text_never_submits():
     """无声音且无转写时不凭空创建一轮回复。"""
     online, events = fake_online()
