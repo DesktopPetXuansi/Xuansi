@@ -28,6 +28,28 @@ from pet.runtime import Runtime
 LOG = logging.getLogger(__name__)
 
 
+class SimulatedMicrophone:
+    """仅模拟设备生命周期与就绪通知，不访问声卡或生成语音输入。"""
+
+    def __init__(self, _segment, state, on_update=None):
+        self.state = state
+        self.muted = threading.Event()
+
+    def start(self, _device):
+        self.muted.clear()
+        self.state("实时聆听中 · 说完即可回复")
+
+    def stop(self):
+        self.muted.set()
+
+    def join(self):
+        return True
+
+
+async def prepare_simulated_voice(_runtime, _settings):
+    await asyncio.sleep(0)
+
+
 def wait_until(predicate, seconds=5):
     deadline = time.monotonic() + seconds
     while not predicate() and time.monotonic() < deadline:
@@ -88,6 +110,7 @@ def inspect(pet, settings_path, fail_save, output):
 
     pet.runtime.engine.chat = chat
     pet.runtime.listening = True  # 仅设置状态，不启动输入设备。
+    pet.voice_enabled = True
     pet.open_panel()
     panel.input.setText("等待测试")
     panel._send()
@@ -116,7 +139,36 @@ def inspect(pet, settings_path, fail_save, output):
     assert not pet.runtime.should_speak(pet.settings)
     assert pet.runtime.listening and not panel.speech_button.isChecked()
     report["speech_buttons_sync_without_closing_microphone"] = True
-    pet.runtime.listening = False
+
+    pet.voice(True)
+    wait_until(lambda: panel.status.text().startswith("实时聆听中"))
+    panel.sleep_button.click()
+    assert pet.paused and pet.voice_enabled and not pet.runtime.listening
+    assert panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    pet.runtime.microphone_state.emit(pet.runtime.microphone_epoch, "麦克风已关闭")
+    QApplication.processEvents()
+    assert "已休眠" in panel.status.text() and "已暂停" in panel.voice_button.text()
+    panel.grab().save(str(output / "sleep-voice-paused.png"))
+    panel.sleep_button.click()
+    wait_until(lambda: pet.runtime.listening and panel.status.text().startswith("实时聆听中"))
+    report["sleep_preserves_choice_and_wake_resumes_microphone"] = True
+
+    panel.sleep_button.click()
+    pet.ui.quick.voice.click()
+    assert pet.paused and not pet.voice_enabled
+    panel.sleep_button.click()
+    assert not pet.runtime.listening and not panel.voice_button.isChecked()
+    report["manual_off_during_sleep_prevents_resume"] = True
+
+    pet.voice(True)
+    wait_until(lambda: panel.status.text().startswith("实时聆听中"))
+    panel.sleep_button.click()
+    panel.input.setText("从休眠发送文字")
+    panel._send()
+    wait_until(lambda: not pet.busy and pet.runtime.listening and panel.status.text().startswith("实时聆听中"))
+    assert not pet.paused and panel.voice_button.isChecked()
+    report["text_wake_resumes_microphone_after_reply"] = True
+    pet.voice(False)
     pet.ui.quick.show()
     QTest.qWait(50)
     panel.grab().save(str(output / "recovery-panel.png"))
@@ -155,6 +207,8 @@ def main():
             patch.object(MouseMonitor, "start", lambda _: None),
             patch.object(AudioActivity, "start", lambda _: None),
             patch.object(Runtime, "load_devices", lambda runtime: runtime.devices_loaded.emit([])),
+            patch.object(runtime_module, "Microphone", SimulatedMicrophone),
+            patch.object(Runtime, "_prepare_voice", prepare_simulated_voice),
             patch.object(runtime_module.sd, "stop", lambda: None),
         ):
             pet = DesktopPet(app, settings)

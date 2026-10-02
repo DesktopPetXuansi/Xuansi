@@ -27,6 +27,8 @@ class DesktopPet(QObject):
         self.application = application
         self.settings = settings or load_settings()
         self.paused, self.busy, self.fullscreen = False, False, False
+        # 用户开关与实际收音分别记录；休眠只暂停设备，不清掉用户选择。
+        self.voice_enabled = False
         self.last_external = cursor_position()
         self.observation_window = 0
         self.observation_started = 0.0
@@ -100,7 +102,8 @@ class DesktopPet(QObject):
 
     def _begin(self):
         if self.paused:
-            self.toggle_sleep()
+            # 先完成唤醒后的当前请求，再恢复收音，避免新请求取消语音预热。
+            self._wake(resume_voice=False)
         self.avatar.cancel_motion()
         self.busy = True
         self.ui.refresh()
@@ -138,10 +141,10 @@ class DesktopPet(QObject):
         self.runtime.ask(settings, f"你好，我是{settings.name}。我会在这里陪着你。", kind="preview")
 
     def voice(self, enabled):
+        self.voice_enabled = enabled
         if enabled and self.paused:
-            self.toggle_sleep()
-        self.panel.voice_state(enabled)
-        self.ui.quick.voice_state(enabled)
+            self._wake(resume_voice=False)
+        self._sync_voice_state()
         self.runtime.toggle_microphone(
             enabled, self.settings.input_device, self.settings.realtime_voice, self.settings
         )
@@ -149,10 +152,15 @@ class DesktopPet(QObject):
             self.panel.live_transcript.clear()
             self.ui.quick.live_transcript.clear()
             self.busy = False
-            self.avatar.set_animation("idle")
+            self.avatar.set_animation("sleep" if self.paused else "idle")
+        LOG.info("连续对话选择 enabled=%s paused=%s", enabled, self.paused)
+
+    def _sync_voice_state(self):
+        self.panel.voice_state(self.voice_enabled, self.paused)
+        self.ui.quick.voice_state(self.voice_enabled, self.paused)
 
     def toggle_voice(self):
-        self.voice(not self.runtime.listening)
+        self.voice(not self.voice_enabled)
 
     def on_segment(self, microphone_epoch, samples):
         if microphone_epoch == self.runtime.microphone_epoch and self.runtime.listening and not self.paused:
@@ -165,8 +173,11 @@ class DesktopPet(QObject):
             return
         if text == "麦克风已关闭" or text.startswith("麦克风无法"):
             self.runtime.listening = False
-            self.panel.voice_state(False)
-            self.ui.quick.voice_state(False)
+            if text == "麦克风已关闭" and self.voice_enabled and (self.paused or self.busy or self.fullscreen):
+                # 暂停设备的通知可能迟到；不能覆盖休眠或等待本轮结束的开启选择。
+                return
+            self.voice_enabled = False
+            self._sync_voice_state()
         if text.startswith("麦克风无法"):
             self.on_failed(self.runtime.epoch, text)
         self.panel.status.setText(text)
@@ -210,6 +221,8 @@ class DesktopPet(QObject):
             self.busy = False
             self.ui.refresh()
             self.avatar.set_animation("idle" if not self.paused else "sleep")
+            if self.voice_enabled and not self.runtime.listening and not self.paused and not self.fullscreen:
+                self.voice(True)
 
     def on_reply(self, epoch, text, kind):
         if epoch != self.runtime.epoch or self.paused:
@@ -278,21 +291,45 @@ class DesktopPet(QObject):
         )
 
     def toggle_sleep(self):
-        self.paused = not self.paused
-        self.avatar.paused = self.paused
-        self.panel.sleep_button.setText("唤醒" if self.paused else "休眠")
         if self.paused:
-            self.voice(False)
-            self.runtime.cancel(release=True)
-            self.avatar.bubble.hide()
-            self.avatar.set_animation("sleep")
-            self.panel.status.setText("已休眠，正在释放模型资源")
-        else:
-            self.avatar.set_animation("idle")
-            self.panel.status.setText("已唤醒 · 麦克风关闭")
+            self._wake()
+            return
+        self.paused = self.avatar.paused = True
+        self.panel.sleep_button.setText("唤醒")
+        # 保留 voice_enabled 和按钮勾选；实际关闭声卡以暂停收音并释放资源。
+        self.runtime.toggle_microphone(False)
+        self.runtime.cancel(release=True)
+        self.panel.live_transcript.clear()
+        self.ui.quick.live_transcript.clear()
+        self._sync_voice_state()
+        self.avatar.bubble.hide()
+        self.avatar.set_animation("sleep")
+        status = "已休眠 · 连续对话已暂停，唤醒后恢复" if self.voice_enabled else "已休眠 · 麦克风关闭"
+        self.panel.status.setText(status)
+        self.ui.quick.status.setText(status)
         self.pending = None
         self.busy = False
-        LOG.info("休眠状态=%s", self.paused)
+        self.ui.refresh()
+        LOG.info("进入休眠，保留连续对话选择 enabled=%s", self.voice_enabled)
+
+    def _wake(self, resume_voice=True):
+        self.paused = self.avatar.paused = False
+        self.panel.sleep_button.setText("休眠")
+        self.avatar.set_animation("idle")
+        self._sync_voice_state()
+        self.pending = None
+        self.busy = False
+        status = "已唤醒 · 麦克风关闭"
+        if self.voice_enabled:
+            status = "已唤醒 · 正在恢复连续对话" if resume_voice else "已唤醒 · 回复后恢复连续对话"
+            if self.fullscreen:
+                status = "已唤醒 · 桌面恢复可用后继续连续对话"
+        self.panel.status.setText(status)
+        self.ui.quick.status.setText(status)
+        if self.voice_enabled and resume_voice and not self.fullscreen:
+            self.voice(True)
+        self.ui.refresh()
+        LOG.info("退出休眠 enabled=%s resume_now=%s", self.voice_enabled, resume_voice)
 
     def apply_settings(self, settings: Settings, error: str):
         if error:
@@ -348,13 +385,17 @@ class DesktopPet(QObject):
             if self.fullscreen:
                 self.avatar.hide()
                 self.avatar.bubble.hide()
-                self.voice(False)
+                # 休眠已经停止实际输入；锁屏或全屏不能清掉其保留的开启选择。
+                if not self.paused:
+                    self.voice(False)
                 self.runtime.cancel(release=True)
                 self.panel.status.setText(
                     "桌面暂不可用 · 已暂停观察和对话" if not state.hwnd else "全屏模式 · 已暂停观察和对话"
                 )
             else:
                 self.avatar.show()
+                if self.voice_enabled and not self.paused and not self.busy and not self.runtime.listening:
+                    self.voice(True)
         if available < 2 and not self.paused:
             self.toggle_sleep()
             self.panel.status.setText("可用内存偏低，已自动休眠")

@@ -215,10 +215,13 @@ class Panel(QWidget):
         self.chat.moveCursor(QTextCursor.MoveOperation.End)
         self.message_added.emit(speaker, text)
 
-    def voice_state(self, enabled):
+    def voice_state(self, enabled, paused=False):
         self.voice_button.blockSignals(True)
         self.voice_button.setChecked(enabled)
-        self.voice_button.setText("关闭连续对话" if enabled else "开启连续对话")
+        self.voice_button.setText(
+            "连续对话已暂停" if enabled and paused else "关闭连续对话" if enabled else "开启连续对话"
+        )
+        self.voice_button.setToolTip("休眠期间暂停收音，唤醒后恢复；点击可取消恢复。" if enabled and paused else "")
         self.voice_button.blockSignals(False)
 
     def _save(self):

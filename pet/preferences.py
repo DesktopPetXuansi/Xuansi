@@ -128,7 +128,7 @@ class PreferencesPage(QWidget):
             self.device.setCurrentIndex(1)
         form.addRow("麦克风", self.device)
         hint = QLabel(
-            "麦克风需手动开启；全屏时暂停观察。\n休眠会关闭麦克风并释放模型，恢复后需再次开启对话。"
+            "麦克风需手动开启；全屏时暂停观察。\n休眠暂停收音并保留开关，唤醒后恢复原来已开启的连续对话。"
         )
         hint.setWordWrap(True)
         hint.setObjectName("hint")

@@ -88,10 +88,13 @@ class QuickChat(QWidget):
             self.input.clear()
             self.send_requested.emit(text, self.with_screen.isChecked())
 
-    def voice_state(self, enabled):
+    def voice_state(self, enabled, paused=False):
         self.voice.blockSignals(True)
         self.voice.setChecked(enabled)
-        self.voice.setText("关闭连续对话" if enabled else "开启连续对话")
+        self.voice.setText(
+            "连续对话已暂停" if enabled and paused else "关闭连续对话" if enabled else "开启连续对话"
+        )
+        self.voice.setToolTip("休眠期间暂停收音，唤醒后恢复；点击可取消恢复。" if enabled and paused else "")
         self.voice.blockSignals(False)
 
     def toggle(self):
