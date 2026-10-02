@@ -30,6 +30,7 @@ class DesktopPet(QObject):
         self.last_external = cursor_position()
         self.observation_window = 0
         self.observation_started = 0.0
+        self.last_voice_notice = float("-inf")
         self.pending = None
         self.runtime = Runtime()
         self.runtime.audio_activity.set_enabled(self.settings.audio_avoidance)
@@ -62,6 +63,8 @@ class DesktopPet(QObject):
         self.panel.voice_requested.connect(self.voice)
         self.panel.look_requested.connect(self.look)
         self.panel.sleep_requested.connect(self.toggle_sleep)
+        self.panel.stop_requested.connect(self.stop_reply)
+        self.panel.speech_requested.connect(self.runtime.set_speech_enabled)
         self.panel.memory_requested.connect(self.runtime.save_memory)
         self.panel.preview_requested.connect(self.preview_voice)
         self.runtime.memory_loaded.connect(self.panel.memory.setPlainText)
@@ -70,6 +73,7 @@ class DesktopPet(QObject):
             lambda devices: self.panel.preferences.set_devices(devices, self.settings.input_device)
         )
         self.runtime.reply.connect(self.on_reply)
+        self.runtime.failed.connect(self.on_failed)
         self.runtime.heard.connect(
             lambda epoch, text: self.panel.append("你", text) if epoch == self.runtime.epoch else None
         )
@@ -99,7 +103,21 @@ class DesktopPet(QObject):
             self.toggle_sleep()
         self.avatar.cancel_motion()
         self.busy = True
+        self.ui.refresh()
         self.avatar.set_animation("thinking")
+
+    def stop_reply(self):
+        """用户明确停止本轮后恢复聆听，不需要先关闭再打开麦克风。"""
+        if self.busy:
+            self.on_state(self.runtime.epoch, "正在停止当前回复…")
+            self.runtime.cancel(notify=True)
+
+    def on_failed(self, epoch, message):
+        if epoch != self.runtime.epoch or self.paused:
+            return
+        self.panel.append("系统提示", message)
+        if not self.fullscreen:
+            self.avatar.bubble.present(message, self.avatar)
 
     def _execute_motion(self, epoch, motion):
         """Qt 将后台决策排入界面线程后，再校验代次和桌宠状态。"""
@@ -149,6 +167,8 @@ class DesktopPet(QObject):
             self.runtime.listening = False
             self.panel.voice_state(False)
             self.ui.quick.voice_state(False)
+        if text.startswith("麦克风无法"):
+            self.on_failed(self.runtime.epoch, text)
         self.panel.status.setText(text)
         self.ui.quick.status.setText(text)
 
@@ -158,6 +178,15 @@ class DesktopPet(QObject):
         text = "" if update.final else "正在听：" + update.text[-100:]
         self.panel.live_transcript.setText(text)
         self.ui.quick.live_transcript.setText(text)
+        if update.final and not update.text:
+            message = "没有识别出文字，请靠近麦克风重说，或在偏好中检查输入设备。"
+            self.on_state(self.runtime.epoch, message)
+            # 环境噪声也可能触发空话段，合并短时间内的相同提示，避免刷屏。
+            now = time.monotonic()
+            if now - self.last_voice_notice >= 10:
+                self.last_voice_notice = now
+                self.on_failed(self.runtime.epoch, message)
+            return
         if update.final and update.text:
             self.panel.append("你", update.text)
         if update.text and update.final:
@@ -179,6 +208,7 @@ class DesktopPet(QObject):
     def on_finished(self, epoch):
         if epoch == self.runtime.epoch:
             self.busy = False
+            self.ui.refresh()
             self.avatar.set_animation("idle" if not self.paused else "sleep")
 
     def on_reply(self, epoch, text, kind):

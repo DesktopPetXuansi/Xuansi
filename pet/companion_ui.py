@@ -25,6 +25,8 @@ class CompanionUI:
         self.quick = QuickChat(owner.settings, STYLE)
         self.quick.send_requested.connect(owner.send)
         self.quick.voice_requested.connect(owner.voice)
+        self.quick.stop_requested.connect(owner.stop_reply)
+        self.quick.speech_requested.connect(owner.runtime.set_speech_enabled)
         owner.panel.message_added.connect(self.quick.append)
         owner.panel.with_screen.toggled.connect(self.quick.with_screen.setChecked)
         self.quick.with_screen.toggled.connect(owner.panel.with_screen.setChecked)
@@ -139,12 +141,19 @@ class CompanionUI:
 
     def refresh(self):
         status = self.owner.runtime.audio_activity.status
-        speech = "回复朗读已开启" if self.owner.runtime.should_speak(self.owner.settings) else "回复朗读已关闭"
+        enabled = self.owner.runtime.should_speak(self.owner.settings)
+        speech = "回复朗读已开启" if enabled else "回复朗读已关闭"
         status = speech + " · " + status
         if self.hotkey.active is None:
             status += " · 热键不可用，请到配置更改"
         self.owner.panel.audio_status.setText(status)
         self.quick.audio_status.setText(status)
+        for window in (self.owner.panel, self.quick):
+            window.speech_button.blockSignals(True)
+            window.speech_button.setChecked(enabled)
+            window.speech_button.setText("朗读开启" if enabled else "朗读关闭")
+            window.speech_button.blockSignals(False)
+            window.stop_button.setEnabled(self.owner.busy)
 
     def close(self):
         self.closed = True

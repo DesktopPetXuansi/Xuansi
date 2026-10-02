@@ -13,6 +13,7 @@ def fake_online():
     online.stream = object()
     online.silence = online.elapsed = 0.0
     online.voiced = False
+    online.quiet = False
     online.last_text = online.prefix = ""
     online._decode = lambda *_: "用户还在继续说话"
     online.recognizer = type("FakeRecognizer", (), {"create_stream": lambda _: object()})()
@@ -49,7 +50,7 @@ def test_recognized_quiet_speech_submits_after_pause():
     """真实转写是轻声输入的证据，不能被固定音量门限吞掉。"""
     online, events = fake_online()
     online.feed(np.full(4800, 0.003, dtype=np.float32))
-    for _ in range(4):
+    for _ in range(8):
         online.feed(np.zeros(4800, dtype=np.float32))
     final = [event for event in events if event.final]
     assert len(final) == 1
@@ -63,7 +64,32 @@ def test_quiet_speech_new_words_keep_turn_open():
         online._decode = lambda *_, index=index: "轻声说话" + str(index)
         online.feed(np.full(4800, 0.003, dtype=np.float32))
     assert not any(event.final for event in events)
-    for _ in range(4):
+    for _ in range(8):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    assert sum(event.final for event in events) == 1
+
+
+def test_quiet_speech_waits_across_recognizer_chunk_gaps():
+    """真实在线模型约每 600ms 更新；不能在两次更新之间截断轻声。"""
+    online, events = fake_online()
+    for index in range(24):
+        online._decode = lambda *_, index=index: "轻声连续输入" + str(index // 6)
+        online.feed(np.full(4800, 0.003, dtype=np.float32))
+    assert not any(event.final for event in events)
+    for _ in range(8):
+        online.feed(np.zeros(4800, dtype=np.float32))
+    assert sum(event.final for event in events) == 1
+
+
+def test_normal_voice_becoming_quiet_does_not_submit_mid_sentence():
+    """开头较响不能让随后轻声绕过分块识别的等待。"""
+    online, events = fake_online()
+    for index in range(24):
+        online._decode = lambda *_, index=index: "由响变轻" + str(index // 6)
+        level = 0.03 if index == 0 else 0.003
+        online.feed(np.full(4800, level, dtype=np.float32))
+    assert not any(event.final for event in events)
+    for _ in range(8):
         online.feed(np.zeros(4800, dtype=np.float32))
     assert sum(event.final for event in events) == 1
 

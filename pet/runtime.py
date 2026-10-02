@@ -28,6 +28,7 @@ class Runtime(QObject):
     heard = Signal(int, str)
     state = Signal(int, str)
     finished = Signal(int)
+    failed = Signal(int, str)
     microphone_state = Signal(int, str)
     segment = Signal(int, object)
     voice_update = Signal(int, object)
@@ -210,17 +211,27 @@ class Runtime(QObject):
                 LOG.warning("语音准备失败 type=%s", type(exc).__name__)
                 self.microphone_state.emit(epoch, "麦克风无法开启，请检查本地语音模型和输入设备")
 
-    def cancel(self, release=False):
+    def cancel(self, release=False, notify=False):
         self.epoch += 1
-        return self.schedule(self._suspend(release))
+        return self.schedule(self._suspend(release, self.epoch, notify))
 
-    async def _suspend(self, release):
+    async def _suspend(self, release, epoch=None, notify=False):
         self.live.reset()
         async with self.control:
             await self._cancel()
             if release:
                 await self.engine.stop()
                 await asyncio.to_thread(self.audio.unload)
+            # 旧回复因代次失效不会自行恢复收音，由本次取消完成后统一恢复。
+            if epoch == self.epoch:
+                if self.listening:
+                    self.microphone.muted.clear()
+                if notify:
+                    self.state.emit(
+                        epoch, "已停止回复 · 麦克风继续聆听" if self.listening else "已停止回复 · 麦克风关闭"
+                    )
+                self.finished.emit(epoch)
+                LOG.info("本轮回复已停止 listening=%s", self.listening)
 
     def persist(self, settings: Settings, validate_models=True):
         def validate_files():

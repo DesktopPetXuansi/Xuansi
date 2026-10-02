@@ -1,8 +1,8 @@
 """模型先决定朗读动作，再生成正文；只解析协议，不匹配用户的说话方式。"""
 
 import logging
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
 LOG = logging.getLogger(__name__)
 

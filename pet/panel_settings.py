@@ -62,7 +62,7 @@ class PanelSettings:
         except ValueError:
             changed = True
         self.hint.setText(
-            "有未保存的配置修改 · 关闭窗口时自动保存"
+            "有未保存的配置修改 · 关闭时保存，并结束对话、关闭麦克风"
             if changed else "配置已保存 · 关闭窗口时自动保存修改"
         )
 

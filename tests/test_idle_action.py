@@ -174,13 +174,16 @@ def test_keyboard_or_mouse_activity_cancels_and_restarts_the_countdown(monkeypat
     cancelled = []
     pet = SimpleNamespace(
         idle_action=IdleActionTimer(inactivity_seconds=300),
-        avatar=SimpleNamespace(interrupt_idle_blade=lambda: cancelled.append(True)),
+        avatar=SimpleNamespace(
+            interrupt_idle_blade=lambda: cancelled.append("idle"),
+            cancel_motion=lambda: cancelled.append("native"),
+        ),
     )
     pet.idle_action.poll(0, eligible=True)
     monkeypatch.setattr("pet.app.time.monotonic", lambda: 120)
 
     DesktopPet._on_system_activity(pet)
 
-    assert cancelled == [True]
+    assert cancelled == ["idle", "native"]
     assert not pet.idle_action.poll(419.99, eligible=True)
     assert pet.idle_action.poll(420, eligible=True)

@@ -28,7 +28,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
             runtime.state.emit(epoch, "正在识别你的话…")
             text = await asyncio.to_thread(runtime.audio.transcribe, samples)
             if not text:
-                return
+                raise RuntimeError("没有识别出文字，请靠近麦克风重说，或在偏好中检查输入设备。")
             runtime.heard.emit(epoch, text)
         if kind == "voice" and not re.search(
             r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text
@@ -65,6 +65,8 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         if isinstance(exc, ScreenShotError):
             message = "当前桌面暂不可读取，请解锁或唤醒屏幕后再试。"
         runtime.state.emit(epoch, message)
+        if kind != "observation" and epoch == runtime.epoch:
+            runtime.failed.emit(epoch, message)
     finally:
         if epoch == runtime.epoch:
             if runtime.listening:
@@ -99,6 +101,14 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
             runtime.motion_actions,
         )
 
+        def speech_state(message):
+            if not current():
+                return
+            runtime.state.emit(epoch, message)
+            # 失败通知单独留在聊天记录中，避免被随后恢复聆听的状态覆盖。
+            if message.startswith(("语音合成失败", "语音播放失败")):
+                runtime.failed.emit(epoch, message)
+
         async def deliver(part):
             nonlocal speech
             if not current() or not runtime.should_speak(settings, kind):
@@ -112,7 +122,7 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
                             part, settings.speaker, settings.speed, settings.tts_engine
                         ),
                         lambda: current() and runtime.should_speak(settings, kind),
-                        lambda message: runtime.state.emit(epoch, message),
+                        speech_state,
                         runtime.mouth_level.emit,
                     )
                 )
@@ -128,14 +138,17 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
             answer = await runtime.engine.chat(settings, text, images, [])
         if epoch != runtime.epoch or not observation_current(observation):
             return
+        answer = (answer or "").strip()
+        if kind == "observation" and (not answer or "无需回应" == answer.strip("。 .\n")):
+            return
+        if not answer:
+            raise RuntimeError("本地模型没有生成回复，请重新发送这句话。")
         if kind != "observation":
             runtime.history = [
                 *runtime.history[-6:],
                 {"role": "user", "content": text[:2000]},
                 {"role": "assistant", "content": answer},
             ]
-        if not answer or "无需回应" == answer.strip("。 .\n"):
-            return
         runtime.reply.emit(epoch, answer, kind)
         if speech is not None:
             await speech.finish()

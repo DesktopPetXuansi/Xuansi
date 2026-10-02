@@ -1,5 +1,6 @@
 """真实本地模型与模拟收音：验证说完后才朗读和首段等待时间。"""
 
+import argparse
 import json
 import logging
 import sys
@@ -49,13 +50,17 @@ class SimulatedInput:
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--quiet-input", action="store_true", help="将输入峰值压到音量门限以下")
+    args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     runtime = Runtime()
     runtime.audio_activity.set_enabled(False)
     settings = replace(Settings(), observe=False, max_tokens=100, audio_avoidance=False)
     metrics, updates, replies, states = {}, [], [], []
-    target = DATA / "verification/live-conversation.json"
+    filename = "live-conversation-quiet.json" if args.quiet_input else "live-conversation.json"
+    target = DATA / "verification" / filename
     target.parent.mkdir(parents=True, exist_ok=True)
     report = {"passed": False, "device": "模拟收音和静音播放接收器；真实 ASR/LLM/TTS；无真实录音"}
     temporary = tempfile.TemporaryDirectory(prefix="xuansi-live-")
@@ -78,11 +83,18 @@ def main():
         metrics["muted_during_playback"] = True
 
     try:
-        samples, rate = runtime.audio.synthesize("你好，请你用一句话介绍一下自己。", 0, 1.08)
+        # 轻声回归明确要求出声，避免模型自主选择静音影响音频恢复断言。
+        utterance = "你好，请出声用一句话介绍一下自己。" if args.quiet_input else "你好，请你用一句话介绍一下自己。"
+        samples, rate = runtime.audio.synthesize(utterance, 0, 1.08)
         source = np.interp(np.arange(round(len(samples) * 16000 / rate)) * rate / 16000,
                            np.arange(len(samples)), samples).astype(np.float32)
         voiced = np.flatnonzero(np.abs(source) > 0.008)
         source = source[:voiced[-1] + 1]
+        if args.quiet_input:
+            # 峰值也低于固定 RMS 门限，确保只凭真实 ASR 文字仍能提交话段。
+            source *= 0.006 / float(np.max(np.abs(source)))
+        report["input_peak"] = round(float(np.max(np.abs(source))), 6)
+        report["quiet_input"] = args.quiet_input
         sd.InputStream = lambda **kw: SimulatedInput(source, kw["callback"], metrics)
         sd.play, sd.wait, sd.stop = play, lambda: None, lambda: None
         runtime.toggle_microphone(True, 0, realtime=True, settings=settings).result(120)
@@ -103,7 +115,9 @@ def main():
         })
         report["end_to_audio_seconds"] = round(report["first_audio_seconds"] - report["input_seconds"], 3)
         report["end_to_endpoint_seconds"] = round(report["endpoint_seconds"] - report["input_seconds"], 3)
-        assert 0 <= report["end_to_audio_seconds"] < 3 and replies, report
+        assert report["end_to_endpoint_seconds"] >= 0, "话还没说完就提交了"
+        assert "介绍一下自己" in "".join(report["final_transcripts"]), "完整输入被截断"
+        assert 0 <= report["end_to_audio_seconds"] < (5 if args.quiet_input else 3) and replies, report
         assert report["first_partial_seconds"] < report["input_seconds"], report
         assert report["muted_during_playback"] and not runtime.microphone.muted.is_set(), report
         runtime.toggle_microphone(False).result(5)

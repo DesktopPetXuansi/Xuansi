@@ -43,6 +43,7 @@ class OnlineInput:
         self.stream = self.recognizer.create_stream()
         self.silence = self.elapsed = 0.0
         self.voiced = False
+        self.quiet = False
         self.last_text = ""
         LOG.info("在线 Paraformer 就绪 threads=2")
 
@@ -58,6 +59,7 @@ class OnlineInput:
             self.stream = self.recognizer.create_stream()
             self.silence = self.elapsed = 0.0
             self.voiced = False
+            self.quiet = False
             self.last_text = ""
 
     def feed(self, samples, rate=48000):
@@ -70,13 +72,19 @@ class OnlineInput:
         else:
             self.silence += duration
         text = self._decode(samples, rate)[-2000:]
+        if text and 0 < rms <= 0.008 and not self.quiet:
+            # 已识别的话段后半句也可能变轻；低幅度输入尚在持续时延长等待。
+            self.quiet = True
+            LOG.info("话段含低音量输入，延长结束等待")
         if text and text != self.last_text:
             # 轻声也可能被正确识别；新文字是说话证据，不能只依赖固定音量门限。
             if not self.voiced:
                 LOG.info("检测到轻声转写，开始等待话段结束 chars=%d", len(text))
+                self.quiet = True
             self.voiced = True
             self.silence = 0.0
-        endpoint = self.voiced and self.silence >= 0.35
+        # 轻声依赖分块转写，等待需长于约 600ms 的更新间隔，防止句中抢答。
+        endpoint = self.voiced and self.silence >= (0.75 if self.quiet else 0.35)
         if endpoint:
             # Paraformer 有前瞻窗口；补尾部静音才能取到最后几个字。
             text = self._decode(np.zeros(int(rate * 0.6), dtype=np.float32), rate)
@@ -85,6 +93,7 @@ class OnlineInput:
             self.stream = self.recognizer.create_stream()
             self.silence = self.elapsed = 0.0
             self.voiced = False
+            self.quiet = False
             self.last_text = ""
             LOG.info("实时话段结束 chars=%d", len(text))
         else:
