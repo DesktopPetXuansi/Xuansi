@@ -190,13 +190,13 @@ class DesktopPet(QObject):
         self.panel.live_transcript.setText(text)
         self.ui.quick.live_transcript.setText(text)
         if update.final and not update.text:
-            message = "没有识别出文字，请靠近麦克风重说，或在偏好中检查输入设备。"
+            message = "未识别到有效语音 · 继续聆听，可重说或检查输入设备。"
             self.on_state(self.runtime.epoch, message)
-            # 环境噪声也可能触发空话段，合并短时间内的相同提示，避免刷屏。
+            # 杂声也会触发空话段；只更新状态，日志限频，不作为故障弹气泡或写入聊天。
             now = time.monotonic()
             if now - self.last_voice_notice >= 10:
                 self.last_voice_notice = now
-                self.on_failed(self.runtime.epoch, message)
+                LOG.info("空语音话段已忽略，继续聆听")
             return
         if update.final and update.text:
             self.panel.append("你", update.text)

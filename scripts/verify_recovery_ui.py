@@ -21,6 +21,7 @@ from pet.app import DesktopPet
 from pet.audio_activity import AudioActivity
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.desktop import DesktopState
+from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.mouse_monitor import MouseMonitor
 from pet.runtime import Runtime
@@ -125,11 +126,32 @@ def inspect(pet, settings_path, fail_save, output):
     assert "恢复测试完成。" in pet.ui.quick.chat.toPlainText()
     report["stop_resumes_listening_and_next_turn_replies_in_both_windows"] = True
 
+    # 噪声造成的空话段只更新状态，不弹气泡、打开窗口或追加聊天。
+    pet.avatar.bubble.hide()
+    panel.hide()
+    pet.ui.quick.hide()
+    previous_chat = panel.chat.toPlainText()
+    previous_epoch = pet.runtime.epoch
+    for turn in range(3):
+        pet.runtime.voice_update.emit(pet.runtime.microphone_epoch, VoiceUpdate(turn, "", final=True))
+    QApplication.processEvents()
+    assert not pet.avatar.bubble.isVisible() and not panel.isVisible() and not pet.ui.quick.isVisible()
+    assert panel.chat.toPlainText() == pet.ui.quick.chat.toPlainText() == previous_chat
+    assert pet.runtime.epoch == previous_epoch and pet.runtime.listening and not pet.busy
+    assert "继续聆听" in panel.status.text() and panel.status.text() == pet.ui.quick.status.text()
+    pet.open_panel()
+    panel.input.setText("空话段后的下一轮")
+    panel._send()
+    wait_until(lambda: not pet.busy)
+    assert panel.chat.toPlainText().count("恢复测试完成。") == previous_chat.count("恢复测试完成。") + 1
+    report["empty_recognition_stays_quiet_and_next_turn_replies"] = True
+
     panel.input.setText("失败测试")
     panel._send()
     wait_until(lambda: not pet.busy and "系统提示" in panel.chat.toPlainText())
     assert "本地服务未能完成请求" in pet.ui.quick.chat.toPlainText()
     assert "synthetic-private-detail" not in panel.chat.toPlainText()
+    assert pet.avatar.bubble.isVisible()
     report["failure_is_visible_in_both_chats_without_private_detail"] = True
 
     panel.speech_button.click()

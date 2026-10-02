@@ -160,3 +160,35 @@ def test_synthesis_failure_keeps_text_and_emits_durable_failure(isolated_runtime
     assert replies == ["这是完整的文字回复。"]
     assert any("语音合成失败" in message for message in failures)
     assert all("private-synthesis-marker" not in message for message in failures)
+
+
+@pytest.mark.parametrize("recognized", ["", "   "])
+def test_empty_offline_recognition_skips_failure_and_resumes_listening(isolated_runtime, recognized):
+    """整句识别的空结果也不能触发气泡对应的故障事件，且下句仍可正常回复。"""
+    runtime = isolated_runtime
+    failures, replies, states, heard, finished = [], [], [], [], []
+    runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
+    runtime.reply.connect(lambda *args: replies.append(args), Qt.ConnectionType.DirectConnection)
+    runtime.state.connect(lambda _, text: states.append(text), Qt.ConnectionType.DirectConnection)
+    runtime.heard.connect(lambda *args: heard.append(args), Qt.ConnectionType.DirectConnection)
+    runtime.finished.connect(finished.append, Qt.ConnectionType.DirectConnection)
+    runtime.audio.transcribe = lambda _: recognized
+    runtime.listening = True
+
+    async def chat(*_, **_kwargs):
+        return "下一轮正常回复"
+
+    runtime.engine.chat = chat
+    settings = replace(Settings(), speak_replies=False, realtime_voice=False)
+    runtime.schedule(runtime._conversation(
+        runtime.epoch, settings, "", "voice", None, [0.0],
+    )).result(3)
+
+    assert not failures and not replies and not heard
+    assert finished == [runtime.epoch] and "继续聆听" in states[-1]
+    assert runtime.listening and not runtime.microphone.muted.is_set()
+
+    runtime.schedule(runtime._conversation(
+        runtime.epoch, settings, "你好", "chat", None, None,
+    )).result(3)
+    assert len(replies) == 1 and replies[0][1] == "下一轮正常回复"

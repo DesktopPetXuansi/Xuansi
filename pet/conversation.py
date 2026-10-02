@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 
 async def converse(runtime, epoch, settings, text, kind, position, samples, observation=None):
-    failed = False
+    keep_status = False
     try:
         runtime.microphone.muted.set()
         if kind == "preview":
@@ -26,9 +26,13 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
             return
         if samples is not None:
             runtime.state.emit(epoch, "正在识别你的话…")
-            text = await asyncio.to_thread(runtime.audio.transcribe, samples)
+            text = (await asyncio.to_thread(runtime.audio.transcribe, samples)).strip()
             if not text:
-                raise RuntimeError("没有识别出文字，请靠近麦克风重说，或在偏好中检查输入设备。")
+                # 空识别可能来自杂声；保持状态提示，由 finally 恢复收音，不触发故障气泡。
+                keep_status = True
+                runtime.state.emit(epoch, "未识别到有效语音 · 继续聆听，可重说或检查输入设备。")
+                LOG.info("整句语音识别为空，继续聆听")
+                return
             runtime.heard.emit(epoch, text)
         if kind == "voice" and not re.search(
             r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text
@@ -55,7 +59,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         sd.stop()
         raise
     except Exception as exc:
-        failed = True
+        keep_status = True
         LOG.warning("对话失败 type=%s", type(exc).__name__)
         message = (
             str(exc)
@@ -71,7 +75,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         if epoch == runtime.epoch:
             if runtime.listening:
                 runtime.microphone.muted.clear()
-            if not failed:
+            if not keep_status:
                 runtime.state.emit(
                     epoch, (("实时聆听中 · 说完即可回复" if settings.realtime_voice else "正在聆听，说完停顿即可")
                     if runtime.listening else "已就绪 · 麦克风关闭")
