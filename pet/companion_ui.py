@@ -108,7 +108,7 @@ class CompanionUI:
             if not (appearance_only or avoidance_only):
                 self.hotkey.stage(settings.chat_hotkey)
         except ValueError as exc:
-            self.owner.panel.status.setText(str(exc))
+            self.owner.panel.form.complete(str(exc))
             return
         self.saving = True
         self.appearance_only = appearance_only
@@ -132,6 +132,7 @@ class CompanionUI:
         if not error:
             self.quick.setWindowTitle(f"{settings.name} · 快捷对话")
         self.owner.apply_settings(settings, error)
+        self.owner.panel.form.complete(error)
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
             self.appearance.saved(error)

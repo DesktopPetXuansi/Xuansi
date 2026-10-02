@@ -1,5 +1,6 @@
 """设置表单；保存事件统一构造经过校验的不可变设置。"""
 
+import logging
 from dataclasses import replace
 
 from PySide6.QtCore import Signal
@@ -18,6 +19,8 @@ from PySide6.QtWidgets import (
 )
 
 from .config import Settings
+
+LOG = logging.getLogger(__name__)
 
 
 class PersonaPage(QWidget):
@@ -119,6 +122,10 @@ class PreferencesPage(QWidget):
         form.addRow(preview)
         self.device = QComboBox()
         self.device.addItem("系统默认麦克风", -1)
+        self._initial_device = settings.input_device
+        if settings.input_device != -1:
+            self.device.addItem("已保存的麦克风（等待设备列表）", settings.input_device)
+            self.device.setCurrentIndex(1)
         form.addRow("麦克风", self.device)
         hint = QLabel(
             "麦克风需手动开启；全屏时暂停观察。\n休眠会关闭麦克风并释放模型，恢复后需再次开启对话。"
@@ -131,11 +138,18 @@ class PreferencesPage(QWidget):
         form.addRow(self.save_button)
 
     def set_devices(self, devices, selected):
+        # 异步枚举不得覆盖已保存设备，也不得覆盖等待期间用户新选的设备。
+        if self.device.currentData() != self._initial_device:
+            selected = self.device.currentData()
         self.device.clear()
         self.device.addItem("系统默认麦克风", -1)
         for index, name in devices:
             self.device.addItem(name, index)
-        self.device.setCurrentIndex(max(0, self.device.findData(selected)))
+        if self.device.findData(selected) < 0:
+            self.device.addItem("已保存的麦克风（当前不可用，请检查连接）", selected)
+            LOG.info("保留暂不可用的麦克风选择 device=%s", selected)
+        self.device.setCurrentIndex(self.device.findData(selected))
+        self._initial_device = selected
 
     def _voice_engine_changed(self):
         natural = self.tts_engine.currentData() == "natural"

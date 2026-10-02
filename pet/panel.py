@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from .config import Settings
 from .log_viewer import LogViewer
 from .model_page import ModelPage
+from .panel_settings import PanelSettings
 from .preferences import PersonaPage, PreferencesPage
 from .theme import configure_fonts
 
@@ -113,6 +114,8 @@ class Panel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.model_page)
         self.tabs.addTab(scroll, "配置")
+        self.form = PanelSettings(self)
+        layout.addWidget(self.form.hint)
         self.logs = LogViewer(STYLE)
         self.logs.setWindowTitle(f"{settings.name} · 运行日志")
         self.audio_status = QLabel("声音回避已开启")
@@ -205,13 +208,7 @@ class Panel(QWidget):
         self.voice_button.blockSignals(False)
 
     def _save(self):
-        try:
-            settings = self.model_page.apply(
-                self.preferences.apply(self.persona.apply(self.settings))
-            ).validate()
-            self.settings_requested.emit(settings)
-        except ValueError as exc:
-            self.status.setText(str(exc))
+        self.form.request()
 
     def _preview(self):
         try:
@@ -232,9 +229,11 @@ class Panel(QWidget):
         self.logs.activateWindow()
 
     def saving(self, enabled):
+        self.form.saving = enabled
+        self.form.refresh()
         for button in (self.persona.save_button, self.preferences.save_button, self.model_page.save_button):
             button.setEnabled(not enabled)
 
     def closeEvent(self, event):
-        self.hide()
         event.ignore()
+        self.form.close()
