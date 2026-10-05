@@ -150,7 +150,9 @@ class Runtime(QObject):
 
     async def _prepare_voice(self, settings):
         # 开麦时预热；预热合成只进内存，不调用播放接口，也不写入对话历史。
-        await self.engine.start(settings)
+        await self.engine.prepare_controls(
+            settings, speech_enabled=self.should_speak(settings), available_motions=self.motion_actions,
+        )
         if self.should_speak(settings):
             pending = asyncio.create_task(asyncio.to_thread(
                 self.audio.synthesize, "你好。", settings.speaker, settings.speed, settings.tts_engine

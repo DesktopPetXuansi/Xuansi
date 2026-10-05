@@ -148,6 +148,31 @@ class LocalEngine:
             await self.stop()
             raise
 
+    async def _understand_control(self, settings, text, history, speech_enabled, actions, allow_memory):
+        """预热和真实对话共用提示与协议，让引擎复用同一个控制上下文前缀。"""
+        options = replace(
+            settings, persona="", max_tokens=256,
+            system_prompt=control_prompt(speech_enabled, actions, allow_memory),
+        )
+        history = await self._fit_history(options, text, False, history)
+        return await decide_control(
+            self.client, request_messages(options, text, [], history), actions, allow_memory,
+        )
+
+    async def prepare_controls(
+        self, settings: Settings, *, speech_enabled=True, available_motions=DEFAULT_ACTION_IDS,
+    ):
+        """只准备缓存，不执行合成输入产生的朗读、动作或记忆建议。"""
+        await self.start(settings)
+        try:
+            await self._understand_control(settings, "你好", [], speech_enabled, available_motions, True)
+            self.last_used = time.monotonic()
+            LOG.info("控制意图预热完成，合成决定不执行")
+        except (asyncio.CancelledError, httpx.HTTPError, RuntimeError, ValueError):
+            # HTTP 取消不代表 GPU 已停止；失败时回收本实例拥有的计算服务。
+            await self.stop()
+            raise
+
     async def chat(
         self,
         settings: Settings,
@@ -166,14 +191,8 @@ class LocalEngine:
             if on_speech is not None:
                 available_motions = getattr(on_speech, "available_motions", DEFAULT_ACTION_IDS)
                 remember = getattr(on_speech, "remember", None)
-                decision_settings = replace(
-                    settings, persona="", max_tokens=256,
-                    system_prompt=control_prompt(speech_enabled, available_motions, remember is not None),
-                )
-                decision_history = await self._fit_history(decision_settings, text, False, history)
-                decision = await decide_control(
-                    self.client, request_messages(decision_settings, text, [], decision_history),
-                    available_motions, remember is not None,
+                decision = await self._understand_control(
+                    settings, text, history, speech_enabled, available_motions, remember is not None,
                 )
                 directive = SpeechDirective(on_speech, decision.header)
                 if decision.memory_intent == "clarify":
