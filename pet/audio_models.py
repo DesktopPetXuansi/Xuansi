@@ -45,12 +45,16 @@ class AudioModels:
         LOG.info("本地语音识别就绪")
 
     def transcribe(self, samples: np.ndarray, sample_rate=16000):
+        if not len(samples):
+            return ""
         with self.lock:
             if self.recognizer is None:
                 self._load_asr()
             started = time.monotonic()
             stream = self.recognizer.create_stream()
-            stream.accept_waveform(sample_rate, samples)
+            # 短句从首个音节直接开始时容易误读句首；补上下文，不猜测或替换识别文字。
+            contextual = np.pad(samples, (round(sample_rate * 0.1), round(sample_rate * 0.3)))
+            stream.accept_waveform(sample_rate, contextual)
             self.recognizer.decode_stream(stream)
             text = re.sub(r"<\|.*?\|>", "", stream.result.text).strip()
             LOG.info(
