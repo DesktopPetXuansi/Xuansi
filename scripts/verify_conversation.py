@@ -1,6 +1,7 @@
 """本机语音→记忆→模型回复→合成闭环；测试音频替代真实麦克风。"""
 
 import json
+import logging
 import sys
 import tempfile
 import threading
@@ -16,8 +17,12 @@ from pet.config import ROOT, Settings
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
 
+LOG = logging.getLogger(__name__)
+
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     runtime = Runtime()
     # 本脚本验证合成语音闭环；声卡为替身，声音回避固定为安静并由独立脚本验收。
     runtime.audio_activity.clock = lambda: 10.0
@@ -65,8 +70,13 @@ def main():
         runtime.thread.join(2)
         temporary.cleanup()
     target = ROOT / "data/verification/conversation-report.json"
+    report["passed"] = report.get("memory_roundtrip_passed", False) and report.get("voice_roundtrip_passed", False)
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False), flush=True)
+    # 生成报告不等于业务验收通过；记忆或语音未完成时让调用方获得失败退出码。
+    LOG.info("整句语音与记忆联调结束 passed=%s", report["passed"])
+    if not report["passed"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
