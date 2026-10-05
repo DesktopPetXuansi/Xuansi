@@ -47,7 +47,9 @@ async def verify(runtime, report):
         )
         entry = {
             "case": label, "input": text, "changes": changes, "expected": expected, "answer": answer,
-            "passed": changes == expected and answer == "".join(chunks).strip() and "[voice:" not in answer,
+            # 已开启时，keep 与重复 on 都满足明确的继续出声要求；无切换请求仍必须 keep。
+            "passed": (changes == expected or (expected == [enabled] and not changes))
+            and answer == "".join(chunks).strip() and "[voice:" not in answer,
             "first_text_seconds": runtime.engine.stats.get("first_text_seconds"),
         }
         report["semantics"].append(entry)

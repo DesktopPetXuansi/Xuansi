@@ -45,9 +45,6 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         )
         if not observation_current(observation):
             return
-        if kind != "observation":
-            if await durable_io(runtime.memory.remember_explicit, text):
-                runtime.memory_loaded.emit(await asyncio.to_thread(runtime.memory.read))
         notes = await asyncio.to_thread(runtime.memory.context, text)
         if notes:
             settings = replace(
@@ -99,10 +96,22 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
             if current():
                 runtime.motion_requested.emit(epoch, motion)
 
+        async def remember(note):
+            # 这里只执行经模型理解并校验的明确事项；取消后不发起新的写入。
+            if current():
+                # 当前原句及近期用户资料保留敏感标签；助手提示不作为用户资料参与过滤。
+                source = "\n".join([
+                    *(turn["content"] for turn in runtime.history[-8:] if turn["role"] == "user"),
+                    text,
+                ])
+                await durable_io(runtime.memory.remember, note, source)
+                runtime.memory_loaded.emit(await asyncio.to_thread(runtime.memory.read))
+
         controls = ControlCallbacks(
             change_speech,
             dispatch_motion,
             runtime.motion_actions,
+            remember,
         )
 
         def speech_state(message):

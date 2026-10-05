@@ -78,16 +78,16 @@ class MemoryStore:
         temporary.replace(self.path)
         LOG.info("本地记忆已更新 chars=%d", len(text))
 
-    def remember_explicit(self, text: str):
+    def remember(self, note: str, source: str = ""):
+        """接收已由模型确认的明确事项；保存层不再按用户口令判断意图。"""
+        # 同时检查源文，防止模型提取事项时删掉密码等敏感标签后绕过既有规则。
+        if SECRET.search(source):
+            raise ValueError("长期记忆不保存密码、验证码、密钥、证件或银行卡信息。")
+        note = note.strip()
+        if not note or len(note) > 500:
+            raise ValueError("单条长期记忆需为 1–500 字，请整理后再保存。")
         with self.lock:
-            return self._remember_explicit(text)
-
-    def _remember_explicit(self, text: str):
-        match = re.match(r"^(?:请|你要|帮我)?(?:记住|记一下)[，,:：\s]*(.+)$", text.strip(), flags=re.S)
-        if not match:
-            return False
-        note = match[1].strip()[:500]
-        old = self.read()
-        if note not in old.splitlines():
-            self.save("\n".join(filter(None, (old, note))))
+            old = self._read()
+            if note not in old.splitlines():
+                self._save("\n".join(filter(None, (old, note))))
         return True

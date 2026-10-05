@@ -16,8 +16,9 @@ from pathlib import Path
 import httpx
 
 from .config import ROOT, Settings
+from .model_control import control_prompt, decide_control
 from .process_guard import ProcessGuard
-from .speech_control import DEFAULT_ACTION_IDS, SpeechDirective, speech_grammar, speech_prompt
+from .speech_control import DEFAULT_ACTION_IDS, SpeechDirective, speech_prompt
 from .text_stream import read_completion
 
 LOG = logging.getLogger(__name__)
@@ -161,13 +162,43 @@ class LocalEngine:
         started = time.monotonic()
         await self.start(settings)
         try:
-            directive = SpeechDirective(on_speech) if on_speech is not None else None
-            if directive is not None:
-                # 动作能力和控制头随本轮对话传入，不额外调用分类模型。
+            directive = None
+            if on_speech is not None:
                 available_motions = getattr(on_speech, "available_motions", DEFAULT_ACTION_IDS)
+                remember = getattr(on_speech, "remember", None)
+                decision_settings = replace(
+                    settings, persona="", max_tokens=256,
+                    system_prompt=control_prompt(speech_enabled, available_motions, remember is not None),
+                )
+                decision_history = await self._fit_history(decision_settings, text, False, history)
+                decision = await decide_control(
+                    self.client, request_messages(decision_settings, text, [], decision_history),
+                    available_motions, remember is not None,
+                )
+                directive = SpeechDirective(on_speech, decision.header)
+                if decision.memory_intent == "clarify":
+                    # 意图由模型判断；待确认反馈依据真实执行结果生成，不能被随机正文改成已保存。
+                    answer = directive.feed(
+                        decision.header + "你是想把刚才的事项保存为长期记忆吗？确认后我再保存。"
+                    )
+                    if on_chunk is not None:
+                        self.stats["first_text_seconds"] = round(time.monotonic() - started, 3)
+                        await on_chunk(answer)
+                    LOG.info("记忆授权待确认，本轮未写入")
+                    return self._complete_reply(directive.finish(), started, len(images))
+                if decision.memory is not None:
+                    await remember(decision.memory)
+                memory_status = (
+                    "已成功保存本轮明确指定的记忆事项，请明确告知已保存到长期记忆。" if decision.memory is not None
+                    else "本轮未保存任何新记忆；不能声称已经长期记住。"
+                )
                 settings = replace(
                     settings,
-                    system_prompt=settings.system_prompt + speech_prompt(speech_enabled, available_motions),
+                    system_prompt=settings.system_prompt + speech_prompt(speech_enabled, available_motions)
+                    + f"\n本轮执行决定已经确定：{decision.header.strip()}；{memory_status}"
+                    "请按已执行结果生成自然正文，不重新决定控制动作。"
+                    "如果当前表达像记忆指令但授权不明确，先询问是否要保存为长期记忆，"
+                    "等待用户确认后再执行，不能仅口头说已记住。",
                     max_tokens=settings.max_tokens + 32,
                 )
             history = await self._fit_history(settings, text, bool(images), history)
@@ -181,7 +212,7 @@ class LocalEngine:
                 "chat_template_kwargs": {"enable_thinking": False},
             }
             if directive is not None:
-                payload["grammar"] = speech_grammar(available_motions)
+                payload["grammar"] = decision.grammar
             if on_chunk is not None:
                 first = True
 
@@ -211,10 +242,7 @@ class LocalEngine:
                 if on_chunk is None:
                     directive.feed(result)
                 result = directive.finish()
-            self.last_used = time.monotonic()
-            self.stats["last_response_seconds"] = round(self.last_used - started, 2)
-            LOG.info("推理完成 images=%d elapsed=%.2fs", len(images), self.last_used - started)
-            return result[:6000]
+            return self._complete_reply(result, started, len(images))
         except asyncio.CancelledError:
             # 断开 HTTP 不保证 GPU 停止计算；终止自己启动的服务以确保释放。
             await self.stop()
@@ -223,6 +251,13 @@ class LocalEngine:
             # 中途断流或无效 SSE 不留下仍在计算的旧请求。
             await self.stop()
             raise
+
+    def _complete_reply(self, result, started, image_count):
+        """正常正文和授权确认共用完成计时，便于核对端到端延迟。"""
+        self.last_used = time.monotonic()
+        self.stats["last_response_seconds"] = round(self.last_used - started, 2)
+        LOG.info("推理完成 images=%d elapsed=%.2fs", image_count, self.last_used - started)
+        return result[:6000]
 
     async def _fit_history(self, settings, text, with_image, history):
         """用当前模型的分词器裁掉最老会话，保留图像、回复和模板的空间。"""

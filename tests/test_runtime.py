@@ -54,9 +54,11 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
 def test_live_waits_for_endpoint_and_deduplicates(runtime):
     calls = []
 
-    async def chat(settings, text, images, history, on_chunk=None, **_kwargs):
+    async def chat(settings, text, images, history, on_chunk=None, on_speech=None, **_kwargs):
         calls.append(text)
-        return "记住了。"
+        # 模拟该完整话段已经过模型理解；部分转写不进入推理，也不能写入记忆。
+        await on_speech.remember("我喜欢喝绿茶")
+        return "已保存这项偏好。"
 
     runtime.engine.chat = chat
     runtime.listening = True

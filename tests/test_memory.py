@@ -5,17 +5,17 @@ from pet.memory import MemoryStore
 
 def test_explicit_memory_survives_restart(tmp_path):
     memory = MemoryStore(tmp_path / "memory.json")
-    assert memory.remember_explicit("记住，我喜欢简短的回答")
+    assert memory.remember("我喜欢简短的回答")
     assert MemoryStore(memory.path).read() == "我喜欢简短的回答"
-    assert not memory.remember_explicit("这个屏幕上是什么")
-    memory.remember_explicit("记住，我喜欢简短的回答")
+    # 意图由推理层验证；这里仅检查模型确认事项的持久化和去重。
+    memory.remember("我喜欢简短的回答")
     assert len(memory.read().splitlines()) == 1
 
 
 def test_secret_is_rejected_and_clear_erases_saved_notes(tmp_path):
     memory = MemoryStore(tmp_path / "memory.json")
     with pytest.raises(ValueError):
-        memory.remember_explicit("记住我的密码是123456")
+        memory.remember("我的密码是123456")
     assert not memory.path.exists()
     memory.save("我喜欢猫")
     memory.save("")

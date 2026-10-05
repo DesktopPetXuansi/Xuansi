@@ -142,7 +142,7 @@ class Panel(QWidget):
         self.chat = QPlainTextEdit()
         self.chat.setReadOnly(True)
         self.chat.setPlaceholderText(
-            "聊点什么，或者开启连续对话。\n\n想让我长期记住什么，可以说：\n“记住，我喜欢简短的回答。”"
+            "聊点什么，或者开启连续对话。\n\n想让我长期记住什么，可以说：\n“我喜欢简短的回答，请保存这个偏好。”"
         )
         self.chat.setMaximumBlockCount(250)
         layout.addWidget(self.chat)
@@ -182,7 +182,7 @@ class Panel(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
         explanation = QLabel(
-            "长期记忆保存在本机，重启后仍在。\n只记录你明确说“记住”的内容，或下面手动填写的事项。"
+            "长期记忆保存在本机，重启后仍在。\n明确要求才会保存，含糊时先确认；也可在下面手动编辑。"
         )
         explanation.setWordWrap(True)
         layout.addWidget(explanation)

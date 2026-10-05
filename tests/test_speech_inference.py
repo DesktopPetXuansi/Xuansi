@@ -21,11 +21,17 @@ async def test_model_directive_precedes_body_and_is_absent_from_answer(monkeypat
         assert payload["grammar"].startswith("root ::=")
         assert "当前对话朗读：开启" in payload["messages"][0]["content"]
         assert payload["messages"][-1]["content"][0]["text"] == "我需要专心写完这封邮件"
+        if r"[^\x00]+" not in payload["grammar"]:
+            assert payload["temperature"] == 0.0
+            return httpx.Response(200, json={"choices": [{"message": {
+                "content": json.dumps({"memory_intent": "none", "voice": "off", "motion": "none", "memory": None})
+            }}]})
+        assert payload["temperature"] == Settings().temperature
         if not streaming:
             return httpx.Response(200, json={"choices": [{"message": {
-                "content": "[voice:off]\n好的，我安静陪你。"
+                "content": "[voice:off][motion:none]\n好的，我安静陪你。"
             }}]})
-        chunks = ["[voi", "ce:o", "ff]\n好的，", "我安静陪你。"]
+        chunks = ["[voi", "ce:o", "ff][motion:none]\n好的，", "我安静陪你。"]
         lines = ["data: " + json.dumps({"choices": [{"delta": {"content": chunk}}]}) + "\n\n"
                  for chunk in chunks]
         return httpx.Response(200, text="".join(lines) + "data: [DONE]\n\n")

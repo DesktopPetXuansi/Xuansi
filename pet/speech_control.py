@@ -1,12 +1,12 @@
 """模型先决定朗读动作，再生成正文；只解析协议，不匹配用户的说话方式。"""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 LOG = logging.getLogger(__name__)
 
-# 同一次推理先给出完整控制头；约束格式不替代模型的语义判断。
+# 执行意图先独立理解；正文输出已选定的控制头，约束格式不替代模型的语义判断。
 # https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md
 ACTION_IDS = ("blink", "raise_hand")
 DEFAULT_ACTION_IDS = ()
@@ -39,6 +39,7 @@ class ControlCallbacks:
     apply_speech: Callable[[bool], None]
     apply_motion: Callable[[str], None]
     available_motions: tuple[str, ...]
+    remember: Callable[[str], Awaitable[None]] | None = None
 
     def __call__(self, enabled):
         self.apply_speech(enabled)
@@ -60,9 +61,9 @@ def speech_prompt(enabled: bool, actions=DEFAULT_ACTION_IDS):
         f"当前对话朗读：{'开启' if enabled else '关闭'}。你可以控制自己的朗读，不控制麦克风。\n"
         "根据当前用户输入和最近上下文判断是否改变朗读，以及是否执行一个受支持的动作。"
         "必须先输出组合控制头并换行，然后才是给用户看的自然回复：\n"
+        "[voice:keep][motion:none]：朗读方式没有变化，或没有明确动作请求。\n"
         "[voice:off][motion:none]：用户希望安静、停止出声或只用文字。\n"
         "[voice:on][motion:none]：用户希望恢复出声或明确要求朗读。\n"
-        "[voice:keep][motion:none]：朗读方式没有变化，或没有明确动作请求。\n"
         "动作字段只能使用下面列出的 ID；无动作时使用 none：\n"
         f"{supported}\n"
         "只根据用户当前输入中的直接意图决定动作；结合上下文只用于理解指代。"
@@ -89,7 +90,7 @@ def speech_prompt(enabled: bool, actions=DEFAULT_ACTION_IDS):
 
 
 class SpeechDirective:
-    def __init__(self, apply: Callable[[bool], None]):
+    def __init__(self, apply: Callable[[bool], None], expected_header: str | None = None):
         self.apply = apply
         self.apply_motion = getattr(apply, "dispatch_motion", None)
         self.available_motions = available_action_ids(
@@ -104,6 +105,9 @@ class SpeechDirective:
         self.headers.update(
             {f"[voice:{voice}]\n": (enabled, None) for voice, enabled in VOICE_VALUES.items()}
         )
+        if expected_header is not None:
+            # 服务端语法之外再校验本轮决定，异常正文不能悄悄重新切换状态。
+            self.headers = {expected_header: self.headers[expected_header]}
         self.pending = ""
         self.decided = False
         self.text = ""

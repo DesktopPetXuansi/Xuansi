@@ -41,3 +41,12 @@ def test_invalid_header_never_executes_or_exposes_private_content(source):
         directive.feed(source)
     assert not changes and not directive.text
     assert "秘密正文" not in str(error.value)
+
+
+def test_body_cannot_change_a_previously_understood_control_decision():
+    """即便服务端返回另一个合法头，也不能重选已经确认的朗读状态。"""
+    changes = []
+    directive = SpeechDirective(changes.append, "[voice:keep][motion:none]\n")
+    with pytest.raises(RuntimeError, match="语音控制"):
+        directive.feed("[voice:off][motion:none]\n错误回复。")
+    assert not changes and not directive.text

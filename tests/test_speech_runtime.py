@@ -119,3 +119,59 @@ def test_final_voice_can_resume_when_saved_reply_preference_is_off(runtime):
     runtime.schedule(finish()).result(3)
     assert clips == ["现在可以听到我了。"]
     assert runtime.listening and not runtime.microphone.muted.is_set()
+
+
+@pytest.mark.parametrize("text, model_note", [
+    ("帮我把刚才那个偏好保存下来", "我喜欢喝绿茶"),
+    ("记住我喜欢喝绿茶", None),
+    ("请翻译：记住我喜欢喝绿茶", None),
+])
+def test_memory_is_written_only_after_model_understands_the_request(runtime, text, model_note):
+    """文字是否含口令不能触发写入；只执行模型返回的明确事项。"""
+    loaded = []
+    runtime.memory_loaded.connect(loaded.append, Qt.ConnectionType.DirectConnection)
+
+    async def chat(*_, on_chunk, on_speech, **kwargs):
+        if model_note is not None:
+            await on_speech.remember(model_note)
+        await on_chunk("处理完毕。")
+        return "处理完毕。"
+
+    runtime.engine.chat = chat
+    runtime.schedule(runtime._conversation(
+        0, replace(Settings(), speak_replies=False), text, "chat", None, None,
+    )).result(3)
+    assert runtime.memory.read() == (model_note or "")
+    assert loaded == ([model_note] if model_note is not None else [])
+
+
+@pytest.mark.parametrize("text, history, sensitive", [
+    ("记住我的密码是123456", [], True),
+    ("把刚才那个记下来", [
+        {"role": "user", "content": "我的验证码是123456"},
+        {"role": "assistant", "content": "请不要保存验证码。"},
+    ], True),
+    ("请保存我的普通编号123456", [], False),
+    ("请保存我的普通编号123456", [
+        {"role": "assistant", "content": "长期记忆不能保存密码或验证码。"},
+    ], False),
+])
+def test_model_rewriting_cannot_remove_source_secret_labels(runtime, text, history, sensitive):
+    """敏感资料过滤检查原始输入，不能被模型提取掉标签后绕过。"""
+    failures, replies = [], []
+    runtime.history = history
+    runtime.failed.connect(lambda _, message: failures.append(message), Qt.ConnectionType.DirectConnection)
+    runtime.reply.connect(lambda _, answer, kind: replies.append(answer), Qt.ConnectionType.DirectConnection)
+
+    async def chat(*_, on_speech, **kwargs):
+        await on_speech.remember("123456")
+        return "已保存。"
+
+    runtime.engine.chat = chat
+    runtime.schedule(runtime._conversation(
+        0, replace(Settings(), speak_replies=False), text, "chat", None, None,
+    )).result(3)
+    assert runtime.memory.read() == ("" if sensitive else "123456")
+    assert bool(failures) is sensitive
+    assert bool(replies) is not sensitive
+    assert "123456" not in "".join(failures)
