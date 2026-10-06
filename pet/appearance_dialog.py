@@ -48,12 +48,22 @@ class AppearanceDialog(QDialog):
         title.setObjectName("title")
         layout.addWidget(title)
         note = QLabel(
-            "支持透明 PNG、GIF、WebP、APNG，也可用 JPG / BMP。\n静态图片带轻微身体动作；动图按原帧序循环播放。"
+            "支持透明 PNG、GIF、WebP、APNG，也可用 JPG / BMP。\n默认玄司显示 Live2D 动画；静态图片带轻微动作，动图按原帧序播放。"
         )
         note.setWordWrap(True)
         layout.addWidget(note)
         self.preview = AppearancePreview(self)
         layout.addWidget(self.preview)
+        row = QHBoxLayout()
+        self.motion_hint = QLabel("默认玄司可预览眨眼、视线跟随与头发衣摆摆动。")
+        self.motion_hint.setWordWrap(True)
+        row.addWidget(self.motion_hint, 1)
+        self.blink_button = QPushButton("预览眨眼")
+        self.blink_button.setEnabled(False)
+        self.blink_button.clicked.connect(self.preview_blink)
+        self.preview.motion_capabilities_changed.connect(lambda _: self.update_buttons())
+        row.addWidget(self.blink_button)
+        layout.addLayout(row)
         self.status = QLabel("当前：默认玄司")
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
@@ -161,11 +171,24 @@ class AppearanceDialog(QDialog):
         self.status.setText(error or "形象已应用，重启后会继续使用。")
         self.update_buttons()
 
+    def preview_blink(self):
+        """动作预览不会把当前候选应用到桌宠，也不会产生配置草稿。"""
+        if not self.loading and not self.saving and self.preview.play_motion("blink"):
+            LOG.info("形象窗口已预览眨眼")
+
     def update_buttons(self):
         free = not self.loading and not self.saving
         self.choose.setEnabled(free)
         self.restore.setEnabled(free)
         self.apply_button.setEnabled(free and self.dirty)
+        self.blink_button.setEnabled(free and "blink" in self.preview.available_motions)
+        renderer = self.preview.renderer
+        if self.candidate:
+            self.motion_hint.setText("导入图片按自身能力预览，不支持 Live2D 眨眼。")
+        elif renderer._live2d_failed:
+            self.motion_hint.setText("动态预览暂不可用，当前显示图片；可查看运行日志。")
+        else:
+            self.motion_hint.setText("移动鼠标查看视线跟随，点击按钮预览一次眨眼。")
 
     def closeEvent(self, event):
         self.picker.close()
@@ -174,5 +197,5 @@ class AppearanceDialog(QDialog):
     def hideEvent(self, event):
         # Esc、关闭按钮和父窗口关闭都拒收迟到导入；已接受的保存事务仍可完成。
         self.generation += 1
-        self.preview.timer.stop()
+        self.preview.stop()
         super().hideEvent(event)

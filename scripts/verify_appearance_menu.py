@@ -28,6 +28,7 @@ from pet.app import DesktopPet
 from pet.avatar import Avatar
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.desktop import USER32, DesktopState
+from pet.live2d_session import configure_opengl_sharing
 from pet.memory import MemoryStore
 
 
@@ -88,6 +89,7 @@ def native_window_icon_matches_tray(pet):
 def main():
     logging.basicConfig(level=logging.INFO)
     USER32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    configure_opengl_sharing()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     output = ROOT / "data/verification"

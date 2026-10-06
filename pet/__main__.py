@@ -11,6 +11,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .config import DATA, ROOT
+from .live2d_session import configure_opengl_sharing
 
 
 def main():
@@ -22,6 +23,7 @@ def main():
     psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
     # Windows / Qt / 全局鼠标钩子使用一致的每显示器 DPI 感知。
     ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    configure_opengl_sharing()
     app = QApplication(sys.argv)
     from .instance import listen_for_launch, show_existing
 

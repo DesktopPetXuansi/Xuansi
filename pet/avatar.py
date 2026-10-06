@@ -185,8 +185,8 @@ class Avatar(QOpenGLWidget):
     open_requested = Signal()
     motion_capabilities_changed = Signal(object)
 
-    def __init__(self, size=160, image_id=""):
-        super().__init__(None, PASSIVE)
+    def __init__(self, size=160, image_id="", *, parent=None):
+        super().__init__(parent, PASSIVE if parent is None else Qt.WindowType.Widget)
         surface = QSurfaceFormat()
         surface.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
         # Cubism 渲染器使用 GLSL 1.20，因此请求兼容模式上下文。
@@ -239,8 +239,9 @@ class Avatar(QOpenGLWidget):
         self.move_start = None
         self.last_follow_step = 0.0
         self.set_size(size)
-        bounds = QGuiApplication.primaryScreen().availableGeometry()
-        self.move(bounds.right() - self.width() - 32, bounds.bottom() - self.height() - 24)
+        if parent is None:
+            bounds = QGuiApplication.primaryScreen().availableGeometry()
+            self.move(bounds.right() - self.width() - 32, bounds.bottom() - self.height() - 24)
         self.clock = QTimer(self)
         self.clock.setTimerType(Qt.TimerType.PreciseTimer)
         self.clock.setInterval(self.durations[self.frame % len(self.durations)])
@@ -249,7 +250,7 @@ class Avatar(QOpenGLWidget):
         self.render_clock = QTimer(self)
         self.render_clock.setInterval(33)
         self.render_clock.timeout.connect(self.update)
-        self.bubble = Bubble()
+        self.bubble = Bubble() if parent is None else None
         self.setToolTip("点击打开对话 · 拖动调整位置")
 
     def set_size(self, size):
@@ -266,11 +267,12 @@ class Avatar(QOpenGLWidget):
         else:
             self._frame_mask()
         # 增大形象后仍完整留在当前工作区，不伸进任务栏或屏幕外。
-        bounds = self.screen().availableGeometry()
-        self.move(
-            max(bounds.left(), min(self.x(), bounds.right() - self.width() + 1)),
-            max(bounds.top(), min(self.y(), bounds.bottom() - self.height() + 1)),
-        )
+        if self.isWindow():
+            bounds = self.screen().availableGeometry()
+            self.move(
+                max(bounds.left(), min(self.x(), bounds.right() - self.width() + 1)),
+                max(bounds.top(), min(self.y(), bounds.bottom() - self.height() + 1)),
+            )
 
     def set_animation(self, name):
         if name != "idle":
@@ -433,6 +435,7 @@ class Avatar(QOpenGLWidget):
             model = self._live2d_model = live2d.LAppModel()
             LOG.info("Live2D 模型加载开始 file=%s", LIVE2D_MODEL.name)
             model.LoadModelJson(str(LIVE2D_MODEL))
+            self.resizeGL(self.width(), self.height())
             LOG.info("Live2D 模型文件已读取")
             parameter_ids = set(model.GetParamIds())
             missing = set(LIVE2D_PARAMETERS) - parameter_ids
