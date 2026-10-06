@@ -18,6 +18,7 @@ from .idle_blade_animation import (
     idle_blade_pose,
     load_idle_blade_frames,
 )
+from .live2d_session import SESSION
 
 LOG = logging.getLogger(__name__)
 LIVE2D_MODEL = Path(__file__).resolve().parents[1] / "assets/xuansi/rigging/xuansi.model3.json"
@@ -427,12 +428,9 @@ class Avatar(QOpenGLWidget):
             LOG.info("玄司 Live2D 渲染器初始化开始")
             import live2d.v3 as live2d
 
-            live2d.enableLog(True)
-            live2d.init()
-            LOG.info("Live2D Cubism 核心初始化完成")
-            live2d.glInit()
-            LOG.info("Live2D OpenGL 渲染器初始化完成")
-            model = live2d.LAppModel()
+            SESSION.acquire(self, live2d)
+            self._live2d_module = live2d
+            model = self._live2d_model = live2d.LAppModel()
             LOG.info("Live2D 模型加载开始 file=%s", LIVE2D_MODEL.name)
             model.LoadModelJson(str(LIVE2D_MODEL))
             LOG.info("Live2D 模型文件已读取")
@@ -461,9 +459,7 @@ class Avatar(QOpenGLWidget):
             LOG.info("Live2D 发丝窗口边界缓冲已启用 padding=%dpx", padding)
         except Exception:
             self._live2d_failed = True
-            self._live2d_model = None
-            self._live2d_module = None
-            self._live2d_parameter_ids = frozenset()
+            self._release_live2d()
             LOG.exception("玄司 Live2D 加载失败，继续使用原 PNG 形象")
 
     def _set_render_mode(self):
@@ -684,13 +680,15 @@ class Avatar(QOpenGLWidget):
         self._gaze_y += (target_y - self._gaze_y) * smoothing
 
     def _release_live2d(self):
-        if self._live2d_model is None or self._live2d_module is None:
+        if self._live2d_module is None:
             return
         self.makeCurrent()
         try:
-            self._live2d_model.DestroyRenderer()
-            self._live2d_module.glRelease()
-            self._live2d_module.dispose()
+            if self._live2d_model is not None:
+                self._live2d_model.DestroyRenderer()
+            # 原生模型析构也会访问 Cubism，必须先在当前上下文中清掉模型引用。
+            self._live2d_model = None
+            SESSION.release(self)
             LOG.info("玄司 Live2D 渲染资源已释放")
         except Exception:
             LOG.exception("玄司 Live2D 渲染资源释放失败")
