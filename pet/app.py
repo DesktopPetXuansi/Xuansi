@@ -1,6 +1,7 @@
 """主线程协调桌宠、用户操作和自动观察；后台结果按代次和窗口校验。"""
 
 import logging
+import re
 import time
 from dataclasses import replace
 
@@ -12,7 +13,7 @@ from .avatar import Avatar
 from .companion_ui import CompanionUI
 from .config import Settings, load_settings
 from .desktop import cursor_position, desktop_state, point_is_own_window
-from .events import MouseEvent, ObservationGate
+from .events import VOICE_SCREEN_PATTERN, MouseEvent, ObservationGate
 from .idle_action import IdleActionTimer
 from .mouse_monitor import MouseMonitor
 from .panel import Panel
@@ -201,11 +202,9 @@ class DesktopPet(QObject):
         if update.final and update.text:
             self.panel.append("你", update.text)
         if update.text and update.final:
-            import re
-
             self._begin()
             with_screen = self.panel.with_screen.isChecked() or re.search(
-                r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", update.text
+                VOICE_SCREEN_PATTERN, update.text
             )
             self.runtime.accept_voice(
                 microphone_epoch, update, self.settings, self.last_external if with_screen else None

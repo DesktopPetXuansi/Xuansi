@@ -96,13 +96,14 @@ class Runtime(QObject):
     async def _conversation(self, epoch, settings, text, kind, position, samples, observation=None):
         await converse(self, epoch, settings, text, kind, position, samples, observation)
 
-    async def _speak(self, epoch, settings, answer, observation):
-        if self.speech_override is False:
+    async def _speak(self, epoch, settings, answer, observation, kind="chat"):
+        # 试听与对话沿用同一朗读门控；自动观察回退必须使用自己的偏好。
+        if not self.should_speak(settings, kind):
             return
         await speak(
             self.audio_activity,
             lambda: self.audio.synthesize(answer, settings.speaker, settings.speed, settings.tts_engine),
-            lambda: epoch == self.epoch and self.speech_override is not False and observation_current(observation),
+            lambda: epoch == self.epoch and self.should_speak(settings, kind) and observation_current(observation),
             lambda text: self.state.emit(epoch, text),
             self.mouth_level.emit,
         )

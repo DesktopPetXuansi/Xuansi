@@ -3,6 +3,9 @@
 import math
 from dataclasses import dataclass
 
+# 两条语音识别路径共用同一表达式；关键词截屏沿用既有行为，不参与控制意图判断。
+VOICE_SCREEN_PATTERN = r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里"
+
 
 @dataclass(frozen=True)
 class MouseEvent:

@@ -10,6 +10,7 @@ import sounddevice as sd
 from mss.exception import ScreenShotError
 
 from .desktop import capture_screen, observation_current
+from .events import VOICE_SCREEN_PATTERN
 from .memory import durable_io
 from .speech_control import ControlCallbacks
 from .streaming_speech import SpeechStream
@@ -22,7 +23,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
     try:
         runtime.microphone.muted.set()
         if kind == "preview":
-            await runtime._speak(epoch, settings, text, observation)
+            await runtime._speak(epoch, settings, text, observation, kind=kind)
             return
         if samples is not None:
             runtime.state.emit(epoch, "正在识别你的话…")
@@ -34,9 +35,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
                 LOG.info("整句语音识别为空，继续聆听")
                 return
             runtime.heard.emit(epoch, text)
-        if kind == "voice" and not re.search(
-            r"屏幕|鼠标|画面|看一[眼下]|看看|这个|这里", text
-        ):
+        if kind == "voice" and not re.search(VOICE_SCREEN_PATTERN, text):
             position = None
         if not observation_current(observation):
             return
@@ -166,4 +165,4 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
         if speech is not None:
             await speech.finish()
         elif runtime.should_speak(settings, kind):
-            await runtime._speak(epoch, settings, answer, observation)
+            await runtime._speak(epoch, settings, answer, observation, kind=kind)

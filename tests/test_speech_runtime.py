@@ -74,6 +74,42 @@ def test_mute_blocks_observation_and_preview_without_opening_microphone(runtime,
     assert not calls or "on_speech" not in calls[0]
 
 
+def test_preview_is_silent_when_saved_reply_preference_is_off(runtime):
+    """试听使用真实 converse 入口；保存的关闭偏好也必须阻止合成。"""
+    clips = []
+
+    def synthesize(text, *_):
+        clips.append(text)
+        return np.zeros(80), 8000
+
+    runtime.audio.synthesize = synthesize
+    settings = replace(Settings(), speak_replies=False)
+    runtime.schedule(runtime._conversation(0, settings, "试听内容。", "preview", None, None)).result(3)
+
+    assert not clips
+    assert runtime.speech_override is None and not runtime.listening
+
+
+def test_observation_fallback_speaks_when_only_reply_preference_is_off(runtime):
+    """自动观察走非流式回退，必须使用观察偏好，不能误用默认 chat 门控。"""
+    clips = []
+
+    async def chat(*_, **_kwargs):
+        return "观察回应。"
+
+    def synthesize(text, *_):
+        clips.append(text)
+        return np.zeros(80), 8000
+
+    runtime.engine.chat = chat
+    runtime.audio.synthesize = synthesize
+    settings = replace(Settings(), speak_replies=False, speak_observations=True)
+    runtime.schedule(runtime._conversation(0, settings, "观察画面", "observation", None, None)).result(3)
+
+    assert clips == ["观察回应。"]
+    assert not runtime.history and not runtime.listening
+
+
 def test_late_model_decision_cannot_change_new_request_state(runtime):
     entered, release = threading.Event(), threading.Event()
 
