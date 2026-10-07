@@ -2,6 +2,8 @@
 
 日期：2026-10-07。直接依据用户反馈“更换桌宠形象”页面仍播放旧跳动动画，以及随后批准采用与桌宠相同的 Live2D 预览并增加眨眼按钮。范围仅为本桌宠的形象预览、共享绘制资源及相应检查和文档。
 
+文档同步：2026-10-07。本文是源码修复验收；正式安装包结果见 [0.5.3 发布验收](安装包0.5.3发布验收.md)，全部资料及文档同步检查见 [文档索引](文档索引.md)。
+
 ## 1. 问题与修复
 
 旧 `AppearancePreview` 只调用 `build_frames(224)`，用默认 PNG 生成 8 帧轻微位移，以 180 毫秒间隔循环。桌宠已经使用 Live2D，预览页却没有接入模型，因此看不到桌面上的眨眼、视线跟随及头发衣摆动作。修改前真实 Qt 检查报出“默认形象预览仍未接入 Live2D”，失败报告保留。
@@ -28,7 +30,7 @@ Cubism 核心和着色器属于应用共享资源，不能由任一窗口单独�
 | 静态图、动图、恢复默认 | 包含在上述 37 项；临时导入、80/160 毫秒帧时长及按钮状态通过 |
 | 既有形象业务流程 | 32 项通过：保存失败、原图删除、透明帧清屏和穿透、未保存表单保留、图标同步、恢复默认及迟到导入隔离 |
 | Ruff 与差异空白检查 | 通过 |
-| 当前文档本地引用 | 111 个引用均存在 |
+| 修复收尾时的文档本地引用 | 当时检查的 4 份文档中，111 个引用均存在；后续全项目检查另记于文档索引 |
 | 原生画面抽查 | 查看本窗口截图，角色、双底色、动作提示及按钮完整显示，无文字裁切 |
 | 独立只读审阅 | 无阻塞问题；额外确认初始隐藏及停止后的预览计时器均未运行 |
 
@@ -38,7 +40,7 @@ Cubism 核心和着色器属于应用共享资源，不能由任一窗口单独�
 
 ```powershell
 & .venv/Scripts/python.exe -X utf8 -m pytest -q
-& .venv/Scripts/python.exe -X utf8 scripts/verify_appearance_preview.py
+& .venv/Scripts/python.exe -X utf8 scripts/verify_appearance_preview.py --output data/verification/appearance-preview-recheck.json
 & .venv/Scripts/python.exe -X utf8 scripts/verify_appearance_menu.py
 & .venv/Scripts/python.exe -m ruff check pet tests scripts
 ```
@@ -47,7 +49,7 @@ Cubism 核心和着色器属于应用共享资源，不能由任一窗口单独�
 
 ## 4. 版本与使用边界
 
-当前修复在源码分支 `codex/live2d-appearance-preview`，基础提交为 `6acbf4d`。已发布的 `v0.5.3` 标签、安装器和 `VERSION` 没有更新；本次不是安装包发布验收。运行中的旧源码桌宠仍需由用户从托盘退出，再重新启动才能加载修复。
+修复在源码分支 `codex/live2d-appearance-preview`，基础提交为 `6acbf4d`，共享资源增量提交为 `99d2ff1`，预览与按钮增量提交为 `2144023`。已发布的 `v0.5.3` 标签、安装器和 `VERSION` 没有更新；本次不是安装包发布验收。运行中的旧源码桌宠仍需由用户从托盘退出，再重新启动才能加载修复。
 
 只有默认玄司具有本项目既有 Live2D 绑定，自定义 PNG 或动图不会自动获得眨眼、口型或骨骼能力。本次在现有 Windows / NVIDIA / Qt 环境验证，不扩展为其他硬件或平台已验收。
 
