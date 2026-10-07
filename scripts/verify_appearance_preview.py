@@ -121,7 +121,7 @@ def main():
                 background.pixelColor(1, 1).name() == "#efeee8"
                 and background.pixelColor(background.width() - 2, 1).name() == "#35413d",
             )
-            with patch("pet.avatar.QCursor") as cursor:
+            with patch("pet.avatar_dynamics.QCursor") as cursor:
                 cursor.pos.return_value = renderer.mapToGlobal(QPoint(renderer.width() + 300, 0))
                 check("gaze_follows_synthetic_cursor", wait_until(lambda: renderer._gaze_x > 0.1))
             check("preview_has_rectangular_canvas", renderer.mask().isEmpty() or renderer.mask().contains(QPoint(0, 0)))
@@ -153,7 +153,7 @@ def main():
             check("sole_preview_has_no_extra_model", len(SESSION.owners) == 1)
             dialog.close()
             # 真实模型已分配但参数校验失败，必须回收模型且明确禁用动作。
-            with patch("pet.avatar.LIVE2D_PARAMETERS", (*LIVE2D_PARAMETERS, "missing_for_preview_test")):
+            with patch("pet.avatar_live2d.LIVE2D_PARAMETERS", (*LIVE2D_PARAMETERS, "missing_for_preview_test")):
                 dialog.present("")
                 check("failed_model_disables_blink", renderer._live2d_failed and not dialog.blink_button.isEnabled())
                 check("failed_model_leaves_no_resource_owner", not SESSION.owners)
@@ -162,6 +162,21 @@ def main():
             dialog.present("")
             check("reopening_recovers_after_failure", wait_until(lambda: renderer._live2d_active))
             check("recovered_model_enables_blink", dialog.blink_button.isEnabled())
+
+            # 两个原生模型都登记时退出，验证迁移后的释放接口与各自 GL 上下文。
+            desktop.show()
+            desktop.set_image("", force=True)
+            check(
+                "application_shutdown_starts_with_two_live_models",
+                desktop._live2d_active and renderer._live2d_active and len(SESSION.owners) == 2,
+            )
+            LOG.info("原生预览验收：开始双模型应用退出检查")
+            SESSION.shutdown()
+            check(
+                "application_shutdown_releases_both_models_and_core",
+                SESSION.disposed and not SESSION.owners
+                and all(view._live2d_model is None and view._live2d_module is None for view in (desktop, renderer)),
+            )
             report["all_passed"] = all(report.values())
         except Exception as exc:
             LOG.exception("形象动态预览验收失败")
