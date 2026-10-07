@@ -2,7 +2,7 @@
 
 当前版本入口（2026-10-07）：[0.5.5 发布验收](安装包0.5.5发布验收.md)。发布进度按该记录理解；历史正文的日期、测试、失败、工时及摘要保留。
 
-文档同步：2026-10-07。本轮版本为 0.5.5，包含默认 Live2D 形象预览、“预览眨眼”及多窗口资源修复；完整资料见 [文档索引](文档索引.md)，安装与公开发布记录见 [0.5.5 发布验收](安装包0.5.5发布验收.md)。
+文档同步：2026-10-07。本轮版本为 0.5.5，纳入试听朗读门控、Avatar 职责拆分和文档核对修复，保留默认 Live2D 形象预览及眨眼按钮；完整资料见 [文档索引](文档索引.md)，安装与公开发布记录见 [0.5.5 发布验收](安装包0.5.5发布验收.md)。
 
 一个运行在 Windows 上的桌面 AI 伙伴。玄司能结合鼠标行为理解屏幕、文字聊天、进行语音对话，并记住你明确指定的事情。名字、人设、系统提示词、模型参数和桌宠形象都可以在软件中调整。
 
@@ -48,7 +48,7 @@ TTS 按短段生成波形，后续文字生成、合成和播放组成流水线�
 
 安装包尚未做代码签名，可用 `Get-FileHash .\Xuansi-0.5.5-windows-x64-setup.exe -Algorithm SHA256` 与随附的 [SHA256SUMS.txt](https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.5.5/SHA256SUMS.txt) 核对。卸载会保留用户数据、安装时下载的环境和 D 盘模型，确认不再需要后可手动清理。
 
-0.5.5 的构建、安装、升级、原生预览与公开复验状态见 [本版发布验收](安装包0.5.4发布验收.md)。本轮使用既有 Windows / NVIDIA 开发设备、已校验的 D 盘模型和隔离安装目录；语音模型链路沿用此前 [0.5.3 发布验收](安装包0.5.3发布验收.md)，历史发布资料见 [开源发布验收](开源发布验收.md)。
+0.5.5 的构建、安装、升级、原生预览与公开复验状态见 [本版发布验收](安装包0.5.5发布验收.md)。本轮使用既有 Windows / NVIDIA 开发设备、已校验的 D 盘模型和隔离安装目录；语音模型链路沿用此前 [0.5.3 发布验收](安装包0.5.3发布验收.md)，历史发布资料见 [开源发布验收](开源发布验收.md)。
 
 ### 升级与确认版本
 
@@ -229,7 +229,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 
 ## 构建 Windows 安装包
 
-在 Windows 上安装 Git，将本次改动提交后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_installer.ps1`。脚本从 Git 提交导出源码，下载并校验固定版本的 Python NuGet 包和 Inno Setup 构建工具，输出 `dist/` 下的安装程序与 SHA256 清单。构建缓存位于 `build/`，不安装全局构建工具。
+在 Windows 上安装 Git，将本次改动提交后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_installer.ps1`。脚本要求工作区完全干净（包括未跟踪文件），从 Git 提交导出源码，下载并校验固定版本的 Python NuGet 包和 Inno Setup 构建工具，输出 `dist/` 下的安装程序与 SHA256 清单。构建缓存位于 `build/`，不安装全局构建工具。需要保留未提交制作工程时，可在独立的干净 Git worktree 构建，原工程留在原目录。
 
 版本由 [VERSION](VERSION) 维护；发布标签必须与此一致。安装目录的 `release.json` 记录安装包对应的源码提交。用户设置、记忆、日志、模型和本机虚拟环境不进入安装包，依赖和模型在用户安装时下载。构建来源与许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
