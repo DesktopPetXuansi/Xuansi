@@ -1,5 +1,6 @@
 """原生界面到真实模型的业务联调；临时数据、模拟收音、静音播放，不捕获桌面。"""
 
+import argparse
 import json
 import logging
 import sys
@@ -13,6 +14,7 @@ from unittest.mock import patch
 import numpy as np
 import psutil
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QOpenGLContext
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QPushButton
 
@@ -21,12 +23,25 @@ from pet.app import DesktopPet
 from pet.audio_activity import AudioActivity
 from pet.config import DATA, Settings, load_settings, save_settings
 from pet.desktop import DesktopState
+from pet.live2d_session import SESSION, configure_opengl_sharing
 from pet.memory import MemoryStore
 from pet.mouse_monitor import MouseMonitor
 from pet.runtime import Runtime
 from scripts.verify_live_conversation import SimulatedInput
 
 LOG = logging.getLogger(__name__)
+
+
+class RenderingErrors(logging.Handler):
+    """原生加载/释放会记录并回退，验收必须将这类错误纳入失败判定。"""
+
+    def __init__(self):
+        super().__init__(logging.ERROR)
+        self.errors = []
+
+    def emit(self, record):
+        if record.name in {"pet.avatar", "pet.live2d_session"}:
+            self.errors.append(record.name)
 
 
 def wait_until(predicate, message, seconds=90):
@@ -130,12 +145,69 @@ def verify_close_settings(pet, settings_path, report):
     LOG.info("跨语音与休眠流程的配置关闭保存、重开联调通过")
 
 
+def verify_window_captures(pet, target, report):
+    """抓图可能初始化隐藏预览；证据保存和两模型渲染都必须成功。"""
+    screenshot_stem = target.stem.removesuffix("-report")
+    for name, window in (("panel", pet.panel), ("quick", pet.ui.quick)):
+        pixels = window.grab()
+        assert not pixels.isNull(), f"{name} 窗口截图为空"
+        assert pixels.save(str(target.parent / f"{screenshot_stem}-{name}.png")), f"{name} 窗口截图保存失败"
+    report["window_captures_saved"] = True
+    preview = pet.ui.appearance.preview.renderer
+    assert all(
+        view._live2d_active and not view._live2d_failed and view._live2d_model is not None
+        for view in (pet.avatar, preview)
+    ), "截图后桌宠或隐藏预览发生 Live2D 回退"
+    report["capture_keeps_both_live2d_models"] = True
+    assert QOpenGLContext.areSharing(pet.avatar.context(), preview.context()), "截图后的 Live2D 上下文没有共享资源"
+    report["capture_contexts_share_resources"] = True
+    rendered = pet.avatar.grabFramebuffer()
+    assert not rendered.isNull(), "截图后桌宠帧缓冲为空"
+    visible = sum(
+        rendered.pixelColor(x, y).alpha() > 128
+        for y in range(rendered.height()) for x in range(rendered.width())
+    )
+    assert visible > rendered.width() * rendered.height() * 0.15, "截图后桌宠没有绘制角色像素"
+    report["capture_desktop_frame_contains_character"] = True
+    LOG.info("窗口截图、共享上下文及 Live2D 实际绘制检查通过")
+
+
+def release_verification_resources(pet, closed, report):
+    """后台退出失败也继续清理线程与 GL，异常保留给最终失败判定。"""
+    try:
+        if pet is not None:
+            try:
+                pet.quit()
+                wait_until(closed.is_set, "退出未完成后台清理", 20)
+            finally:
+                pet.runtime.loop.call_soon_threadsafe(pet.runtime.loop.stop)
+                pet.runtime.thread.join(3)
+                assert not pet.runtime.thread.is_alive(), "退出后运行时线程仍存活"
+                report["shutdown_releases_runtime_thread"] = True
+    finally:
+        # 本脚本用 qWait 驱动 Qt，未进入 app.exec，不能依赖 aboutToQuit。
+        SESSION.shutdown()
+        assert SESSION.disposed and not SESSION.owners, "退出后 Live2D 会话仍持有资源"
+        if pet is not None:
+            assert all(
+                view._live2d_model is None and view._live2d_module is None
+                for view in (pet.avatar, pet.ui.appearance.preview.renderer)
+            ), "退出后 Live2D 模型引用未清空"
+        report["shutdown_releases_live2d_session"] = True
+        LOG.info("业务验收原生资源已释放")
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=DATA / "verification/business-integration-report.json")
+    arguments = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # 与生产入口保持相同顺序；隐藏预览也可能在父窗口抓图时首次创建上下文。
+    configure_opengl_sharing()
     application = QApplication(sys.argv)
     application.setQuitOnLastWindowClosed(False)
-    target = DATA / "verification/business-integration-report.json"
+    target = arguments.output
     target.parent.mkdir(parents=True, exist_ok=True)
     report = {"passed": False, "devices": "模拟收音和静音播放；真实 ASR/LLM/TTS、Qt 和 Live2D"}
     source = {"samples": np.zeros(1600, dtype=np.float32)}
@@ -169,6 +241,8 @@ def main():
             patch("pet.runtime.sd.wait", lambda: time.sleep(0.15)),
             patch("pet.runtime.sd.stop", lambda: None),
         ):
+            rendering = RenderingErrors()
+            logging.getLogger().addHandler(rendering)
             try:
                 settings = replace(Settings(), observe=False, audio_avoidance=False, temperature=0.0,
                                    max_tokens=100, chat_hotkey="Ctrl+Alt+Shift+F21")
@@ -194,19 +268,20 @@ def main():
                 verify_close_settings(pet, settings_path, report)
                 assert not failures, "联调期间出现业务故障提示"
                 report["no_business_failures"] = True
-                pet.panel.grab().save(str(target.parent / "business-integration-panel.png"))
-                pet.ui.quick.grab().save(str(target.parent / "business-integration-quick.png"))
-                report["passed"] = True
+                verify_window_captures(pet, target, report)
             finally:
-                if pet is not None:
-                    pet.quit()
-                    wait_until(closed.is_set, "退出未完成后台清理", 20)
-                    pet.runtime.loop.call_soon_threadsafe(pet.runtime.loop.stop)
-                    pet.runtime.thread.join(3)
-                    assert not pet.runtime.thread.is_alive(), "退出后运行时线程仍存活"
-                    report["shutdown_releases_runtime_thread"] = True
-                target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-                LOG.info("业务联调结束 passed=%s", report["passed"])
+                try:
+                    release_verification_resources(pet, closed, report)
+                    assert not rendering.errors, f"联调期间发生渲染错误：{rendering.errors}"
+                    report["no_rendering_errors"] = True
+                finally:
+                    logging.getLogger().removeHandler(rendering)
+                    target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+                    LOG.info("业务联调清理结束 passed=%s", report["passed"])
+            # 只有业务、截图和退出断言全部通过才能标记成功。
+            report["passed"] = True
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+            LOG.info("业务联调全部通过")
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

@@ -19,6 +19,7 @@ from pet.avatar import Avatar
 from pet.config import ROOT, Settings
 from pet.desktop import USER32
 from pet.idle_blade_animation import idle_blade_pose
+from pet.live2d_session import configure_opengl_sharing
 from pet.panel import Panel
 from pet.quick_chat import QuickChat
 
@@ -26,6 +27,8 @@ from pet.quick_chat import QuickChat
 def main():
     logging.basicConfig(level=logging.INFO)
     USER32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    # 与桌宠生产入口一致，在任何 GL 窗口创建前启用共享。
+    configure_opengl_sharing()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     output = ROOT / "data/verification"

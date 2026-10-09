@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pet.app import DesktopPet
 from pet.config import ROOT, Settings
 from pet.desktop import DesktopState
+from pet.live2d_session import configure_opengl_sharing
 from pet.memory import MemoryStore
 
 
@@ -28,6 +29,8 @@ def wait_until(predicate):
 
 
 def main():
+    # 与桌宠生产入口一致，在任何 GL 窗口创建前启用共享。
+    configure_opengl_sharing()
     application = QApplication(sys.argv)
     application.setQuitOnLastWindowClosed(False)
     output = ROOT / "data/verification"

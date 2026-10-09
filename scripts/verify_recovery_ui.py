@@ -21,6 +21,7 @@ from pet.app import DesktopPet
 from pet.audio_activity import AudioActivity
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.desktop import DesktopState
+from pet.live2d_session import configure_opengl_sharing
 from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.mouse_monitor import MouseMonitor
@@ -200,6 +201,8 @@ def inspect(pet, settings_path, fail_save, output):
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    # 与桌宠生产入口一致，在任何 GL 窗口创建前启用共享。
+    configure_opengl_sharing()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     output = ROOT / "data/verification/recovery"

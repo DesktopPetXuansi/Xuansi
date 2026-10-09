@@ -2,16 +2,20 @@
 
 from types import SimpleNamespace
 
+import pytest
+
+from pet import live2d_session
 from pet.live2d_session import Live2DSession
 
 
 class Owner:
-    def __init__(self, session):
+    def __init__(self, session, context=None):
         self.session = session
         self.released = False
+        self.gl_context = context
 
     def context(self):
-        return None
+        return self.gl_context
 
     def _release_live2d(self):
         self.released = True
@@ -68,3 +72,25 @@ def test_shutdown_releases_every_model_before_disposing_the_core():
     assert events[-2:] == ["gl-release", "dispose"]
     session.shutdown()
     assert events.count("dispose") == 1
+
+
+@pytest.mark.parametrize("sharing", [True, False])
+def test_second_context_must_share_without_disrupting_existing_model(monkeypatch, sharing):
+    """独立窗口只可复用共享组，拒绝时不能初始化 SDK 或影响桌宠资源。"""
+    monkeypatch.setattr(live2d_session, "QOpenGLContext", SimpleNamespace(areSharing=lambda *_: sharing))
+    events = []
+    session = Live2DSession()
+    module = sdk(events)
+    desktop, preview = Owner(session, object()), Owner(session, object())
+    session.acquire(desktop, module)
+    initial = list(events)
+
+    if sharing:
+        session.acquire(preview, module)
+        assert preview in session.owners
+    else:
+        with pytest.raises(RuntimeError, match="未共享"):
+            session.acquire(preview, module)
+        assert preview not in session.owners
+
+    assert events == initial and desktop in session.owners and not desktop.released

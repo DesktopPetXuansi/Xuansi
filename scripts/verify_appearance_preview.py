@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from PIL import Image, ImageDraw
 from PySide6.QtCore import QPoint, QTimer
+from PySide6.QtGui import QOpenGLContext
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -19,8 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pet.appearance import image_path, import_image
 from pet.appearance_dialog import AppearanceDialog
 from pet.avatar import LIVE2D_PARAMETERS, Avatar
-from pet.config import ROOT
+from pet.config import ROOT, Settings
 from pet.live2d_session import SESSION, configure_opengl_sharing
+from pet.panel import Panel
 
 LOG = logging.getLogger(__name__)
 
@@ -43,7 +45,8 @@ def main():
     application = QApplication(sys.argv)
     application.setQuitOnLastWindowClosed(False)
     desktop = Avatar()
-    dialog = AppearanceDialog(None)
+    screenshot_host = Panel(Settings())
+    dialog = AppearanceDialog(screenshot_host)
     report = {}
     requests = []
     dialog.apply_requested.connect(requests.append)
@@ -101,6 +104,18 @@ def main():
         try:
             desktop.show()
             assert wait_until(lambda: desktop._live2d_active), "桌宠 Live2D 未能加载"
+            screenshot_host.show()
+            QTest.qWait(80)
+            # 抓取父窗口会初始化未打开的形象预览，重现业务截图的原始故障路径。
+            renderer = dialog.preview.renderer
+            check("hidden_preview_is_uninitialized_before_parent_capture", not renderer._live2d_ready)
+            parent_capture = screenshot_host.grab()
+            check("hidden_parent_capture_is_not_empty", not parent_capture.isNull())
+            check("hidden_parent_capture_saves", parent_capture.save(str(output.with_name(output.stem + "-hidden.png"))))
+            check("hidden_parent_capture_initializes_live2d", renderer._live2d_active and not renderer._live2d_failed)
+            check("hidden_capture_models_share_contexts", QOpenGLContext.areSharing(desktop.context(), renderer.context()))
+            check("hidden_capture_keeps_desktop_pixels", desktop._live2d_active and has_character(desktop))
+            screenshot_host.hide()
             dialog.present("")
             assert wait_until(
                 lambda: getattr(getattr(dialog.preview, "renderer", None), "_live2d_active", False)
@@ -184,6 +199,7 @@ def main():
             report["all_passed"] = False
         finally:
             dialog.close()
+            screenshot_host.hide()
             desktop.hide()
             desktop.bubble.hide()
             desktop._release_live2d()

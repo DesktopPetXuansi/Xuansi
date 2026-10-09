@@ -17,10 +17,13 @@ import pet.app as app_module
 from pet.app import DesktopPet
 from pet.config import ROOT, Settings
 from pet.desktop import USER32, desktop_state
+from pet.live2d_session import configure_opengl_sharing
 
 
 def main():
     ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    # 与桌宠生产入口一致，在任何 GL 窗口创建前启用共享。
+    configure_opengl_sharing()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     pet = DesktopPet(app, Settings(observe=False, speak_replies=False))

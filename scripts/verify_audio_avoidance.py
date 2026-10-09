@@ -20,12 +20,15 @@ import pet.runtime as runtime_module
 from pet.app import DesktopPet
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.desktop import DesktopState
+from pet.live2d_session import configure_opengl_sharing
 from pet.memory import MemoryStore
 from pet.panel import Panel
 
 
 def main():
     ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    # 与桌宠生产入口一致，在任何 GL 窗口创建前启用共享。
+    configure_opengl_sharing()
     application = QApplication(sys.argv)
     application.setQuitOnLastWindowClosed(False)
     temporary = tempfile.TemporaryDirectory(prefix="xuansi-avoidance-")
