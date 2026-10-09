@@ -22,6 +22,11 @@ def runtime(monkeypatch, tmp_path):
     result = Runtime()
     result.audio_activity.set_enabled(False)
     result.memory = MemoryStore(tmp_path / "memory.json")
+
+    async def choose_tts(settings, _text):
+        return settings.tts_engine
+
+    monkeypatch.setattr(result.engine, "choose_tts", choose_tts)
     yield result
     result.cancel(release=True).result(5)
     result.loop.call_soon_threadsafe(result.loop.stop)
@@ -108,6 +113,32 @@ def test_observation_fallback_speaks_when_only_reply_preference_is_off(runtime):
 
     assert clips == ["观察回应。"]
     assert not runtime.history and not runtime.listening
+
+
+@pytest.mark.parametrize("kind", ["preview", "observation"])
+def test_nonstreaming_voice_uses_model_selected_engine(runtime, kind):
+    """试听和观察也消费模型决定，同时沿用原有显式设置及朗读门控。"""
+    choices, clips = [], []
+
+    async def chat(*_, **_kwargs):
+        return "Hello there."
+
+    async def choose_tts(settings, text):
+        choices.append((settings.tts_engine, text))
+        return "natural"
+
+    def synthesize(text, _speaker, _speed, engine):
+        clips.append((text, engine))
+        return np.zeros(80), 8000
+
+    runtime.engine.chat = chat
+    runtime.engine.choose_tts = choose_tts
+    runtime.audio.synthesize = synthesize
+    runtime.schedule(runtime._conversation(
+        0, replace(Settings(), speak_observations=True), "Hello there.", kind, None, None,
+    )).result(3)
+    assert choices == [("fast", "Hello there.")]
+    assert clips == [("Hello there.", "natural")]
 
 
 def test_late_model_decision_cannot_change_new_request_state(runtime):

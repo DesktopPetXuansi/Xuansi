@@ -16,6 +16,8 @@ class VoiceUpdate:
     turn: int
     text: str
     final: bool = False
+    # 界面只携带用户显式选择；自动附图交给模型在后台理解。
+    with_screen: bool = False
 
 
 class PartialTurn:

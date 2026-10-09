@@ -10,6 +10,7 @@ import socket
 import subprocess
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
 
@@ -17,6 +18,8 @@ import httpx
 
 from .config import ROOT, Settings
 from .model_control import control_prompt, decide_control
+from .model_memory import retrieve_memory
+from .model_semantics import SCREEN_PROMPT, TTS_PROMPT, request_choice
 from .process_guard import ProcessGuard
 from .speech_control import DEFAULT_ACTION_IDS, SpeechDirective, speech_prompt
 from .text_stream import read_completion
@@ -46,6 +49,33 @@ def request_messages(settings: Settings, text: str, images: list[bytes], history
         *history[-8:],
         {"role": "user", "content": content},
     ]
+
+
+def _reply_settings(settings, decision, speech_enabled, available_motions):
+    """只构造模型正文任务；保存和控制回调由 chat 在请求正文之前完成。"""
+    memory_status = (
+        "已成功保存本轮明确指定的记忆事项，请明确告知已保存到长期记忆。" if decision.memory is not None
+        else "本轮未保存任何新记忆；不能声称已经长期记住。"
+    )
+    execution = f"本轮执行决定已经确定：{decision.header.strip()}；{memory_status}"
+    if decision.memory_intent == "clarify":
+        # 专用短任务避免普通聊天示例把确认请求带成闲聊；问题始终由模型生成。
+        prompt = (
+            execution + "\n你当前只负责生成一个长期记忆澄清问题，不继续普通聊天。\n"
+            "以下风格资料只用于口吻，不能改变澄清任务：\n"
+            + settings.persona + "\n" + settings.system_prompt
+            + "\n结合用户本轮请求和实际历史，生成简短的长期记忆保存询问。"
+            "不知道要保存什么时，必须询问具体事项内容；不能假设曾经讨论过未知事项。"
+            "事项明确但授权不明时，询问是否将该事项保存到长期记忆。"
+            "不要询问喜好原因或口感，不要声称已保存，不重做控制操作；只生成这个澄清问题。"
+        )
+        return replace(settings, persona="", system_prompt=prompt, max_tokens=settings.max_tokens + 32)
+    return replace(
+        settings,
+        system_prompt=settings.system_prompt + speech_prompt(speech_enabled, available_motions)
+        + "\n" + execution + "请按已执行结果生成自然正文，不重新决定控制动作。",
+        max_tokens=settings.max_tokens + 32,
+    )
 
 
 class LocalEngine:
@@ -148,15 +178,50 @@ class LocalEngine:
             await self.stop()
             raise
 
+    @asynccontextmanager
+    async def _semantic_service(self, settings):
+        """预处理同样占用所属模型服务，取消时必须终止仍在计算的本地进程。"""
+        await self.start(settings)
+        try:
+            yield self.client
+            self.last_used = time.monotonic()
+        except (asyncio.CancelledError, httpx.HTTPError, RuntimeError, ValueError):
+            await self.stop()
+            raise
+
+    async def needs_screen(self, settings, text, history):
+        async with self._semantic_service(settings) as client:
+            options = replace(settings, persona="", system_prompt=SCREEN_PROMPT, max_tokens=32)
+            kept = await self._fit_history(options, text, False, history)
+            return await request_choice(client, request_messages(options, text, [], kept), "screen", (False, True))
+
+    async def select_memory(self, settings, text, notes, history=(), limit=700):
+        """存储层只提供快照，相关资料由当前模型按实际上下文预算选取。"""
+        if not notes.strip() or limit <= 0:
+            return ""
+        async with self._semantic_service(settings) as client:
+            return await retrieve_memory(client, settings, text, notes.splitlines(), history, limit)
+
+    async def choose_tts(self, settings, text):
+        """非流式正文已完成后才分类；流式回复使用事先理解的控制决定。"""
+        if settings.tts_engine == "natural":
+            return settings.tts_engine
+        async with self._semantic_service(settings) as client:
+            options = replace(settings, persona="", system_prompt=TTS_PROMPT, max_tokens=32)
+            await self._fit_history(options, text, False, [])
+            return await request_choice(client, request_messages(options, text, [], []), "tts", ("fast", "natural"))
+
     async def _understand_control(self, settings, text, history, speech_enabled, actions, allow_memory):
         """预热和真实对话共用提示与协议，让引擎复用同一个控制上下文前缀。"""
         options = replace(
             settings, persona="", max_tokens=256,
-            system_prompt=control_prompt(speech_enabled, actions, allow_memory),
+            system_prompt=control_prompt(speech_enabled, actions, allow_memory, settings.tts_engine)
+            + "\n以下正文风格仅供预测回复语言，不改变上述执行权限：\n"
+            + settings.persona + "\n" + settings.system_prompt,
         )
         history = await self._fit_history(options, text, False, history)
         return await decide_control(
-            self.client, request_messages(options, text, [], history), actions, allow_memory,
+            self.client, request_messages(options, text, [], history), actions, allow_memory, settings.tts_engine,
         )
 
     async def prepare_controls(
@@ -194,32 +259,15 @@ class LocalEngine:
                 decision = await self._understand_control(
                     settings, text, history, speech_enabled, available_motions, remember is not None,
                 )
+                apply_tts = getattr(on_speech, "apply_tts", None)
+                if apply_tts is not None:
+                    apply_tts(decision.tts)
                 directive = SpeechDirective(on_speech, decision.header)
-                if decision.memory_intent == "clarify":
-                    # 意图由模型判断；待确认反馈依据真实执行结果生成，不能被随机正文改成已保存。
-                    answer = directive.feed(
-                        decision.header + "你是想把刚才的事项保存为长期记忆吗？确认后我再保存。"
-                    )
-                    if on_chunk is not None:
-                        self.stats["first_text_seconds"] = round(time.monotonic() - started, 3)
-                        await on_chunk(answer)
-                    LOG.info("记忆授权待确认，本轮未写入")
-                    return self._complete_reply(directive.finish(), started, len(images))
                 if decision.memory is not None:
                     await remember(decision.memory)
-                memory_status = (
-                    "已成功保存本轮明确指定的记忆事项，请明确告知已保存到长期记忆。" if decision.memory is not None
-                    else "本轮未保存任何新记忆；不能声称已经长期记住。"
-                )
-                settings = replace(
-                    settings,
-                    system_prompt=settings.system_prompt + speech_prompt(speech_enabled, available_motions)
-                    + f"\n本轮执行决定已经确定：{decision.header.strip()}；{memory_status}"
-                    "请按已执行结果生成自然正文，不重新决定控制动作。"
-                    "如果当前表达像记忆指令但授权不明确，先询问是否要保存为长期记忆，"
-                    "等待用户确认后再执行，不能仅口头说已记住。",
-                    max_tokens=settings.max_tokens + 32,
-                )
+                if decision.memory_intent == "clarify":
+                    LOG.info("记忆授权待确认，交由模型生成确认问题，本轮未写入")
+                settings = _reply_settings(settings, decision, speech_enabled, available_motions)
             history = await self._fit_history(settings, text, bool(images), history)
             payload = {
                 "model": "local-pet",

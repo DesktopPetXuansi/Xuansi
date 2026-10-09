@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import threading
-from dataclasses import replace
 
 import httpx
 import numpy as np
@@ -46,7 +45,7 @@ async def test_warmup_uses_actual_control_prompt_and_discards_all_execution_sugg
             # 返回合法但有副作用的建议，缓存预热仍必须全部丢弃。
             decision = {
                 "memory_intent": "save", "voice": "off" if enabled else "on",
-                "motion": "blink" if actions else "none", "memory": "预热合成事项",
+                "motion": "blink" if actions else "none", "memory": "预热合成事项", "tts": "fast",
             }
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(decision)}}]})
 
@@ -57,8 +56,10 @@ async def test_warmup_uses_actual_control_prompt_and_discards_all_execution_sugg
         engine.client = client
         result = await engine.prepare_controls(settings, speech_enabled=enabled, available_motions=actions)
     assert result is None
-    expected = replace(settings, persona="", max_tokens=256, system_prompt=control_prompt(enabled, actions, True))
-    assert payloads[0]["messages"] == request_messages(expected, "你好", [], [])
+    # 预热与真实轮次共用控制解释器；正文风格仅辅助预测朗读语言。
+    assert control_prompt(enabled, actions, True, settings.tts_engine) in payloads[0]["messages"][0]["content"]
+    assert settings.persona in payloads[0]["messages"][0]["content"]
+    assert payloads[0]["messages"][-1] == request_messages(settings, "你好", [], [])[-1]
     assert payloads[0]["max_tokens"] == 256
     assert all(payload["temperature"] == 0.0 and payload["top_p"] == 1.0 for payload in payloads)
     assert all(payload["stream"] is False for payload in payloads)

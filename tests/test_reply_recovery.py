@@ -20,6 +20,11 @@ def isolated_runtime(monkeypatch, tmp_path):
     monkeypatch.setattr("pet.runtime.sd.wait", lambda: None)
     runtime = Runtime()
     runtime.memory = MemoryStore(tmp_path / "memory.json")
+
+    async def select_memory(_settings, _query, notes, _history):
+        return notes
+
+    monkeypatch.setattr(runtime.engine, "select_memory", select_memory)
     runtime.audio_activity.clock = lambda: 10.0
     runtime.audio_activity.update(False, now=10.0)
     yield runtime

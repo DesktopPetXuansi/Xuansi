@@ -24,7 +24,8 @@ async def test_model_directive_precedes_body_and_is_absent_from_answer(monkeypat
         if r"[^\x00]+" not in payload["grammar"]:
             assert payload["temperature"] == 0.0
             return httpx.Response(200, json={"choices": [{"message": {
-                "content": json.dumps({"memory_intent": "none", "voice": "off", "motion": "none", "memory": None})
+                "content": json.dumps({"memory_intent": "none", "voice": "off", "motion": "none",
+                                       "memory": None, "tts": "fast"})
             }}]})
         assert payload["temperature"] == Settings().temperature
         if not streaming:

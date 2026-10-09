@@ -46,22 +46,8 @@ class MemoryStore:
             return ""
 
     def context(self, query: str, limit=700):
-        """按关键词与最近记录选择有限记忆，避免长期资料挤爆本地上下文。"""
-        notes = self.read().splitlines()
-        terms = {query[i : i + 2].lower() for i in range(len(query) - 1) if query[i : i + 2].isalnum()}
-        ranked = sorted(
-            enumerate(notes),
-            key=lambda pair: (sum(term in pair[1].lower() for term in terms), pair[0]),
-            reverse=True,
-        )
-        selected = []
-        size = 0
-        for _, note in ranked:
-            if size >= limit:
-                break
-            selected.append(note[: limit - size])
-            size += len(selected[-1]) + 1
-        return "\n".join(selected)
+        """保持同步字符串接口，仅提供原始候选；相关性由推理层的模型选择。"""
+        return self.read()[:max(0, limit)]
 
     def save(self, text: str):
         with self.lock:

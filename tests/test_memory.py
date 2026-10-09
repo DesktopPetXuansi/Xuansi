@@ -22,12 +22,14 @@ def test_secret_is_rejected_and_clear_erases_saved_notes(tmp_path):
     assert MemoryStore(memory.path).read() == ""
 
 
-def test_context_prioritizes_relevant_memory_within_budget(tmp_path):
+def test_context_returns_original_candidates_without_keyword_ranking(tmp_path):
     memory = MemoryStore(tmp_path / "memory.json")
     memory.save("我喜欢喝绿茶\n" + "\n".join(f"普通备注第{i}条" for i in range(120)))
     context = memory.context("我喜欢喝什么？", limit=100)
     assert context.startswith("我喜欢喝绿茶")
     assert len(context) <= 100
+    assert context == memory.read()[:100]
+    assert memory.context("换一个没有共同词语的问题", limit=100) == context
 
 
 def test_manual_edit_can_save_more_than_the_dialogue_item_limit(tmp_path):

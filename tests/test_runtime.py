@@ -1,9 +1,11 @@
 """用假声卡和延迟任务复现取消、记忆及开关竞态，不读取真实设备。"""
 
 import asyncio
+import json
 import threading
 from dataclasses import replace
 
+import httpx
 import numpy as np
 import pytest
 from PySide6.QtCore import Qt
@@ -24,6 +26,15 @@ def runtime(monkeypatch, tmp_path):
     result.audio_activity.clock = lambda: 10.0
     result.audio_activity.update(False, now=10.0)
     result.memory = MemoryStore(tmp_path / "memory.json")
+
+    async def select_memory(_settings, _query, notes, _history):
+        return notes
+
+    async def choose_tts(settings, _text):
+        return settings.tts_engine
+
+    monkeypatch.setattr(result.engine, "select_memory", select_memory)
+    monkeypatch.setattr(result.engine, "choose_tts", choose_tts)
     yield result
     result.microphone.stop()
     result.microphone.join()
@@ -49,6 +60,47 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
         runtime._conversation(0, replace(Settings(), tts_engine="natural"), "你好", "chat", None, None)
     ).result(3)
     assert seen == ["natural"]
+
+
+def test_real_control_chain_selects_tts_before_streaming_synthesis(runtime, monkeypatch):
+    """保留真实Engine、协议解析及流水线，只替换HTTP服务和音频设备边界。"""
+    events = []
+
+    async def start(_):
+        pass
+
+    async def handle(request):
+        if request.url.path == "/tokenize":
+            return httpx.Response(200, json={"tokens": [1]})
+        payload = json.loads(request.content)
+        if "memory_intent" in payload["grammar"]:
+            events.append("control")
+            content = json.dumps({
+                "memory_intent": "none", "voice": "keep", "motion": "none", "memory": None,
+                "tts": "natural",
+            })
+            return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+        events.append("body")
+        content = "[voice:keep][motion:none]\nHello, how are you?"
+        event = json.dumps({"choices": [{"delta": {"content": content}}]})
+        return httpx.Response(200, text="data: " + event + "\n\ndata: [DONE]\n\n")
+
+    def synthesize(text, _speaker, _speed, engine):
+        events.append(("audio", engine, text))
+        return np.zeros(80, dtype=np.float32), 8000
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
+            runtime.engine.client = client
+            await runtime._conversation(0, Settings(), "用英语向我问好", "chat", None, None)
+
+    monkeypatch.setattr(runtime.engine, "start", start)
+    runtime.audio.synthesize = synthesize
+    runtime.schedule(run()).result(3)
+    assert events[:2] == ["control", "body"]
+    assert all(event[:2] == ("audio", "natural") for event in events[2:])
+    assert "".join(event[2] for event in events[2:]) == "Hello, how are you?"
+    assert runtime.history[-1]["content"] == "Hello, how are you?"
 
 
 def test_live_waits_for_endpoint_and_deduplicates(runtime):
@@ -140,6 +192,28 @@ def test_clear_memory_cancels_old_request_and_history(runtime):
     assert stopped.is_set()
     assert runtime.memory.read() == ""
     assert runtime.history == []
+
+
+def test_clear_memory_cancels_pending_model_retrieval(runtime):
+    """清空发生在检索阶段也要取消GPU请求，旧候选不得进入随后正文。"""
+    runtime.memory.save("我偏好清淡饮品")
+    entered, stopped = threading.Event(), threading.Event()
+    replies = []
+
+    async def select_memory(*_):
+        entered.set()
+        try:
+            await asyncio.Future()
+        finally:
+            stopped.set()
+
+    runtime.engine.select_memory = select_memory
+    runtime.reply.connect(lambda *args: replies.append(args), Qt.ConnectionType.DirectConnection)
+    runtime.ask(Settings(), "推荐一种饮品")
+    assert entered.wait(2)
+    runtime.save_memory("").result(3)
+    assert stopped.is_set() and not replies
+    assert not runtime.history and runtime.memory.read() == ""
 
 
 def test_voice_switch_discards_late_start(runtime, monkeypatch):

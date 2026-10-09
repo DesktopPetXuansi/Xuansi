@@ -34,6 +34,7 @@ class ControlDecision:
     motion: str
     memory: str | None
     memory_intent: str
+    tts: str = "fast"
 
     @property
     def header(self):
@@ -45,7 +46,7 @@ class ControlDecision:
         return f"root ::= {json.dumps(self.header)} [^\\x00]+"
 
 
-def control_grammar(actions, allow_memory):
+def control_grammar(actions, allow_memory, requested_tts="fast"):
     """先选择保存授权；未授权及待确认分支从语法上禁止附带写入事项。"""
     suffix = (
         'ws "," ws "\\\"voice\\\":" ws voice ws "," ws '
@@ -54,11 +55,14 @@ def control_grammar(actions, allow_memory):
     inactive = ("none", "clarify") if allow_memory else ("none",)
     prefixes = " | ".join(json.dumps('{"memory_intent":"' + intent + '"') for intent in inactive)
     saved_prefix = json.dumps('{"memory_intent":"save"')
+    ending = 'ws "," ws "\\\"tts\\\":" ws tts ws "}"'
+    engines = ("natural",) if requested_tts == "natural" else ("fast", "natural")
     return (
         f'root ::= inactive{" | save" if allow_memory else ""}\n'
-        f'inactive ::= ({prefixes}) {suffix} "null" ws "}}"\n'
-        + (f'save ::= {saved_prefix} {suffix} string ws "}}"\n' if allow_memory else "")
+        f'inactive ::= ({prefixes}) {suffix} "null" {ending}\n'
+        + (f'save ::= {saved_prefix} {suffix} string {ending}\n' if allow_memory else "")
         + 'voice ::= "\\\"keep\\\"" | "\\\"on\\\"" | "\\\"off\\\""\n'
+        f'tts ::= {" | ".join(json.dumps(json.dumps(item)) for item in engines)}\n'
         f'motion ::= {" | ".join(json.dumps(json.dumps(item)) for item in ("none", *available_action_ids(actions)))}\n'
         'string ::= "\\\"" char+ "\\\""\n'
         'char ::= [^"\\\\\\x00-\\x1f] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F]{4})\n'
@@ -66,7 +70,7 @@ def control_grammar(actions, allow_memory):
     )
 
 
-def control_prompt(enabled, actions, allow_memory):
+def control_prompt(enabled, actions, allow_memory, requested_tts="fast"):
     """把操作授权与资料陈述分开说明，避免正文协议及人设干扰短决策。"""
     actions = available_action_ids(actions)
     motion_rules = "；".join(
@@ -75,7 +79,7 @@ def control_prompt(enabled, actions, allow_memory):
     ) or "无可执行动作"
     return (
         "你是操作指令解释器，只判断用户本轮要执行什么，不聊天、不推荐，不主动做操作。\n"
-        "只输出JSON：memory_intent、voice、motion、memory。"
+        "只输出JSON：memory_intent、voice、motion、memory、tts。"
         "按整句话的意图理解，不按关键词猜测。历史仅用于理解本轮指代，不能重做历史请求。\n"
         "【记忆】先判断用户是否正在要求保存，不是判断资料是否有用。"
         "陈述资料不等于授权！‘我喜欢喝绿茶’只是陈述，必须none；"
@@ -85,13 +89,13 @@ def control_prompt(enabled, actions, allow_memory):
         "句首转写不通、后面却是清楚的个人资料时，不推断授权，选clarify让用户确认。"
         "引用、翻译、假设、否定保存、回忆旧请求都选none。"
         "save才填写事项本身，第一人称，不添加用户未提供的信息，最多500字；其他一律memory=null。\n"
-        "以下都是完整决策示例：\n"
-        '用户：我喜欢喝绿茶。→{"memory_intent":"none","voice":"keep","motion":"none","memory":null}\n'
+        "以下都是默认语音设置下的完整决策示例；用户显式选择natural时，示例tts也改为natural：\n"
+        '用户：我喜欢喝绿茶。→{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
         '用户：昨天我让你记住我喜欢喝绿茶，你还记得吗？→'
-        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null}\n'
+        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
         '用户：请帮我把喜欢喝绿茶的偏好记下来。→'
-        '{"memory_intent":"save","voice":"keep","motion":"none","memory":"我喜欢喝绿茶"}\n'
-        '用户：地重我喜欢喝绿茶。→{"memory_intent":"clarify","voice":"keep","motion":"none","memory":null}\n'
+        '{"memory_intent":"save","voice":"keep","motion":"none","memory":"我喜欢喝绿茶","tts":"fast"}\n'
+        '用户：地重我喜欢喝绿茶。→{"memory_intent":"clarify","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
         f"【朗读】当前对话朗读：{'开启' if enabled else '关闭'}。"
         "只管你的朗读，不管麦克风。keep=用户没有本轮切换请求或意图不清。"
         "off=用户希望你停止出声、只用文字；on=用户要求恢复或继续出声。"
@@ -101,34 +105,47 @@ def control_prompt(enabled, actions, allow_memory):
         "‘我在开会，用文字陪我’选off；‘别停，我还在听’选on；"
         "‘不要关闭语音，我还想听你说’选on；‘翻译：别说话’选keep。\n"
         '用户：语音功能要怎么关闭？→'
-        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null}\n'
+        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
         '用户：告诉我语音开关在哪里。→'
-        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null}\n'
+        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
         '用户：请关闭你的朗读，接下来用文字回复。→'
-        '{"memory_intent":"none","voice":"off","motion":"none","memory":null}\n'
+        '{"memory_intent":"none","voice":"off","motion":"none","memory":null,"tts":"fast"}\n'
         f"【动作】支持：{motion_rules}。只在本轮直接请求时选择ID，否则none。"
         "引用、否定、假设、问怎么做、过去的动作都不执行。"
         "重做过去动作需本轮明确要求；不支持的动作选none，不假装已做。\n"
+        "【语音模型】根据即将生成的回复语言选择tts，而不是按用户输入语言猜测。"
+        "中文或中英混合回复选fast；只有纯英文回复选natural。"
+        "中文提问要求只给英文译文应选natural；英文提问要求中文回答应选fast。"
+        "本轮明确指定的回复语言优先于提问语言；未指定时遵循正文人设与系统提示。"
+        "不要因为用户用英文提问就把中文回复交给natural。\n"
+        '用户：Please answer in Chinese only: say hello to me.；实际回复应为“你好！”→'
+        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"fast"}\n'
+        '用户：把“你好，朋友”翻译成英文，只输出英文译文。；实际回复应为“Hello, friend.”→'
+        '{"memory_intent":"none","voice":"keep","motion":"none","memory":null,"tts":"natural"}\n'
+        + ("用户显式选择natural，本轮tts必须natural。" if requested_tts == "natural" else "")
         + ("" if allow_memory else "本轮没有记忆保存权限，memory_intent只能none，memory只能null。")
     )
 
 
-async def decide_control(client, messages, actions, allow_memory):
+async def decide_control(client, messages, actions, allow_memory, requested_tts="fast"):
     """同一引擎先完成短决策，不把用户的正文采样温度带进执行判断。"""
     started = time.monotonic()
     response = await client.post("/v1/chat/completions", json={
-        "model": "local-pet", "messages": messages, "max_tokens": 256 if allow_memory else 64,
+        "model": "local-pet", "messages": messages, "max_tokens": 256 if allow_memory else 96,
         "temperature": 0.0, "top_p": 1.0, "stream": False,
-        "grammar": control_grammar(actions, allow_memory),
+        "grammar": control_grammar(actions, allow_memory, requested_tts),
         "chat_template_kwargs": {"enable_thinking": False},
     })
     response.raise_for_status()
     try:
         result = json.loads(response.json()["choices"][0]["message"]["content"])
-        if not isinstance(result, dict) or set(result) != {"memory_intent", "voice", "motion", "memory"}:
+        if not isinstance(result, dict) or set(result) != {"memory_intent", "voice", "motion", "memory", "tts"}:
             raise ValueError("控制字段不完整")
         voice, motion, memory = result["voice"], result["motion"], result["memory"]
         intent = result["memory_intent"]
+        tts = result["tts"]
+        if tts not in (("natural",) if requested_tts == "natural" else ("fast", "natural")):
+            raise ValueError("未知或未经授权的语音模型")
         if voice not in VOICE_VALUES or motion not in ("none", *available_action_ids(actions)):
             raise ValueError("未知控制动作")
         if intent not in (("none", "save", "clarify") if allow_memory else ("none",)):
@@ -143,9 +160,9 @@ async def decide_control(client, messages, actions, allow_memory):
     if intent == "save" and await authorize_memory(client, messages) != "save":
         # 提取资料可能诱发过度保存；独立复核不一致时先确认，不把猜测写入文件。
         intent, memory = "clarify", None
-    LOG.info("执行意图已理解 speech=%s motion=%s memory_intent=%s elapsed=%.3fs",
-             voice, motion, intent, time.monotonic() - started)
-    return ControlDecision(voice, motion, memory.strip() if memory is not None else None, intent)
+    LOG.info("执行意图已理解 speech=%s motion=%s memory_intent=%s tts=%s elapsed=%.3fs",
+             voice, motion, intent, tts, time.monotonic() - started)
+    return ControlDecision(voice, motion, memory.strip() if memory is not None else None, intent, tts)
 
 
 async def authorize_memory(client, messages):

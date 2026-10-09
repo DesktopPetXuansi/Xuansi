@@ -34,12 +34,13 @@ SPEECH_GRAMMAR = speech_grammar()
 
 @dataclass(frozen=True, slots=True)
 class ControlCallbacks:
-    """把同轮朗读和动作决策回调及模型能力一起传给推理层。"""
+    """传递同轮朗读、动作及语音模型回调；语音选择在正文生成前完成。"""
 
     apply_speech: Callable[[bool], None]
     apply_motion: Callable[[str], None]
     available_motions: tuple[str, ...]
     remember: Callable[[str], Awaitable[None]] | None = None
+    apply_tts: Callable[[str], None] | None = None
 
     def __call__(self, enabled):
         self.apply_speech(enabled)

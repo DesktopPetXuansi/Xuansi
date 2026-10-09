@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import re
 from contextlib import AsyncExitStack
 from dataclasses import replace
 
@@ -10,7 +9,6 @@ import sounddevice as sd
 from mss.exception import ScreenShotError
 
 from .desktop import capture_screen, observation_current
-from .events import VOICE_SCREEN_PATTERN
 from .memory import durable_io
 from .speech_control import ControlCallbacks
 from .streaming_speech import SpeechStream
@@ -35,20 +33,33 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
                 LOG.info("整句语音识别为空，继续聆听")
                 return
             runtime.heard.emit(epoch, text)
-        if kind == "voice" and not re.search(VOICE_SCREEN_PATTERN, text):
-            position = None
-        if not observation_current(observation):
+        if epoch != runtime.epoch or not observation_current(observation):
             return
+        if kind in ("voice", "voice-final") and position is not None:
+            runtime.state.emit(epoch, "正在理解你的请求…")
+            if not await runtime.engine.needs_screen(settings, text, runtime.history):
+                position = None
+            if epoch != runtime.epoch or not observation_current(observation):
+                return
         images = (
             [await asyncio.to_thread(capture_screen, *position, settings.capture_scope)] if position else []
         )
-        if not observation_current(observation):
+        if epoch != runtime.epoch or not observation_current(observation):
             return
-        notes = await asyncio.to_thread(runtime.memory.context, text)
+        # 读取完整候选而非先截取700字；模型按实际token容量检索，保留末尾资料可达。
+        notes = await asyncio.to_thread(runtime.memory.context, text, limit=6000)
+        if epoch != runtime.epoch or not observation_current(observation):
+            return
         if notes:
-            settings = replace(
-                settings, system_prompt=settings.system_prompt + "\n本地长期记忆（用户资料）：\n" + notes
+            notes = await runtime.engine.select_memory(
+                settings, text, notes, [] if kind == "observation" else runtime.history,
             )
+            if epoch != runtime.epoch or not observation_current(observation):
+                return
+            if notes:
+                settings = replace(
+                    settings, system_prompt=settings.system_prompt + "\n本地长期记忆（用户资料）：\n" + notes
+                )
         runtime.state.emit(epoch, "正在看画面并思考…" if images else "正在思考…")
         await generate_reply(runtime, epoch, settings, text, images, kind, observation)
     except asyncio.CancelledError:
@@ -83,6 +94,7 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
 async def generate_reply(runtime, epoch, settings, text, images, kind, observation):
     async with AsyncExitStack() as stack:
         speech = None
+        selected_tts = settings.tts_engine
 
         def current():
             return epoch == runtime.epoch and observation_current(observation)
@@ -106,11 +118,17 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
                 await durable_io(runtime.memory.remember, note, source)
                 runtime.memory_loaded.emit(await asyncio.to_thread(runtime.memory.read))
 
+        def select_tts(engine):
+            nonlocal selected_tts
+            if current():
+                selected_tts = engine
+
         controls = ControlCallbacks(
             change_speech,
             dispatch_motion,
             runtime.motion_actions,
             remember,
+            select_tts,
         )
 
         def speech_state(message):
@@ -130,8 +148,8 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
                 speech = await stack.enter_async_context(
                     SpeechStream(
                         runtime.audio_activity,
-                        lambda part: runtime.audio.synthesize(
-                            part, settings.speaker, settings.speed, settings.tts_engine
+                        lambda part: runtime.audio.synthesize_selected(
+                            part, settings.speaker, settings.speed, settings.tts_engine, selected_tts
                         ),
                         lambda: current() and runtime.should_speak(settings, kind),
                         speech_state,
@@ -165,4 +183,7 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
         if speech is not None:
             await speech.finish()
         elif runtime.should_speak(settings, kind):
-            await runtime._speak(epoch, settings, answer, observation, kind=kind)
+            await runtime._speak(
+                epoch, settings, answer, observation, kind=kind,
+                selected_engine=selected_tts if kind != "observation" else None,
+            )

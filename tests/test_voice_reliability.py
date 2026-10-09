@@ -15,7 +15,6 @@ from pet.speech_control import ControlCallbacks
 
 LOG = logging.getLogger(__name__)
 BODY = "我理解你的意思，继续陪你聊。"
-CONFIRMATION = "你是想把刚才的事项保存为长期记忆吗？确认后我再保存。"
 CONTEXT = [
     {"role": "user", "content": "先不要出声，等我说现在可以了，你再恢复语音。"},
     {"role": "assistant", "content": "好的，我先安静地用文字陪你。"},
@@ -77,6 +76,7 @@ class SamplingService:
                 json.dumps({
                     "memory_intent": self.memory_intent or ("save" if self.memory is not None else "none"),
                     "voice": voice, "motion": "none", "memory": self.memory,
+                    **({"tts": "fast"} if "tts" in grammar else {}),
                 }, ensure_ascii=False)
                 if json_control else f"[voice:{voice}][motion:none]\n"
             )
@@ -150,15 +150,17 @@ def assert_sampling_and_delivery(service, settings, answer, events, expected, st
 
 
 def assert_confirmation_delivery(service, answer, events, expected, streaming):
-    # 模型负责判定意图；待确认问题由程序交付，不能随机生成虚假的保存确认。
-    assert answer == CONFIRMATION
+    # 待确认正文必须来自模型；没有授权仍不得写入，不能以固定回复冒充生成。
+    assert answer == service.body
     assert service.control_temperatures and set(service.control_temperatures) == {0.0}
     assert service.saved_memory == []
     assert not any(kind == "memory-start" for kind, _ in events)
-    assert service.body_messages == [] and service.body_temperatures == []
+    assert service.body_messages and service.body_temperatures
+    assert "未保存" in service.body_messages[-1][0]["content"]
+    assert "确认" in service.body_messages[-1][0]["content"]
     assert [value for kind, value in events if kind == "speech"] == expected
     if streaming:
-        assert "".join(value for kind, value in events if kind == "text") == CONFIRMATION
+        assert "".join(value for kind, value in events if kind == "text") == service.body
         assert [kind for kind, _ in events[:len(expected)]] == ["speech"] * len(expected)
 
 
@@ -250,7 +252,7 @@ async def test_only_model_memory_decision_is_awaited_once_before_reply(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("streaming", [True, False])
 async def test_unclear_model_memory_decision_asks_for_confirmation_without_saving(monkeypatch, streaming):
-    service = SamplingService("keep", "off", memory_intent="clarify", body="已经记下来了。")
+    service = SamplingService("keep", "off", memory_intent="clarify", body="你希望长期保存这个口味偏好吗？")
     settings = Settings()
     answer, events = await converse(
         monkeypatch, service, settings, "地重我喜欢喝绿茶", True, streaming, [], remember=True
@@ -265,7 +267,7 @@ async def test_unclear_model_memory_decision_asks_for_confirmation_without_savin
 async def test_memory_review_disagreement_never_saves_or_changes_speech_decision(
     monkeypatch, streaming, voice, changes
 ):
-    service = SamplingService(voice, "on", memory="我喜欢喝绿茶", authorization="none", body="已经记下来了。")
+    service = SamplingService(voice, "on", memory="我喜欢喝绿茶", authorization="none", body="请确认需要保存的事项。")
     settings = Settings()
     answer, events = await converse(
         monkeypatch, service, settings, "店主我喜欢喝绿茶", True, streaming, [], remember=True

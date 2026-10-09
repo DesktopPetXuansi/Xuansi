@@ -16,7 +16,7 @@ from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
 
-# 同时覆盖每个关键词、相似但不命中的文字以及勾选框的显式附图行为。
+# 覆盖无固定关键词的视觉指代、含关键词的否定/引用，以及显式附图选择。
 SCREEN_CASES = [
     (keyword, False, True)
     for keyword in ("屏幕", "鼠标", "画面", "看一眼", "看一下", "看看", "这个", "这里")
@@ -27,6 +27,10 @@ SCREEN_CASES = [
     ("看一\n眼", False, False),
     ("看看", True, True),
     ("你好", True, True),
+    ("这格为什么突然变红了？", False, True),
+    ("帮我读出左上角那一项。", False, True),
+    ("不要读取我的屏幕，讲个笑话就好。", False, False),
+    ("把‘看一眼’翻译成英文。", False, False),
 ]
 
 
@@ -93,8 +97,13 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
         inputs.append((recognized, images))
         return "合成测试回复。"
 
+    async def needs_screen(_settings, recognized, _history):
+        assert recognized == text
+        return expected_screen
+
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
     realtime_runtime.engine.chat = chat
+    realtime_runtime.engine.needs_screen = needs_screen
     realtime_runtime.finished.connect(lambda _: completed.set(), Qt.ConnectionType.DirectConnection)
     realtime_runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
     update = VoiceUpdate(1, text, final=True)
@@ -150,7 +159,8 @@ def test_sentence_voice_and_voice_screen_keep_the_existing_capture_boundary(
         speech_override=None,
         microphone=SimpleNamespace(muted=threading.Event()),
         audio=SimpleNamespace(transcribe=lambda _: text),
-        memory=SimpleNamespace(context=lambda _: ""),
+        memory=SimpleNamespace(context=lambda _, limit=700: ""),
+        history=[],
         state=signal,
         heard=signal,
         finished=signal,
@@ -173,6 +183,12 @@ def test_sentence_voice_and_voice_screen_keep_the_existing_capture_boundary(
 
     async def generate(_runtime, _epoch, _settings, recognized, images, kind, _observation):
         replies.append((recognized, images, kind))
+
+    async def needs_screen(_settings, recognized, _history):
+        assert recognized == text
+        return expected_screen
+
+    runtime.engine = SimpleNamespace(needs_screen=needs_screen)
 
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
     monkeypatch.setattr("pet.conversation.generate_reply", generate)

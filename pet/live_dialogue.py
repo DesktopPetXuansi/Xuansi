@@ -21,4 +21,5 @@ class LiveDialogue:
         self.last_final = update.turn
         runtime.epoch += 1
         LOG.info("用户话段结束，开始回复 chars=%d", len(update.text))
-        await runtime._replace(runtime.epoch, settings, update.text, "voice-final", position, None, None)
+        kind = "voice-screen" if update.with_screen else "voice-final"
+        await runtime._replace(runtime.epoch, settings, update.text, kind, position, None, None)
