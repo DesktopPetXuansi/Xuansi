@@ -4,11 +4,11 @@ Copyright 2026 Xuansi contributors
 Original source code and documentation are licensed under the Apache License,
 Version 2.0. See LICENSE for the full terms.
 
-The Xuansi artwork in assets/xuansi/front.png, assets/xuansi/icon.png, and
-assets/xuansi/icon.ico is separately reserved and is NOT licensed under the
-Apache License. See assets/xuansi/LICENSE and assets/xuansi/README.md.
+The Xuansi artwork and derived model/pose assets in assets/xuansi/ are
+separately reserved and are NOT licensed under the Apache License.
+See assets/xuansi/LICENSE and the artwork, rigging, and idle-blade README files.
 
-Historical cat sprites, icons, and animation definitions originate from NekoAI:
+Historical cat sprites and animation definitions originate from NekoAI:
 https://github.com/nucket/NekoAI
 Copyright (c) 2026 Naudy Castellanos
 These third-party assets retain their MIT license in assets/neko/LICENSE.

@@ -1,8 +1,6 @@
 # 玄司 Live2D 制作规格
 
-当前版本入口（2026-10-07）：[0.5.5 发布验收](安装包0.5.5发布验收.md)。发布进度按该记录理解；历史正文的日期、测试、失败、工时及摘要保留。
-
-文档更新日期：2026-10-07。运行时说明已按当前源码核对，早期制作和验收事实按各自日期保留；正式版本与源码增量见 [文档索引](文档索引.md)。
+运行说明核对日期：2026-10-11。本文集中维护现行绑定、驱动与预览边界；素材制作来源和原始参数检查保存在 [绑定素材说明](assets/xuansi/rigging/README.md)。版本状态见 [文档索引](文档索引.md)，下方历史验收未在本轮重新执行。
 
 ## 目标与实现
 
@@ -27,7 +25,18 @@
 - `assets/xuansi/rigging/xuansi-layers.psd`、`layers/*.png`：眼睛、嘴部、头部和身体的素材层。
 - `assets/xuansi/rigging/xuansi.cmo3`：Cubism 工程。
 - `assets/xuansi/rigging/xuansi.moc3`、`xuansi.model3.json`、`xuansi.cdi3.json`、`xuansi.1024/texture_00.png`：运行时模型、参数和纹理。
-- `ParamEyeBallX/Y`：鼠标视线；`ParamEyeLOpen/ROpen`：眨眼与睡眠闭眼；`ParamMouthOpenY`：语音响度口型；`ParamHairFront`、`ParamHairSide`、`ParamHairBack`：发根、发中、发梢摆动；`ParamBodyAngleX`：局部衣摆摆动。
+
+| 实际参数名 | 已接入行为 |
+| --- | --- |
+| `ParamEyeBallX`、`ParamEyeBallY` | 按角色所在显示器边界平滑映射鼠标视线 |
+| `ParamEyeLOpen`、`ParamEyeROpen` | 自动眨眼、一次性眨眼及休眠闭眼 |
+| `ParamMouthOpenY` | 播放响度口型，停止、取消、静音或休眠归零 |
+| `ParamHairFront`、`ParamHairSide`、`ParamHairBack` | 发根、发中、发梢的弹簧链摆动 |
+| `ParamBodyAngleX` | 衣摆局部网格摆动，不驱动整身体转动 |
+
+自动眨眼还要求 `xuansi.model3.json` 中的 `EyeBlink` 参数组包含左右眼开合 ID；仅存在参数或启用自动眨眼不足以证明绑定可用。当前 [动作能力](pet/avatar_motion.py) 由 `ARM_RAISE_BINDING_VERIFIED=False` 禁用原生抬手，只开放 `blink`。未跟踪的个人 Cubism 工程不作为运行时模型或已交付动作的证据。
+
+久置拔刀要求持续五分钟满足默认 Live2D、idle、桌面可用、无忙碌任务和无收音等资格，并且没有系统键鼠输入；资格中断重置计时。实现与姿态文件见 [久置拔刀说明](assets/xuansi/idle-blade/README.md)。
 
 单张立绘不足以还原全套角色结构。本版没有逐束发丝、衣物和手臂独立分层；头发与衣摆通过合并 ArtMesh 的局部网格关键形摆动，不是 Cubism 物理模拟。当前没有头部转动、身体呼吸或摄像头面捕；口型是响度驱动，不是音素级口型。绑定只针对当前 1024 × 1536 立绘坐标。
 

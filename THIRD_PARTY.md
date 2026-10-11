@@ -1,16 +1,14 @@
 # 第三方来源与许可范围
 
-当前版本入口（2026-10-07）：[0.5.5 发布验收](安装包0.5.5发布验收.md)。发布进度按该记录理解；历史正文的日期、测试、失败、工时及摘要保留。
+来源复核与文档更新：2026-10-11；历史许可核对记录始于 2026-09-29。本项目原创源代码及文档采用根目录 [Apache-2.0](LICENSE)，不改变第三方代码、模型、数据和图片各自的许可。以下记录来源与已发现的分发边界，没有完成商业安装包的逐组件许可审计，也未新增任何授权。
 
-许可核对日期：2026-09-29；文档同步日期：2026-10-07。本项目原创源代码及文档采用根目录 [Apache-2.0](LICENSE)，不改变第三方代码、模型、数据和图片各自的许可。以下记录来源与已发现的分发边界，不是商业安装包的完整许可审计。
-
-本次同步仅补充运行与版本范围：本轮安装包版本为 0.5.5，Live2D 预览复用既有 `live2d-py`、PySide6 和角色素材，没有增加或升级运行依赖，也未新增许可授权或重新完成许可审计。当前源码与历史发布资料见 [文档索引](文档索引.md)，预览修复见 [验收记录](形象预览Live2D修复验收.md)。
+本地源码为 0.5.6，远程主分支和最新公开安装包仍为 0.5.5；本次没有更改依赖、模型或许可原文。具体基线见 [代码与文档核对](docs/文档核对记录-2026-10-11.md)，安装和校验覆盖集中见 [安装与发布](docs/安装与发布.md)。Neko ICO 的移除属于用户已有的未提交清理，公开 0.5.5 仍含旧文件。
 
 ## 主要组件
 
 | 组件 | 来源与版本 | 许可及范围 |
 | --- | --- | --- |
-| 历史猫精灵、图标、动画定义 | [NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT，Copyright (c) 2026 Naudy Castellanos；原文保留于 [assets/neko/LICENSE](assets/neko/LICENSE)，当前默认形象不再加载。开发时的 `upstream-nekoai/` 副本不随本仓库发布 |
+| 历史猫精灵、动画定义 | [NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT，Copyright (c) 2026 Naudy Castellanos；原文保留于 [assets/neko/LICENSE](assets/neko/LICENSE)，当前默认形象不再加载。开发时的 `upstream-nekoai/` 副本不随本仓库发布 |
 | 当前玄司立绘、头像及 Live2D 派生素材 | 用户角色参考图，经图像工具及授权的本机处理制作，见 [素材来源](assets/xuansi/README.md) | 用户明确要求保留版权，见 [单独声明](assets/xuansi/LICENSE)；不属于 Apache-2.0 或 NekoAI 的 MIT 范围 |
 | 图文基础模型 | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | Apache-2.0；模型许可仍应随实际分发保留 |
 | GGUF 及视觉组件 | [unsloth/Qwen3.5-4B-GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF)，提交 `e87f176479d0855a907a41277aca2f8ee7a09523` | 上述模型的转换，按 HF LFS 摘要校验，不因格式转换获得新的无限制许可 |
@@ -55,7 +53,7 @@ Qt 的开源许可可以用于满足条款的商业分发，但实际组件可�
 
 当前 Kokoro 配置使用模型包中的 `espeak-ng-data`。Kokoro 权重的 Apache-2.0 标签不等于 eSpeak NG 代码、数据及实际 sherpa 构建都能按 Apache 分发。本次已核对上游 GPL-3.0 文本，未完成具体数据文件和静态/动态链接关系的逐项审计；不能将此处写成“整包已获闭源商用许可”。默认朗读使用 Melo，安装脚本仍会下载可选 Kokoro 包。
 
-NVIDIA CUDA 运行库是单独下载的第三方二进制组件，适用其实际发布包及 [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) 中的许可和可再分发范围。llama.cpp 本身的 MIT 不覆盖 NVIDIA 组件。
+NVIDIA CUDA 运行库是单独下载的第三方二进制组件，适用其实际发布包及 [CUDA 12.4.1 EULA 归档](https://docs.nvidia.com/cuda/archive/12.4.1/eula/index.html) 中的许可和可再分发范围。llama.cpp 本身的 MIT 不覆盖 NVIDIA 组件。
 
 ## 下载与发布范围
 
@@ -67,10 +65,10 @@ NVIDIA CUDA 运行库是单独下载的第三方二进制组件，适用其实�
 
 Release 的 `.exe` 包含源码、现有角色素材和 Python 运行时，不包含本机数据、PySide6、模型或 CUDA；这些依赖沿用现有脚本在用户安装时下载。Python 和 Inno Setup 的许可不改变项目代码、图片、模型和其他第三方组件各自的许可。当前在线包没有取得额外商业授权，也不代表上文所列商用分发事项已经完成审计。
 
-运行库、权重、虚拟环境和用户 `data/` 不进入 Git；公开仓库提供下载脚本和 [固定清单](assets-manifest.json)。实际下载及解压时保留包内原有许可文件，不把这些组件重新标为项目 Apache-2.0。
+运行库、权重、虚拟环境和用户 `data/` 不进入 Git；公开仓库提供下载脚本和 [基础资源清单](assets-manifest.json)。此清单只含基础七项；实时 Paraformer 的三项资源另在 [下载脚本](scripts/download_realtime.py) 固定版本和摘要。Python 依赖锁定版本，但没有项目维护的逐包 hash，不能将所有依赖统称为固定 SHA256 校验。实际下载及解压时保留包内原有许可文件，不把这些组件重新标为项目 Apache-2.0。
 
 Melo 历史 GitHub 发布包未提供作者 SHA256，清单里的值是首次 HTTPS 下载后计算并锁定的摘要，不是作者签名。其他摘要及版本由下载脚本和清单记录。AISHELL3 只在早期开发中测试过，未被当前应用采用，也不列入本次下载或发布内容。
 
 历史说明：2026-09-13 本项目只在开发电脑集成，尚未发布；2026-09-14 用户授权发布到 `DesktopPetXuansi/Xuansi`，本文件据此更新许可范围与公开文档。实际推送和核验结果见 [开源发布验收](开源发布验收.md)，不将历史的本机安装记录当成商业发行验收。
 
-2026-09-20 增量：默认语音输入改为上述在线 Paraformer，SenseVoice 保留为可选整句模式。在线模型的固定 URL、摘要见 `scripts/download_realtime.py`；未将权重上传仓库。本次使用已有 sherpa-onnx，不增加回声消除依赖。
+2026-09-20 增量：默认语音输入改为上述本地流式 Paraformer，SenseVoice 保留为可选整句模式。这里的 online 指流式解码，不是云端识别；固定 URL、摘要见 [实时下载器](scripts/download_realtime.py)，权重未上传仓库。使用已有 sherpa-onnx，没有回声消除依赖。
