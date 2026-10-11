@@ -27,7 +27,7 @@
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest) 获取 Windows x64 在线安装包及 `SHA256SUMS.txt`。安装包内置 Python 3.13.15，无需预装 Python 或 Git。
+下载 [Windows x64 在线安装包 0.5.6](https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.5.6/Xuansi-0.5.6-windows-x64-setup.exe) 和 [SHA256SUMS.txt](https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.5.6/SHA256SUMS.txt)，或查看 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest)。安装包内置 Python 3.13.15，无需预装 Python 或 Git。
 
 当前安装路线要求 **Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 与驱动、D 盘**。建议至少预留 15GB 空间；模型固定放在 `D:\AI\Models\desktop-pet`，应用盘还需容纳环境与推理引擎。首次下载需要网络，不是离线安装包。
 
