@@ -19,19 +19,6 @@ def available_action_ids(actions):
     return tuple(action for action in ACTION_IDS if action in requested)
 
 
-def speech_grammar(actions=DEFAULT_ACTION_IDS):
-    """只把当前模型确有原生绑定的动作放进本轮受限语法。"""
-    motions = ("none", *available_action_ids(actions))
-    motion_choices = " | ".join(f'"{motion}"' for motion in motions)
-    return (
-        'root ::= "[voice:" ("on" | "off" | "keep") '
-        f'"][motion:" ({motion_choices}) "]\\n" [^\\x00]+'
-    )
-
-
-SPEECH_GRAMMAR = speech_grammar()
-
-
 @dataclass(frozen=True, slots=True)
 class ControlCallbacks:
     """传递同轮朗读、动作及语音模型回调；语音选择在正文生成前完成。"""
