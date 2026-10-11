@@ -6,18 +6,13 @@
   <img src="assets/xuansi/front.png" alt="玄司：黑发高马尾、黑金古风服装的桌面伙伴" width="220">
 </p>
 
-## 版本与文档基线
+## 版本与发布
 
-核对日期：2026-10-11。完整提交、远程分支及差异见 [本次代码与文档核对记录](docs/文档核对记录-2026-10-11.md)。
+源码及现行指南为 **0.5.6**。本版将自动语音附图、记忆相关性、保存澄清及自动朗读引擎选择交给现有 Qwen，并纳入原生验收共享上下文与截图检查修复、旧语音语法及闲置 Neko ICO 清理。
 
-| 对象 | 当前状态 |
-| --- | --- |
-| GitHub 默认分支 `main` | 0.5.5，提交 `d53c484` |
-| GitHub 最新公开安装包 | [v0.5.5](https://github.com/DesktopPetXuansi/Xuansi/releases/tag/v0.5.5)，2026-10-07 发布 |
-| 当前本地源码 | 0.5.6，提交 `c779711`，另有未提交的旧语音语法与 Neko ICO 清理 |
-| 0.5.6 本地安装包 | [已有构建及安装验收记录](安装包0.5.6验收.md)，尚未公开发布；包来源为 `c0a56e6`，不含后续工作区清理 |
+公开安装包以 [GitHub Latest](https://github.com/DesktopPetXuansi/Xuansi/releases/latest) 为准；本版来源、摘要、安装和公开验证见 [0.5.6 发布验收](安装包0.5.6发布验收.md)。安装目录的 `release.json` 记录实际版本及提交。
 
-本文及现行指南说明当前本地实现。**克隆远程主分支或下载公开安装包，目前得到 0.5.5**。0.5.6 将自动语音附图、记忆相关性、保存澄清及自动朗读引擎选择改由现有 Qwen 判断；0.5.5 的相关规则见 [更新记录](CHANGELOG.md)，两者不能混为同一交付版本。
+[首次文档核对](docs/文档核对记录-2026-10-11.md) 与 [历史本地安装验收](安装包0.5.6验收.md) 保留发布前快照，不代表后续正式包来源；历史实现差异见 [更新记录](CHANGELOG.md)。
 
 ## 已实现能力
 
@@ -32,7 +27,7 @@
 
 ## 下载与安装
 
-直接下载 [Windows x64 在线安装包 0.5.5](https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.5.5/Xuansi-0.5.5-windows-x64-setup.exe)，或查看 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest)。安装包内置 Python 3.13.15，无需预装 Python 或 Git。
+从 [GitHub Releases](https://github.com/DesktopPetXuansi/Xuansi/releases/latest) 获取 Windows x64 在线安装包及 `SHA256SUMS.txt`。安装包内置 Python 3.13.15，无需预装 Python 或 Git。
 
 当前安装路线要求 **Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 与驱动、D 盘**。建议至少预留 15GB 空间；模型固定放在 `D:\AI\Models\desktop-pet`，应用盘还需容纳环境与推理引擎。首次下载需要网络，不是离线安装包。
 
