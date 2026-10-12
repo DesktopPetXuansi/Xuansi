@@ -1,0 +1,30 @@
+name: xuansi-web
+services:
+  db:
+    image: postgres:18
+    # 开发数据库只绑定回环地址；生产部署必须使用密码认证与独立配置。
+    environment:
+      POSTGRES_USER: xuansi
+      POSTGRES_DB: xuansi
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xuansi -d xuansi"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  mail:
+    image: axllent/mailpit:v1.29.0
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres_data:

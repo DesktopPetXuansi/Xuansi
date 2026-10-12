@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/.env*
+**/.runtime
+**/.data
+**/test-results
+**/playwright-report
+**/*.exe
+**/*.test
+.git

@@ -32,8 +32,8 @@ Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式（安装版）"; Flags: unchecked
 
 [Files]
-; 安装包只保留运行时模型；PSD、拆分图层和编辑器工程继续由源码仓库保存。
-Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 桌面包不携带官网源码；运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
+Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\玄司 AI 桌宠"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: "-m pet"; WorkingDir: "{app}"; IconFilename: "{app}\assets\xuansi\icon.ico"
