@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+.runtime/
+.data/
+playwright-report/
+test-results/
+*.exe
+*.test
+*.tsbuildinfo
