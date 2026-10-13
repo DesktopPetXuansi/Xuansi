@@ -43,7 +43,8 @@ class AvatarIdleBlade:
     @property
     def supports_idle_blade(self):
         """只有默认 Live2D 模型和完整透明动作帧才允许播放。"""
-        return bool(self._live2d_active and self._live2d_model is not None and self._idle_blade_frames)
+        return bool(self._live2d_active and self._live2d_model is not None and self._idle_blade_frames
+                    and not getattr(self, "_platform_model_version", ""))
 
     def _load_idle_blade_frames(self):
         """按当前桌宠尺寸预缩放动作帧，避免空闲动画中途读盘或解码。"""

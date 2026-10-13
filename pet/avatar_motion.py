@@ -48,6 +48,9 @@ class AvatarMotion:
         """仅向模型公布当前默认 Live2D 中已验证的原生动作。"""
         if not self._live2d_active or self._live2d_model is None:
             return ()
+        if getattr(self, "_platform_model_version", ""):
+            # 外部模型只通过绑定的资源动作驱动，不套用玄司的眨眼时序。
+            return ()
         actions = []
         if {"ParamEyeLOpen", "ParamEyeROpen"}.issubset(self._live2d_parameter_ids):
             actions.append("blink")

@@ -26,6 +26,9 @@ class AvatarMask:
 
     def _live2d_window_mask(self):
         """按窗口高度扩展原图点击轮廓，避免高 DPI 或改尺寸后缓冲失衡。"""
+        if getattr(self, "_platform_model_version", ""):
+            # 外部角色轮廓未知，不能用玄司轮廓裁切其他模型。
+            return QRegion(self.rect())
         padding = max(2, round(self.height() * LIVE2D_MASK_PADDING_RATIO))
         return _expand_mask_region(self.frames["idle"][0][1], padding)
 

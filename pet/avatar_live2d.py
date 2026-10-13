@@ -39,6 +39,108 @@ class AvatarLive2D:
         self._live2d_module = None
         self._live2d_model = None
         self._live2d_parameter_ids = frozenset()
+        self._platform_model_version = ""
+        self._platform_expression = False
+        self._platform_parameters = {}
+
+    def select_platform_model(self, version_id, prepared=None):
+        """Qt GL 线程先试载候选模型，成功才替换；磁盘校验由调用方后台完成。"""
+        from .platform_resources import read_installed
+
+        manifest, path = prepared or read_installed(version_id)
+        if manifest["kind"] != "MODEL" or manifest["resourceVersionId"] != version_id:
+            raise ValueError("请选择已安装的 Live2D 模型")
+        if not self._live2d_ready:
+            raise ValueError("Live2D 窗口尚未就绪，请稍后重试")
+        from .character_frames import build_frames
+
+        frames, durations, native = build_frames(self.height(), "")
+        self.makeCurrent()
+        candidate = None
+        try:
+            import live2d.v3 as live2d
+
+            SESSION.acquire(self, live2d)
+            candidate = live2d.LAppModel()
+            candidate.LoadModelJson(str(path))
+            parameter_ids = frozenset(candidate.GetParamIds())
+            if not parameter_ids:
+                raise ValueError("模型未加载有效参数")
+            scale = self.devicePixelRatioF()
+            candidate.Resize(round(self.width() * scale), round(self.height() * scale))
+            candidate.SetAutoBlinkEnable(True)
+            candidate.SetAutoBreathEnable(False)
+            # 试算并绘制一帧验证原生渲染资源；旧模型仍然完整保留。
+            candidate.Update()
+            candidate.Draw()
+            self.cancel_motion()
+            self.interrupt_idle_blade(fade=False)
+            previous = self._live2d_model
+            self._live2d_model = candidate
+            self._live2d_module = live2d
+            self._live2d_parameter_ids = parameter_ids
+            self._platform_model_version = version_id
+            self._platform_expression = False
+            self._platform_parameters = manifest.get("capabilities", {}).get("parameters", {})
+            self.image_id = ""
+            self.frames, self.durations, self.native_animation = frames, durations, native
+            self._live2d_requested = True
+            self._live2d_failed = False
+            candidate = None
+            if previous is not None:
+                previous.DestroyRenderer()
+            LOG.info("平台 Live2D 模型已切换 version=%s", version_id)
+        finally:
+            if candidate is not None:
+                candidate.DestroyRenderer()
+                candidate = None
+                if self._live2d_model is None:
+                    SESSION.release(self)
+            self.doneCurrent()
+        self._set_render_mode()
+
+    def apply_platform_action(self, version_id, prepared=None):
+        """只有绑定当前模型精确版本的已校验动作或表情可交给 SDK。"""
+        from .platform_resources import read_installed
+
+        manifest, path = prepared or read_installed(version_id)
+        if (not self._live2d_active or self._live2d_model is None
+                or manifest["kind"] not in {"MOTION", "EXPRESSION"}
+                or len(manifest["dependencies"]) != 1
+                or manifest["dependencies"][0]["resourceVersionId"] != self._platform_model_version):
+            raise ValueError("动作或表情未绑定当前模型版本")
+        self.makeCurrent()
+        try:
+            self.cancel_motion()
+            if manifest["kind"] == "MOTION":
+                index = self._live2d_model.LoadExtraMotion("platform", str(path))
+                if type(index) is not int or index < 0:
+                    raise ValueError("SDK 无法加载此动作")
+                self._live2d_model.StartMotion("platform", index, 3)
+                if self._live2d_model.IsMotionFinished():
+                    raise ValueError("SDK 未能启动此动作")
+            else:
+                self._live2d_model.LoadExtraExpression(version_id, str(path))
+                # SDK 的 GetExpressionIds 仅列模型原始设置，不包含动态加载的表情。
+                self._live2d_model.SetExpression(version_id)
+                self._platform_expression = True
+            LOG.info("平台资源已应用 kind=%s version=%s", manifest["kind"], version_id)
+        finally:
+            self.doneCurrent()
+        self.update()
+
+    def reset_platform_expression(self):
+        """用户显式结束表情覆盖，恢复视线与口型驱动。"""
+        if not self._platform_model_version or self._live2d_model is None:
+            return
+        self.makeCurrent()
+        try:
+            self._live2d_model.ResetExpressions()
+            self._platform_expression = False
+        finally:
+            self.doneCurrent()
+        self._refresh_motion_capabilities()
+        self.update()
 
     def initializeGL(self):
         self._live2d_ready = True
@@ -128,6 +230,19 @@ class AvatarLive2D:
             self._update_gaze(elapsed)
             self._mouth_level += (self._mouth_target - self._mouth_level) * min(1.0, elapsed * 14.0)
             model = self._live2d_model
+            if self._platform_model_version:
+                # SDK 动作/表情拥有最高优先级，陌生模型不接收玄司专用驱动。
+                if model.IsMotionFinished() and not self._platform_expression:
+                    values = {"gazeX": self._gaze_x, "gazeY": self._gaze_y,
+                              "mouthOpen": self._mouth_level}
+                    for semantic, value in values.items():
+                        parameter = self._platform_parameters.get(semantic)
+                        if parameter in self._live2d_parameter_ids:
+                            model.SetParameterValue(parameter, value)
+                live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
+                model.Update()
+                model.Draw()
+                return
             if self.animation == "sleep":
                 model.SetParameterValue("ParamEyeLOpen", 0.0)
                 model.SetParameterValue("ParamEyeROpen", 0.0)

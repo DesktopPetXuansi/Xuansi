@@ -10,6 +10,7 @@ from .appearance_dialog import AppearanceDialog
 from .config import ROOT
 from .hotkey import GlobalHotkey
 from .panel import STYLE
+from .platform_dialog import PlatformDialog
 from .quick_chat import QuickChat
 
 LOG = logging.getLogger(__name__)
@@ -43,6 +44,11 @@ class CompanionUI:
         self.appearance = AppearanceDialog(owner.panel)
         self.appearance.apply_requested.connect(self.save_appearance)
         owner.panel.appearance_requested.connect(self.open_appearance)
+        self.platform = PlatformDialog(owner)
+        # 先显示角色创建 GL 上下文，再异步恢复本机已安装模型。
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(250, self.platform.restore_saved)
         self.tray = self._tray()
         self.refresh_icon()
         self.refresh()
@@ -59,7 +65,8 @@ class CompanionUI:
         if self.saving:
             self.appearance.saved("配置正在保存，请稍后应用形象")
             return
-        self.save(replace(self.owner.settings, avatar_image=identifier), appearance_only=True)
+        self.save(replace(self.owner.settings, avatar_image=identifier, platform_model_version="",
+                          platform_expression_version=""), appearance_only=True)
         if not self.saving:
             self.appearance.saved(self.owner.panel.status.text())
 
@@ -89,6 +96,7 @@ class CompanionUI:
             ("配置：模型参数与快捷键", pet.panel.open_configuration),
             ("日志：运行日志", pet.panel.open_logs),
             ("形象：更换桌宠形象", self.open_appearance),
+            ("官网：资源库与模型管理", self.platform.present),
             ("开启/关闭连续对话", pet.toggle_voice),
             ("看一眼屏幕", pet.look),
             ("休眠/唤醒", pet.toggle_sleep),
@@ -124,7 +132,12 @@ class CompanionUI:
         self.owner.panel.audio_avoidance_action.setEnabled(False)
         self.owner.panel.status.setText("正在保存配置…")
         self.quick.status.setText("正在保存配置…")
-        self.owner.runtime.persist(settings, validate_models=not (appearance_only or avoidance_only))
+        platform_changes = ({"platform_model_version": settings.platform_model_version,
+                             "platform_expression_version": settings.platform_expression_version,
+                             "avatar_image": settings.avatar_image}
+                            if appearance_only else None)
+        self.owner.runtime.persist(settings, validate_models=not (appearance_only or avoidance_only),
+                                   platform_changes=platform_changes)
 
     def saved(self, settings, error):
         if self.closed:
@@ -169,5 +182,6 @@ class CompanionUI:
         self.quick.hide()
         self.owner.panel.logs.hide()
         self.appearance.close()
+        self.platform.shutdown()
         self.tray.hide()
         LOG.info("快捷窗口关闭，热键已注销")

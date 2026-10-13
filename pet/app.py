@@ -35,6 +35,10 @@ class DesktopPet(QObject):
         self.last_voice_notice = float("-inf")
         self.pending = None
         self.runtime = Runtime()
+        self.runtime.current_settings = self.settings
+        self._quitting = False
+        self._runtime_shutdown_complete = False
+        self._platform_shutdown_complete = False
         self.runtime.audio_activity.set_enabled(self.settings.audio_avoidance)
         self.runtime.audio_activity.start()
         self.idle_action = IdleActionTimer()
@@ -45,6 +49,7 @@ class DesktopPet(QObject):
         self.monitor = MouseMonitor()
         self._connect()
         self.ui = CompanionUI(self)
+        self.ui.platform.shutdown_done.connect(self._platform_shutdown_finished)
         self.tray = self.ui.tray
         self.monitor.start()
         self.resource_timer = QTimer(self)
@@ -84,7 +89,7 @@ class DesktopPet(QObject):
         self.runtime.microphone_state.connect(self.on_microphone_state)
         self.runtime.segment.connect(self.on_segment)
         self.runtime.voice_update.connect(self.on_voice_update)
-        self.runtime.shutdown_done.connect(self.application.quit)
+        self.runtime.shutdown_done.connect(self._runtime_shutdown_finished)
         self.monitor.event.connect(self.on_mouse)
         self.monitor.activity.connect(self._on_system_activity)
 
@@ -431,6 +436,9 @@ class DesktopPet(QObject):
             LOG.info("系统连续空闲达到五分钟，开始玄司拔刀待机动作")
 
     def quit(self):
+        if self._quitting:
+            return
+        self._quitting = True
         self.resource_timer.stop()
         self.monitor.stop()
         self.ui.close()
@@ -440,3 +448,16 @@ class DesktopPet(QObject):
         self.panel.hide()
         self.runtime.shutdown()
         LOG.info("正在退出并释放本地模型")
+
+    def _runtime_shutdown_finished(self):
+        self._runtime_shutdown_complete = True
+        self._finish_shutdown()
+
+    def _platform_shutdown_finished(self):
+        self._platform_shutdown_complete = True
+        self._finish_shutdown()
+
+    def _finish_shutdown(self):
+        # Qt 事件循环保留到资源线程与推理运行时全部结束，禁止提前销毁 QThread。
+        if self._quitting and self._runtime_shutdown_complete and self._platform_shutdown_complete:
+            self.application.quit()

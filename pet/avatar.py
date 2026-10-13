@@ -128,10 +128,10 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
             if model is not None:
                 sleeping = self.animation == "sleep"
                 model.SetAutoBlinkEnable(not sleeping and self._motion_name != "blink")
-                if sleeping:
+                if sleeping and not self._platform_model_version:
                     model.SetParameterValue("ParamEyeLOpen", 0.0)
                     model.SetParameterValue("ParamEyeROpen", 0.0)
-                elif self._motion_name != "blink":
+                elif self._motion_name != "blink" and not self._platform_model_version:
                     model.SetParameterValue("ParamEyeLOpen", 1.0)
                     model.SetParameterValue("ParamEyeROpen", 1.0)
             self._mouth_target = 0.0
@@ -146,6 +146,12 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
         self.interrupt_idle_blade(fade=False)
         # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
         frames, durations, native = build_frames(self.height(), identifier)
+        if self._platform_model_version:
+            # 本机图片入口明确选择原有形象流程，解除平台模型选择。
+            self._release_live2d()
+            self._platform_model_version = ""
+            self._platform_expression = False
+            self._live2d_failed = False
         self.image_id, self.frames, self.durations = identifier, frames, durations
         self.native_animation, self.frame = native, 0
         self._live2d_requested = not bool(identifier)

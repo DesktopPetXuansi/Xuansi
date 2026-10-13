@@ -4,6 +4,7 @@ import asyncio
 import logging
 import threading
 from contextlib import suppress
+from dataclasses import replace
 from pathlib import Path
 
 import sounddevice as sd
@@ -33,6 +34,7 @@ class Runtime(QObject):
     segment = Signal(int, object)
     voice_update = Signal(int, object)
     settings_saved = Signal(object, str)
+    platform_settings_saved = Signal(object, str)
     memory_loaded = Signal(str)
     memory_saved = Signal(str)
     shutdown_done = Signal()
@@ -59,6 +61,7 @@ class Runtime(QObject):
         self.control = asyncio.Lock()
         self.microphone_control = asyncio.Lock()
         self.storage_control = asyncio.Lock()
+        self.current_settings = Settings()
         self.live = LiveDialogue(self)
         self.microphone = self._new_microphone(0)
         self.thread = threading.Thread(target=self._run, daemon=True, name="pet-runtime")
@@ -242,7 +245,7 @@ class Runtime(QObject):
                 self.finished.emit(epoch)
                 LOG.info("本轮回复已停止 listening=%s", self.listening)
 
-    def persist(self, settings: Settings, validate_models=True):
+    def persist(self, settings: Settings, validate_models=True, platform_changes=None):
         def validate_files():
             settings.validate()
             from .appearance import image_path
@@ -258,8 +261,14 @@ class Runtime(QObject):
             try:
                 async with self.storage_control:
                     await asyncio.to_thread(validate_files)
-                    await durable_io(save_settings, settings)
-                self.settings_saved.emit(settings, "")
+                    # 普通表单可能是旧快照，平台字段必须合并最近成功的持久状态。
+                    latest = {name: getattr(self.current_settings, name) for name in (
+                        "platform_url", "platform_model_version", "platform_expression_version", "avatar_image")}
+                    latest.update(platform_changes or {})
+                    merged = replace(settings, **latest)
+                    await durable_io(save_settings, merged)
+                    self.current_settings = merged
+                self.settings_saved.emit(merged, "")
             except Exception as exc:
                 LOG.warning("设置保存失败 type=%s", type(exc).__name__)
                 self.settings_saved.emit(
@@ -267,6 +276,25 @@ class Runtime(QObject):
                 )
 
         self.schedule(write())
+
+    def persist_platform(self, changes):
+        """平台与普通配置共用串行队列，持锁后才基于最新配置合并字段。"""
+        allowed = {"platform_url", "platform_model_version", "platform_expression_version", "avatar_image"}
+        if not set(changes).issubset(allowed):
+            raise ValueError("平台不能修改其他本地推理设置")
+
+        async def write():
+            try:
+                async with self.storage_control:
+                    merged = replace(self.current_settings, **changes)
+                    await durable_io(save_settings, merged)
+                    self.current_settings = merged
+                self.platform_settings_saved.emit(merged, "")
+            except Exception as exc:
+                LOG.warning("平台设置保存失败 type=%s", type(exc).__name__)
+                self.platform_settings_saved.emit(self.current_settings, "平台选择保存失败，请检查磁盘空间。")
+
+        return self.schedule(write())
 
     def load_memory(self):
         async def read():

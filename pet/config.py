@@ -19,6 +19,9 @@ class Settings:
     interval: int = 20
     pet_size: int = 160
     avatar_image: str = ""
+    platform_url: str = "http://localhost:3000"
+    platform_model_version: str = ""
+    platform_expression_version: str = ""
     observe: bool = True
     capture_scope: str = "screen"
     speak_replies: bool = True
@@ -53,6 +56,15 @@ class Settings:
         from .appearance import image_path
 
         image_path(self.avatar_image)
+        from .platform_auth import website_url
+
+        website_url(self.platform_url)
+        if self.platform_model_version or self.platform_expression_version:
+            from .platform_resources import identifier
+
+            for version in (self.platform_model_version, self.platform_expression_version):
+                if version:
+                    identifier(version)
         limit = 0 if self.tts_engine == "fast" else 102
         if (
             self.tts_engine not in ("fast", "natural")
