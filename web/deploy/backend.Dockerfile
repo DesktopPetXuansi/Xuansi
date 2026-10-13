@@ -1,10 +1,11 @@
-FROM golang:1.26.6-alpine AS build
+FROM golang:1.26.9-alpine AS build
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 go build -trimpath -o /out/api ./cmd/api && \
-    CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker
+    CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker && \
+    CGO_ENABLED=0 go build -trimpath -o /out/admin ./cmd/admin
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates tzdata && addgroup -S xuansi && adduser -S -G xuansi xuansi

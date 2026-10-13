@@ -3,6 +3,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.*.example
 .runtime/
 .data/
 playwright-report/

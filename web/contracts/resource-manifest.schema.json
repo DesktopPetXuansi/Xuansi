@@ -13,7 +13,7 @@
     "entrypoint": {"type": "string", "minLength": 1},
     "minimumClientVersion": {"type": "string"},
     "files": {
-      "type": "array", "minItems": 1, "maxItems": 1024,
+      "type": "array", "minItems": 1, "maxItems": 2048,
       "items": {
         "type": "object", "required": ["path", "bytes", "sha256"],
         "properties": {

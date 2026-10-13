@@ -11,7 +11,8 @@
     }
     header {
         X-Content-Type-Options nosniff
-        Referrer-Policy strict-origin-when-cross-origin
+        # 邮箱验证与密码恢复使用一次性链接，代理层保持页面的来源保密策略。
+        Referrer-Policy no-referrer
         X-Frame-Options DENY
     }
 }

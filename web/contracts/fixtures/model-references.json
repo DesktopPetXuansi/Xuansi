@@ -1,0 +1,12 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "pet.moc3",
+    "Textures": ["texture.png"],
+    "Physics": "",
+    "Pose": "",
+    "DisplayInfo": "",
+    "UserData": "",
+    "Motions": { "Idle": [{ "File": "idle.motion3.json", "Sound": "" }] }
+  }
+}
