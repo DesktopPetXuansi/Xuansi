@@ -795,6 +795,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 公开密码规则与当前邮件验证方式 */
+        get: operations["get_auth_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -955,6 +972,7 @@ export interface components {
         RegisterInput: {
             /** Format: email */
             email: string;
+            /** @description 12至128个Unicode码点，与服务端密码规则一致 */
             password: string;
             displayName: string;
         };
@@ -1222,6 +1240,24 @@ export interface components {
             meta?: {
                 nextCursor?: string;
             };
+        };
+        AuthConfig: {
+            password: {
+                minLength: number;
+                maxLength: number;
+            };
+            email: {
+                /** @enum {string} */
+                mode: "LOCAL_MAILBOX" | "SMTP";
+                /**
+                 * Format: uri
+                 * @description 仅本地开发邮件模式提供，不包含SMTP账号或密钥
+                 */
+                inboxUrl: string | null;
+            };
+        };
+        AuthConfigResponse: {
+            data: components["schemas"]["AuthConfig"];
         };
     };
     responses: never;
@@ -1491,6 +1527,7 @@ export interface operations {
             content: {
                 "application/json": {
                     token: string;
+                    /** @description 12至128个Unicode码点，与服务端密码规则一致 */
                     password: string;
                 };
             };
@@ -1595,6 +1632,7 @@ export interface operations {
             content: {
                 "application/json": {
                     currentPassword: string;
+                    /** @description 12至128个Unicode码点，与服务端密码规则一致 */
                     password: string;
                 };
             };
@@ -3222,6 +3260,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_auth_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前表单配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigResponse"];
                 };
             };
         };

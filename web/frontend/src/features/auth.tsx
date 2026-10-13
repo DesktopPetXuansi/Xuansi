@@ -8,9 +8,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  LocalMailbox,
+  passwordError,
+  passwordHint,
+  useAuthConfig,
+} from "./auth-config";
 const schema = z.object({
   email: z.string(),
-  password: z.string().max(128),
+  password: z.string(),
   displayName: z.string().max(80),
 });
 type Values = z.infer<typeof schema>;
@@ -25,6 +31,7 @@ export function AuthPage({ mode }: { mode: string }) {
   const query = useSearchParams();
   const router = useRouter();
   const client = useQueryClient();
+  const config = useAuthConfig();
   const [error, setError] = useState<unknown>();
   const [success, setSuccess] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -36,15 +43,15 @@ export function AuthPage({ mode }: { mode: string }) {
         path: ["email"],
         message: "请输入有效的邮箱地址。",
       });
-    if (
-      ["register", "login", "reset-password"].includes(mode) &&
-      values.password.length < 10
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["password"],
-        message: "密码至少 10 个字符。",
-      });
+    if (["register", "login", "reset-password"].includes(mode) && config.data) {
+      const message = passwordError(
+        values.password,
+        config.data.password,
+        mode !== "login",
+      );
+      if (message)
+        context.addIssue({ code: "custom", path: ["password"], message });
+    }
   });
   const {
     register,
@@ -55,6 +62,7 @@ export function AuthPage({ mode }: { mode: string }) {
     defaultValues: { displayName: "", password: "", email: "" },
   });
   async function submit(values: Values) {
+    if (!config.data) return;
     setError(undefined);
     setSuccess("");
     try {
@@ -67,7 +75,11 @@ export function AuthPage({ mode }: { mode: string }) {
             : { email: values.email, password: values.password },
         );
         if (mode === "register") {
-          setSuccess("账号已创建。请检查邮箱完成验证，再返回登录。");
+          setSuccess(
+            config.data.email.mode === "LOCAL_MAILBOX"
+              ? "账号已创建。请打开下方本地收件箱，使用邮件中的验证链接完成验证，再返回登录。"
+              : "账号已创建。验证邮件已排队发送，请使用邮件中的链接完成验证，再返回登录。",
+          );
           return;
         }
         await client.invalidateQueries({ queryKey: ["me"] });
@@ -89,7 +101,11 @@ export function AuthPage({ mode }: { mode: string }) {
           "POST",
           { email: values.email },
         );
-        setSuccess("如邮箱符合条件，邮件将发送至该地址。请检查收件箱。");
+        setSuccess(
+          config.data.email.mode === "LOCAL_MAILBOX"
+            ? "如邮箱符合条件，验证邮件会进入下方本地收件箱。请打开邮件中的链接。"
+            : "如邮箱符合条件，邮件已排队发送。请检查收件箱和垃圾邮件。邮件内含验证链接。",
+        );
       }
     } catch (cause) {
       setError(cause);
@@ -120,6 +136,8 @@ export function AuthPage({ mode }: { mode: string }) {
           账号用于管理资源。桌面的聊天与记忆继续保存在本地。
         </Heading>
         <div className="panel">
+          {config.isPending && <Notice>正在加载账号配置…</Notice>}
+          {config.error && <Notice error={config.error} />}
           {mode === "verify-email" && query.get("token") ? (
             <Button disabled={verifying || !!success} onClick={confirm}>
               {verifying ? "正在验证…" : "确认验证邮箱"}
@@ -144,7 +162,14 @@ export function AuthPage({ mode }: { mode: string }) {
                 </Field>
               )}
               {["login", "register", "reset-password"].includes(mode) && (
-                <Field label="密码" hint="至少 10 个字符。">
+                <Field
+                  label="密码"
+                  hint={
+                    mode === "login"
+                      ? undefined
+                      : config.data && passwordHint(config.data.password)
+                  }
+                >
                   <input
                     type="password"
                     autoComplete={
@@ -159,7 +184,7 @@ export function AuthPage({ mode }: { mode: string }) {
                   )}
                 </Field>
               )}
-              <Button disabled={isSubmitting} type="submit">
+              <Button disabled={isSubmitting || !config.data} type="submit">
                 {isSubmitting
                   ? "正在处理…"
                   : mode === "login"
@@ -174,11 +199,15 @@ export function AuthPage({ mode }: { mode: string }) {
           )}
           {error !== undefined && <Notice error={error} />}{" "}
           {success && <Notice>{success}</Notice>}
+          <LocalMailbox config={config.data} />
           <div className="auth-links">
             <Link href={mode === "login" ? "/register" : "/login"}>
               {mode === "login" ? "创建账号" : "返回登录"}
             </Link>
             <Link href="/forgot-password">忘记密码？</Link>
+            {mode !== "reset-password" && (
+              <Link href="/verify-email">重新发送验证邮件</Link>
+            )}
           </div>
         </div>
         <p className="legal-note">

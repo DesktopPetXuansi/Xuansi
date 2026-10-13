@@ -9,6 +9,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AuthConfigEmailMode.
+const (
+	LOCALMAILBOX AuthConfigEmailMode = "LOCAL_MAILBOX"
+	SMTP         AuthConfigEmailMode = "SMTP"
+)
+
+// Valid indicates whether the value is a known member of the AuthConfigEmailMode enum.
+func (e AuthConfigEmailMode) Valid() bool {
+	switch e {
+	case LOCALMAILBOX:
+		return true
+	case SMTP:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateCoverInputPurpose.
 const (
 	COVER CreateCoverInputPurpose = "COVER"
@@ -381,6 +399,27 @@ type AuditList struct {
 	} `json:"meta,omitempty"`
 }
 
+// AuthConfig defines model for AuthConfig.
+type AuthConfig struct {
+	Email struct {
+		// InboxUrl 仅本地开发邮件模式提供，不包含SMTP账号或密钥
+		InboxUrl *string             `json:"inboxUrl"`
+		Mode     AuthConfigEmailMode `json:"mode"`
+	} `json:"email"`
+	Password struct {
+		MaxLength int `json:"maxLength"`
+		MinLength int `json:"minLength"`
+	} `json:"password"`
+}
+
+// AuthConfigEmailMode defines model for AuthConfig.Email.Mode.
+type AuthConfigEmailMode string
+
+// AuthConfigResponse defines model for AuthConfigResponse.
+type AuthConfigResponse struct {
+	Data AuthConfig `json:"data"`
+}
+
 // AuthorizeResponse defines model for AuthorizeResponse.
 type AuthorizeResponse struct {
 	Data struct {
@@ -605,7 +644,9 @@ type OAuthToken struct {
 type RegisterInput struct {
 	DisplayName string              `json:"displayName"`
 	Email       openapi_types.Email `json:"email"`
-	Password    string              `json:"password"`
+
+	// Password 12至128个Unicode码点，与服务端密码规则一致
+	Password string `json:"password"`
 }
 
 // Release defines model for Release.
@@ -1015,6 +1056,7 @@ type PostApiV1AuthPasswordResetsParams struct {
 
 // PostApiV1AuthPasswordResetsConfirmJSONBody defines parameters for PostApiV1AuthPasswordResetsConfirm.
 type PostApiV1AuthPasswordResetsConfirmJSONBody struct {
+	// Password 12至128个Unicode码点，与服务端密码规则一致
 	Password string `json:"password"`
 	Token    string `json:"token"`
 }
@@ -1104,7 +1146,9 @@ type PutApiV1MeLibraryIdParams struct {
 // PutApiV1MePasswordJSONBody defines parameters for PutApiV1MePassword.
 type PutApiV1MePasswordJSONBody struct {
 	CurrentPassword string `json:"currentPassword"`
-	Password        string `json:"password"`
+
+	// Password 12至128个Unicode码点，与服务端密码规则一致
+	Password string `json:"password"`
 }
 
 // PutApiV1MePasswordParams defines parameters for PutApiV1MePassword.

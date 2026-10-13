@@ -1,10 +1,11 @@
-import type {components} from '../../../contracts/generated/api';
+import type { components } from "../../../contracts/generated/api";
 // 公共实体直接引用OpenAPI生成类型，避免网站与Go协议漂移。
-export type User = components['schemas']['User'];
-export type Resource = components['schemas']['Resource'];
-export type Version = components['schemas']['ResourceVersion'];
-export type Upload = components['schemas']['Upload'];
-export type Release = components['schemas']['Release'];
+export type User = components["schemas"]["User"];
+export type AuthConfig = components["schemas"]["AuthConfig"];
+export type Resource = components["schemas"]["Resource"];
+export type Version = components["schemas"]["ResourceVersion"];
+export type Upload = components["schemas"]["Upload"];
+export type Release = components["schemas"]["Release"];
 export interface Session {
   id: string;
   createdAt: string;

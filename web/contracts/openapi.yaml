@@ -403,7 +403,9 @@
                   },
                   "password": {
                     "type": "string",
-                    "minLength": 10
+                    "minLength": 12,
+                    "maxLength": 128,
+                    "description": "12至128个Unicode码点，与服务端密码规则一致"
                   }
                 },
                 "required": [
@@ -568,7 +570,9 @@
                   },
                   "password": {
                     "type": "string",
-                    "minLength": 10
+                    "minLength": 12,
+                    "maxLength": 128,
+                    "description": "12至128个Unicode码点，与服务端密码规则一致"
                   }
                 },
                 "required": [
@@ -3759,6 +3763,28 @@
         },
         "security": []
       }
+    },
+    "/api/v1/auth/config": {
+      "get": {
+        "operationId": "get_auth_config",
+        "summary": "公开密码规则与当前邮件验证方式",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "当前表单配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4362,8 +4388,9 @@
           },
           "password": {
             "type": "string",
-            "minLength": 10,
-            "maxLength": 128
+            "minLength": 12,
+            "maxLength": 128,
+            "description": "12至128个Unicode码点，与服务端密码规则一致"
           },
           "displayName": {
             "type": "string",
@@ -5302,6 +5329,67 @@
         "required": [
           "data"
         ]
+      },
+      "AuthConfig": {
+        "type": "object",
+        "required": [
+          "password",
+          "email"
+        ],
+        "properties": {
+          "password": {
+            "type": "object",
+            "required": [
+              "minLength",
+              "maxLength"
+            ],
+            "properties": {
+              "minLength": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "maxLength": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "email": {
+            "type": "object",
+            "required": [
+              "mode",
+              "inboxUrl"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "LOCAL_MAILBOX",
+                  "SMTP"
+                ]
+              },
+              "inboxUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "仅本地开发邮件模式提供，不包含SMTP账号或密钥"
+              }
+            }
+          }
+        }
+      },
+      "AuthConfigResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthConfig"
+          }
+        }
       }
     },
     "securitySchemes": {

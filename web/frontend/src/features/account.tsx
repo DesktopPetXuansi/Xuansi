@@ -5,10 +5,12 @@ import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { passwordError, passwordHint, useAuthConfig } from "./auth-config";
 export function Account() {
   const router = useRouter();
   const me = useMe();
   const cache = useQueryClient();
+  const config = useAuthConfig();
   const [error, setError] = useState<unknown>();
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,9 +19,21 @@ export function Account() {
     password = false,
   ) {
     event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    if (password) {
+      if (!config.data) return;
+      const problem = passwordError(
+        String(form.get("password")),
+        config.data.password,
+      );
+      if (problem) {
+        setError(new Error(problem));
+        setSuccess("");
+        return;
+      }
+    }
     setBusy(true);
     setError(undefined);
-    const form = new FormData(event.currentTarget);
     try {
       await api(
         password ? "/me/password" : "/me",
@@ -67,7 +81,11 @@ export function Account() {
           </Field>
           <Button disabled={busy}>保存资料</Button>
         </form>
-        <form className="panel" onSubmit={(event) => submit(event, true)}>
+        <form
+          className="panel"
+          onSubmit={(event) => submit(event, true)}
+          noValidate
+        >
           <h3>修改密码</h3>
           <Field label="当前密码">
             <input
@@ -77,17 +95,19 @@ export function Account() {
               required
             />
           </Field>
-          <Field label="新密码">
+          <Field
+            label="新密码"
+            hint={config.data && passwordHint(config.data.password)}
+          >
             <input
               type="password"
               name="password"
               autoComplete="new-password"
-              minLength={10}
-              maxLength={128}
               required
             />
           </Field>
-          <Button disabled={busy}>更新密码</Button>
+          {config.error && <Notice error={config.error} />}
+          <Button disabled={busy || !config.data}>更新密码</Button>
         </form>
       </div>
       {error !== undefined && <Notice error={error} />}{" "}

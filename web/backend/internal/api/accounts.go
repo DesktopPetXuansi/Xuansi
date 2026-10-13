@@ -18,6 +18,7 @@ import (
 )
 
 func (s *Server) accountRoutes(r chi.Router) {
+	r.Get("/auth/config", s.authConfig)
 	r.Get("/auth/csrf", func(w http.ResponseWriter, r *http.Request) {
 		token := platform.RandomToken()
 		// 同一浏览器并行操作复用随机令牌，避免两次GET互相覆盖Cookie。

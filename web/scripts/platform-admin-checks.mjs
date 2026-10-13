@@ -18,7 +18,9 @@ async function promoteLocalAccount(project, email) {
 export async function verifyAdmin({ project, email, page, browser, origin, api, request, image, imageVersion, checked }) {
   await promoteLocalAccount(project, email);
   await page.goto(`${origin}/admin/resources`);
-  const publication = page.locator('article').filter({ has: page.getByRole('heading', { name: '验收专用图片（已编辑）', exact: true }) });
+  // 多次验收可产生同名资源，以本次唯一版本定位，避免选中旧数据。
+  assert.match(imageVersion, /^[a-f0-9-]{36}$/);
+  const publication = page.locator('article').filter({ has: page.locator(`option[value="${imageVersion}"]`) });
   await publication.getByRole('combobox').selectOption(imageVersion);
   await publication.getByRole('button', { name: '发布公开资源' }).click();
   await publication.getByText('公开', { exact: false }).waitFor();

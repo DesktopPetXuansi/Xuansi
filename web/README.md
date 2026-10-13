@@ -93,6 +93,8 @@ go run ./cmd/admin -email 已验证的邮箱
 Pop-Location
 ```
 
+新密码要求 12～128 个字符，中文和 Emoji 按 Unicode 码点计数；注册、重置与修改密码从 `/api/v1/auth/config` 读取同一规则。当前邮件发送到本地开发收件箱，不会投递到填写的真实邮箱。页面提供“打开本地收件箱”和“重新发送验证邮件”；验证通过邮件链接完成，不需要填写数字验证码。接入真实 SMTP 后，页面自动隐藏本地收件入口。
+
 API 启动时 `-migrate` 应用嵌入的四个迁移，可重复运行；不使用 AutoMigrate。开发的随机 OAuth 密钥随 API 重启失效，客户端需要重新授权。生产必须配置稳定密钥。
 
 验收生产构建时，在 `web/frontend` 执行 `pnpm build`，关闭正在运行的开发前端，然后在项目根目录运行 `& web/scripts/run-preview.ps1`。它使用与镜像相同的 standalone 入口，仍仅绑定本机；不能与开发前端同时占用 3000 端口。
