@@ -84,7 +84,7 @@ Copy-Item web/.env.example web/.env
 | 开发邮件捕获界面 | http://127.0.0.1:8025 |
 | PostgreSQL | 127.0.0.1:54329；开发库 xuansi |
 
-浏览器使用 `localhost:3000`，保持与 `APP_URL` 相同来源。注册后在邮件捕获界面打开验证链接，再登录。没有默认管理员账号。需先注册并验证实际账号，再在已配置 `DATABASE_URL` 的后端终端提升：
+浏览器使用 `localhost:3000`，保持与 `APP_URL` 相同来源。默认开发配置使用 Mailpit，注册后在邮件捕获界面打开验证链接；配置真实 SMTP 时从实际邮箱打开链接。没有默认管理员账号。需先注册并验证实际账号，再在已配置 `DATABASE_URL` 的后端终端提升：
 
 ```powershell
 Push-Location web/backend
@@ -93,7 +93,19 @@ go run ./cmd/admin -email 已验证的邮箱
 Pop-Location
 ```
 
-新密码要求 12～128 个字符，中文和 Emoji 按 Unicode 码点计数；注册、重置与修改密码从 `/api/v1/auth/config` 读取同一规则。当前邮件发送到本地开发收件箱，不会投递到填写的真实邮箱。页面提供“打开本地收件箱”和“重新发送验证邮件”；验证通过邮件链接完成，不需要填写数字验证码。接入真实 SMTP 后，页面自动隐藏本地收件入口。
+新密码要求 12～128 个字符，中文和 Emoji 按 Unicode 码点计数；注册、重置与修改密码从 `/api/v1/auth/config` 读取同一规则。默认 Mailpit 模式的邮件留在本地收件箱，不会投递到填写的真实邮箱。页面提供“打开本地收件箱”和“重新发送验证邮件”；验证通过有效期 1 小时的邮件链接完成，不需要填写数字验证码。接入真实 SMTP 后，页面自动隐藏本地收件入口。
+
+QQ 邮箱可在本地 `web/.env` 中配置以下字段，并将占位文字替换为自己的实际信息。SMTP 登录账号和发件人使用同一个完整 QQ 邮箱地址；密码字段填写邮箱生成的授权码。服务器与认证方式可参考 [腾讯云邮箱登录配置说明](https://intl.cloud.tencent.com/zh/document/product/1266/71700) 和 [QQ 邮箱授权码说明](https://wx.mail.qq.com/list/readtemplate?name=app_intro.html#/agreement/authorizationCode)。
+
+```dotenv
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=587
+SMTP_FROM=你的QQ邮箱完整地址
+SMTP_USER=你的QQ邮箱完整地址
+SMTP_PASSWORD=你的邮箱授权码
+```
+
+本项目通过 587 端口的 STARTTLS 校验服务器证书后登录。更新配置后重启 API 和 worker，前端刷新页面即可。此前在 Mailpit 收到的邮件不会自动补发，已有账号可在 `/verify-email` 重新发送验证链接。`.env` 不进入 Git；不要把授权码放入公开配置示例。`verify-platform.mjs` 和 `verify-auth-regression.mjs` 会在真实 SMTP 模式下提前停止，重新运行这些验收时须切回默认 Mailpit 配置。
 
 API 启动时 `-migrate` 应用嵌入的四个迁移，可重复运行；不使用 AutoMigrate。开发的随机 OAuth 密钥随 API 重启失效，客户端需要重新授权。生产必须配置稳定密钥。
 

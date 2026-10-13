@@ -16,6 +16,11 @@ const mail = process.env.MAIL_URL ?? 'http://127.0.0.1:8025';
 for (const address of [origin, mail]) {
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(address).hostname), '集成验收仅允许回环开发服务');
 }
+// 本机 API 也可能连接真实 SMTP；创建验收账号前先确认邮件被 Mailpit 捕获。
+const authConfigResponse = await fetch(`${origin}/api/v1/auth/config`);
+assert.ok(authConfigResponse.ok, '无法读取邮件验收配置');
+const { data: authConfig } = await authConfigResponse.json();
+assert.equal(authConfig.email.mode, 'LOCAL_MAILBOX', '浏览器验收需要 Mailpit 配置；当前使用真实 SMTP，已停止，未创建验收账号或发送邮件');
 const fixture = path.join(root, '.runtime/fixtures');
 await mkdir(path.join(root, '.runtime/screenshots'), { recursive: true });
 const completionKeys = new Map();

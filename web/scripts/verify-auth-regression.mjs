@@ -8,6 +8,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium, expect } = await import(pathToFileURL(path.join(root, 'frontend/node_modules/@playwright/test/index.mjs')).href);
 const origin = process.env.WEB_URL ?? 'http://localhost:3000';
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname));
+// 提前拒绝真实 SMTP，避免回归测试把随机账号邮件投递到外网。
+const authConfigResponse = await fetch(`${origin}/api/v1/auth/config`);
+assert.ok(authConfigResponse.ok, '无法读取邮件验收配置');
+const { data: authConfig } = await authConfigResponse.json();
+assert.equal(authConfig.email.mode, 'LOCAL_MAILBOX', '浏览器验收需要 Mailpit 配置；当前使用真实 SMTP，已停止，未创建验收账号或发送邮件');
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const context = await browser.newContext();
 const page = await context.newPage();
