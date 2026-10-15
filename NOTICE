@@ -6,7 +6,8 @@ Version 2.0. See LICENSE for the full terms.
 
 The Xuansi artwork and derived model/pose assets in assets/xuansi/ are
 separately reserved and are NOT licensed under the Apache License.
-See assets/xuansi/LICENSE and the artwork, rigging, and idle-blade README files.
+See assets/xuansi/LICENSE and the artwork, rigging, and idle-blade documentation
+under omx_wiki/Live2D与形象/素材/.
 
 Historical cat sprites and animation definitions originate from NekoAI:
 https://github.com/nucket/NekoAI
@@ -14,5 +15,5 @@ Copyright (c) 2026 Naudy Castellanos
 These third-party assets retain their MIT license in assets/neko/LICENSE.
 
 Models, third-party libraries, and separately downloaded runtime components
-retain their respective licenses. See THIRD_PARTY.md for sources and scope.
+retain their respective licenses. See omx_wiki/项目/THIRD_PARTY.md for sources and scope.
 This NOTICE is informational and does not change any license terms.

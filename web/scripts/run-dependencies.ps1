@@ -16,7 +16,7 @@ $taskPgBin = Join-Path $taskRuntime 'tools/postgresql/pgsql/bin'
 $taskMail = Join-Path $taskRuntime 'tools/mailpit/mailpit.exe'
 $taskPgData = Join-Path $taskRuntime 'postgres'
 if (-not (Test-Path -LiteralPath (Join-Path $taskPgBin 'pg_ctl.exe')) -or -not (Test-Path -LiteralPath $taskMail)) {
-    throw '缺少便携官方工具，参照 web/README.md 的依赖目录说明；也可使用常规 Docker 模式'
+    throw '缺少便携官方工具，参照 omx_wiki/官网/本地开发与运行.md 的依赖目录说明；也可使用常规 Docker 模式'
 }
 if (-not (Test-Path -LiteralPath (Join-Path $taskPgData 'PG_VERSION'))) {
     & (Join-Path $taskPgBin 'initdb.exe') -D $taskPgData -U xuansi -A trust -E UTF8 --locale=C
