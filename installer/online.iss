@@ -34,6 +34,8 @@ Name: "desktopicon"; Description: "创建桌面快捷方式（安装版）"; Fla
 [Files]
 ; 桌面包不携带官网源码；运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 安装版资源回归与 Go 共用这份校验样例，显式保留数据文件，不部署官网程序。
+Source: "{#Payload}\web\contracts\fixtures\model-references.json"; DestDir: "{app}\web\contracts\fixtures"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\玄司 AI 桌宠"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: "-m pet"; WorkingDir: "{app}"; IconFilename: "{app}\assets\xuansi\icon.ico"
