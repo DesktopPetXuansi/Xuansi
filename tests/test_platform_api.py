@@ -69,7 +69,8 @@ def test_rejected_refresh_clears_only_platform_credentials(monkeypatch):
     assert store.tokens is None
 
 
-def test_authorization_real_loopback_and_pkce(monkeypatch):
+@pytest.mark.parametrize("upload,scope", [(False, "resources:read"), (True, "resources:read resources:write")])
+def test_authorization_real_loopback_and_pkce(monkeypatch, upload, scope):
     query = {}
     def browser(url):
         query.update(parse_qs(urlsplit(url).query))
@@ -85,13 +86,13 @@ def test_authorization_real_loopback_and_pkce(monkeypatch):
         expected = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
         assert expected == query["code_challenge"][0]
         assert query["code_challenge_method"] == ["S256"]
-        assert query["scope"] == ["resources:read"]
+        assert query["scope"] == [scope]
         assert form["redirect_uri"] == query["redirect_uri"]
-        return httpx.Response(200, json={"access_token": "test-access", "refresh_token": "test-refresh"})
+        return httpx.Response(200, json={"access_token": "test-access", "refresh_token": "test-refresh", "scope": scope})
     original = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(
         transport=httpx.MockTransport(handler), **kwargs))
-    assert asyncio.run(authorize("http://localhost:3000"))["access_token"] == "test-access"
+    assert asyncio.run(authorize("http://localhost:3000", upload=upload))["access_token"] == "test-access"
 
 
 def test_cancel_install_preserves_package_until_disk_work_finishes(tmp_path, monkeypatch):

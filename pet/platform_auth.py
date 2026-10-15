@@ -91,7 +91,7 @@ def callback_code(target, expected_state):
     return code[0]
 
 
-async def authorize(base_url):
+async def authorize(base_url, *, upload=False):
     """随机回环端口只处理本次 state；五分钟内完成系统浏览器授权。"""
     base_url = website_url(base_url)
     verifier, challenge = pkce_pair()
@@ -121,8 +121,9 @@ async def authorize(base_url):
 
     server = await asyncio.start_server(callback, "127.0.0.1", 0, limit=8192)
     redirect = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}/oauth/callback"
+    scopes = "resources:read resources:write" if upload else "resources:read"
     query = urlencode({"response_type": "code", "client_id": CLIENT_ID, "redirect_uri": redirect,
-                       "scope": "resources:read", "state": state, "code_challenge": challenge,
+                       "scope": scopes, "state": state, "code_challenge": challenge,
                        "code_challenge_method": "S256"})
     try:
         await asyncio.to_thread(webbrowser.open, f"{base_url}/oauth/authorize?{query}")

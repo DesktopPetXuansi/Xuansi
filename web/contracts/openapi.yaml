@@ -1017,6 +1017,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -1039,7 +1042,12 @@
             },
             "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       }
     },
     "/api/v1/me/resources": {
@@ -1222,6 +1230,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -1252,7 +1263,12 @@
             },
             "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。 Bearer 仅允许 currentVersionId 字段，不允许编辑资料、状态或发布。"
       },
       "delete": {
         "operationId": "delete__api_v1_resources_id",
@@ -1440,6 +1456,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -1470,7 +1489,12 @@
             },
             "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       }
     },
     "/api/v1/resources/{id}/versions/{versionId}": {
@@ -1757,6 +1781,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -1768,7 +1795,12 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       },
       "delete": {
         "operationId": "delete__api_v1_uploads_id",
@@ -1794,6 +1826,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -1814,7 +1849,12 @@
             },
             "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       }
     },
     "/api/v1/me/uploads": {
@@ -1946,6 +1986,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -1989,7 +2032,12 @@
             },
             "description": "同一上传完成意图重试复用此键，跨上传复用返回409"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       }
     },
     "/api/v1/uploads/{id}/content": {
@@ -2017,6 +2065,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -2048,7 +2099,12 @@
               }
             }
           }
-        }
+        },
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       }
     },
     "/api/v1/me/library": {
@@ -2176,6 +2232,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -2213,7 +2272,12 @@
             },
             "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
           }
-        ]
+        ],
+        "x-required-scopes": [
+          "resources:read",
+          "resources:write"
+        ],
+        "description": " 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。"
       },
       "delete": {
         "operationId": "delete__api_v1_me_library_id",
@@ -3572,7 +3636,8 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。"
           },
           {
             "name": "state",
@@ -3660,7 +3725,8 @@
                     "type": "string"
                   },
                   "scope": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。"
                   },
                   "state": {
                     "type": "string"
@@ -5400,7 +5466,8 @@
       },
       "bearerAuth": {
         "type": "http",
-        "scheme": "bearer"
+        "scheme": "bearer",
+        "description": "PKCE 桌面令牌；resources:read 提供资源读取与下载，resources:write 追加本人资源的上传、当前版本选择与入库能力，不包含网站账号或管理员权限。"
       }
     }
   }

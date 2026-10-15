@@ -182,7 +182,23 @@ func (s *Server) patchResource(w http.ResponseWriter, r *http.Request) {
 		Tags                                               *[]string
 		CurrentVersionID                                   *string
 	}
-	if !decode(w, r, &in) {
+	if who(r).GrantID != "" {
+		// 检查原始字段，包括 null；写令牌只可选择已校验的当前版本。
+		var fields map[string]json.RawMessage
+		if !decode(w, r, &fields) {
+			return
+		}
+		for field := range fields {
+			if field != "currentVersionId" {
+				problem(w, r, 403, "INSUFFICIENT_SCOPE", "客户端授权只允许设置当前版本")
+				return
+			}
+		}
+		if len(fields) != 1 || json.Unmarshal(fields["currentVersionId"], &in.CurrentVersionID) != nil || in.CurrentVersionID == nil {
+			invalid(w, r, "请选择当前版本")
+			return
+		}
+	} else if !decode(w, r, &in) {
 		return
 	}
 	fields := map[string]interface{}{"updated_at": time.Now()}

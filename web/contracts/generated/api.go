@@ -1288,9 +1288,11 @@ type PutApiV1UploadsIdContentParams struct {
 
 // GetOauthAuthorizeParams defines parameters for GetOauthAuthorize.
 type GetOauthAuthorizeParams struct {
-	ResponseType        string `form:"response_type" json:"response_type"`
-	ClientId            string `form:"client_id" json:"client_id"`
-	RedirectUri         string `form:"redirect_uri" json:"redirect_uri"`
+	ResponseType string `form:"response_type" json:"response_type"`
+	ClientId     string `form:"client_id" json:"client_id"`
+	RedirectUri  string `form:"redirect_uri" json:"redirect_uri"`
+
+	// Scope 必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。
 	Scope               string `form:"scope" json:"scope"`
 	State               string `form:"state" json:"state"`
 	CodeChallenge       string `form:"code_challenge" json:"code_challenge"`
@@ -1306,8 +1308,10 @@ type PostOauthAuthorizeFormdataBody struct {
 	Consent             PostOauthAuthorizeFormdataBodyConsent  `form:"consent" json:"consent"`
 	RedirectUri         string                                 `form:"redirect_uri" json:"redirect_uri"`
 	ResponseType        string                                 `form:"response_type" json:"response_type"`
-	Scope               string                                 `form:"scope" json:"scope"`
-	State               string                                 `form:"state" json:"state"`
+
+	// Scope 必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。
+	Scope string `form:"scope" json:"scope"`
+	State string `form:"state" json:"state"`
 }
 
 // PostOauthAuthorizeParams defines parameters for PostOauthAuthorize.

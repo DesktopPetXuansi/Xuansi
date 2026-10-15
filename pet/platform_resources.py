@@ -102,6 +102,44 @@ def hash_file(path):
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
+def model_file_references(references):
+    """仅识别 Go/Cubism 契约中的运行文件字段，未知元数据不会触发本地文件读取。"""
+    if not isinstance(references, dict):
+        raise ValueError("模型缺少有效的文件引用")
+    moc, textures = references.get("Moc"), references.get("Textures")
+    if (not isinstance(moc, str) or not moc or not isinstance(textures, list) or not textures
+            or any(not isinstance(name, str) or not name for name in textures)):
+        raise ValueError("模型缺少有效的 MOC 或纹理引用")
+    result = [moc, *textures]
+    for key in ("Physics", "Pose", "DisplayInfo", "UserData"):
+        value = references.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError("模型可选文件引用无效")
+        if value:
+            result.append(value)
+    expressions, groups = references.get("Expressions") or [], references.get("Motions") or {}
+    if not isinstance(expressions, list) or not isinstance(groups, dict):
+        raise ValueError("模型动作或表情引用无效")
+    actions = list(expressions)
+    for motions in groups.values():
+        if motions is not None and not isinstance(motions, list):
+            raise ValueError("模型动作引用无效")
+        actions.extend(motions or [])
+    for action in actions:
+        if not isinstance(action, dict) or not isinstance(action.get("File"), str) or not action["File"]:
+            raise ValueError("模型动作或表情缺少文件引用")
+        result.append(action["File"])
+    # 表情没有 Sound 字段；只取动作中明确声明的可选声音文件。
+    for motions in groups.values():
+        for motion in motions or []:
+            sound = motion.get("Sound")
+            if sound is not None and not isinstance(sound, str):
+                raise ValueError("模型声音引用无效")
+            if sound:
+                result.append(sound)
+    return result
+
+
 def check_references(manifest, directory):
     """校验模型引用存在且位于清单中；JSON 动作/表情也须可解析。"""
     entry = directory / manifest["entrypoint"]
@@ -127,27 +165,12 @@ def check_references(manifest, directory):
     if manifest["kind"] != "MODEL":
         return
     references = document.get("FileReferences", {})
-    if not references.get("Moc") or not references.get("Textures"):
-        raise ValueError("模型缺少 Moc 或纹理引用")
     declared = {item["path"] for item in manifest["files"]}
-
-    def visit(value, key=""):
-        if isinstance(value, dict):
-            for name, child in value.items():
-                visit(child, name)
-        elif isinstance(value, list):
-            for child in value:
-                visit(child, key)
-        elif isinstance(value, str) and key not in {"Name"}:
-            # Cubism允许不启用的可选引用留空；必需Moc、Textures和File仍校验。
-            if value == "" and key in {"Physics", "Pose", "DisplayInfo", "UserData", "Sound"}:
-                return
-            path = relative_path(value)
-            combined = str(PurePosixPath(manifest["entrypoint"]).parent / path)
-            if combined not in declared or not (directory / combined).is_file():
-                raise ValueError("模型引用文件缺失")
-
-    visit(references)
+    for value in model_file_references(references):
+        path = relative_path(value)
+        combined = str(PurePosixPath(manifest["entrypoint"]).parent / path)
+        if combined not in declared or not (directory / combined).is_file():
+            raise ValueError("模型引用文件缺失")
 
 
 def install_package(package, manifest, authorization, root=RESOURCE_ROOT):

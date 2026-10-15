@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"xuansi/web/backend/internal/platform"
@@ -27,12 +28,13 @@ type OAuthService interface {
 	Authorize(http.ResponseWriter, *http.Request)
 	Token(http.ResponseWriter, *http.Request)
 	Revoke(http.ResponseWriter, *http.Request)
-	Authenticate(context.Context, string) (string, string, error)
+	Authenticate(context.Context, string) (string, string, []string, error)
 }
 type identityKey struct{}
 type Identity struct {
 	User               platform.User
 	SessionID, GrantID string
+	Scopes             []string
 }
 
 // CurrentUser 为OAuth协议层提供已由中间件验证的身份。
@@ -97,9 +99,10 @@ func (s *Server) requestLog(next http.Handler) http.Handler {
 func (s *Server) authentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var uid, sid, gid string
+		var scopes []string
 		if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") && s.OAuth != nil {
 			var e error
-			uid, gid, e = s.OAuth.Authenticate(r.Context(), strings.TrimPrefix(auth, "Bearer "))
+			uid, gid, scopes, e = s.OAuth.Authenticate(r.Context(), strings.TrimPrefix(auth, "Bearer "))
 			if e != nil {
 				problem(w, r, 401, "UNAUTHORIZED", "客户端授权已失效")
 				return
@@ -114,7 +117,7 @@ func (s *Server) authentication(next http.Handler) http.Handler {
 		if uid != "" {
 			u, e := gorm.G[platform.User](s.DB).Where("id = ? AND status = 'ACTIVE'", uid).First(r.Context())
 			if e == nil {
-				r = r.WithContext(context.WithValue(r.Context(), identityKey{}, &Identity{u, sid, gid}))
+				r = r.WithContext(context.WithValue(r.Context(), identityKey{}, &Identity{User: u, SessionID: sid, GrantID: gid, Scopes: scopes}))
 				if sid != "" {
 					_ = s.DB.WithContext(r.Context()).Exec("UPDATE web_sessions SET last_seen_at=now() WHERE id=? AND last_seen_at<now()-interval '5 minutes'", sid).Error
 				}
@@ -123,20 +126,59 @@ func (s *Server) authentication(next http.Handler) http.Handler {
 				}
 			}
 		}
-		if gid != "" && !bearerAllowed(r.Method, r.URL.Path) {
-			problem(w, r, 403, "INSUFFICIENT_SCOPE", "客户端授权只允许读取资源")
+		if gid != "" && !bearerAllowed(r.Method, r.URL.Path, scopes) {
+			problem(w, r, 403, "INSUFFICIENT_SCOPE", "客户端授权不允许此操作")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-// resources:read 不是网站会话：连账号会话列表也不提供给桌面客户端。
-func bearerAllowed(method, path string) bool {
-	if method == "GET" {
-		return path == "/api/v1/me" || path == "/api/v1/me/library" || path == "/api/v1/me/resources" || path == "/api/v1/resources" || strings.HasPrefix(path, "/api/v1/resources/") || strings.HasPrefix(path, "/api/v1/client/releases")
+// 精确匹配方法和路由段，新增网站接口不会隐式继承桌面客户端权限。
+func bearerAllowed(method, path string, scopes []string) bool {
+	if !slices.Contains(scopes, "resources:read") || !strings.HasPrefix(path, "/api/v1/") {
+		return false
 	}
-	return method == "POST" && strings.HasPrefix(path, "/api/v1/resources/") && strings.HasSuffix(path, "/download-authorizations")
+	p := strings.Split(strings.TrimPrefix(path, "/api/v1/"), "/")
+	id := func(value string) bool { _, e := uuid.Parse(value); return e == nil }
+	if method == "GET" {
+		if path == "/api/v1/me" || path == "/api/v1/me/library" || path == "/api/v1/me/resources" || path == "/api/v1/resources" || path == "/api/v1/client/releases" {
+			return true
+		}
+		if len(p) == 3 && p[0] == "client" && p[1] == "releases" && (p[2] == "latest" || id(p[2])) {
+			return true
+		}
+		if len(p) >= 2 && p[0] == "resources" && id(p[1]) {
+			if len(p) == 2 || len(p) == 3 && (p[2] == "versions" || p[2] == "cover") {
+				return true
+			}
+			if len(p) == 4 && p[2] == "versions" && id(p[3]) || len(p) == 5 && p[2] == "versions" && id(p[3]) && p[4] == "manifest" {
+				return true
+			}
+		}
+	}
+	if method == "POST" && len(p) == 5 && p[0] == "resources" && id(p[1]) && p[2] == "versions" && id(p[3]) && p[4] == "download-authorizations" {
+		return true
+	}
+	if !slices.Contains(scopes, "resources:write") {
+		return false
+	}
+	if method == "POST" && path == "/api/v1/resources" {
+		return true
+	}
+	if len(p) == 2 && p[0] == "resources" && id(p[1]) {
+		return method == "PATCH"
+	}
+	if len(p) == 3 && p[0] == "resources" && id(p[1]) && p[2] == "versions" {
+		return method == "POST"
+	}
+	if len(p) == 2 && p[0] == "uploads" && id(p[1]) {
+		return method == "GET" || method == "DELETE"
+	}
+	if len(p) == 3 && p[0] == "uploads" && id(p[1]) {
+		return p[2] == "content" && method == "PUT" || p[2] == "completion" && method == "POST"
+	}
+	return len(p) == 3 && p[0] == "me" && p[1] == "library" && id(p[2]) && method == "PUT"
 }
 
 // 双提交 Cookie 配合精确 Origin；Bearer 请求具有独立的客户端授权边界。
@@ -178,8 +220,8 @@ func verified(next http.Handler) http.Handler {
 			problem(w, r, 403, "EMAIL_UNVERIFIED", "请先验证邮箱")
 			return
 		}
-		if who(r).GrantID != "" && r.Method != "GET" && !strings.Contains(r.URL.Path, "download-authorizations") {
-			problem(w, r, 403, "INSUFFICIENT_SCOPE", "客户端授权只允许读取资源")
+		if who(r).GrantID != "" && !bearerAllowed(r.Method, r.URL.Path, who(r).Scopes) {
+			problem(w, r, 403, "INSUFFICIENT_SCOPE", "客户端授权不允许此操作")
 			return
 		}
 		next.ServeHTTP(w, r)

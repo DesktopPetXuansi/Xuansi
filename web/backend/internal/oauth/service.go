@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 	"xuansi/web/backend/internal/platform"
 )
@@ -48,7 +49,7 @@ func (s *Service) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirect, e := url.Parse(r.Form.Get("redirect_uri"))
-	if e != nil || !validRedirect(redirect) || r.Form.Get("code_challenge_method") != "S256" || r.Form.Get("scope") != "resources:read" || r.Form.Get("response_type") != "code" || len(r.Form.Get("state")) < 8 {
+	if e != nil || !validRedirect(redirect) || r.Form.Get("code_challenge_method") != "S256" || !validScopes(r.Form.Get("scope")) || r.Form.Get("response_type") != "code" || len(r.Form.Get("state")) < 8 {
 		http.Error(w, "授权参数无效", 400)
 		return
 	}
@@ -86,7 +87,9 @@ func (s *Service) Authorize(w http.ResponseWriter, r *http.Request) {
 		if e := gorm.G[platform.OAuthGrant](tx).Create(ctx, &grant); e != nil {
 			return e
 		}
-		request.GrantScope("resources:read")
+		for _, scope := range request.GetRequestedScopes() {
+			request.GrantScope(scope)
+		}
 		session := &Session{DefaultSession: fosite.DefaultSession{Subject: user.ID, Username: user.Email}, GrantID: grant.ID}
 		var e error
 		response, e = s.Provider.NewAuthorizeResponse(ctx, request, session)
@@ -144,14 +147,28 @@ func (s *Service) Revoke(w http.ResponseWriter, r *http.Request) {
 	e := s.Provider.NewRevocationRequest(r.Context(), r)
 	s.Provider.WriteRevocationResponse(r.Context(), w, e)
 }
-func (s *Service) Authenticate(ctx context.Context, token string) (string, string, error) {
+
+// 只接受明确的读授权或读写授权；旧只读请求不会自动提升。
+func validScopes(raw string) bool {
+	scopes := strings.Fields(raw)
+	seen := map[string]bool{}
+	for _, scope := range scopes {
+		if seen[scope] || scope != "resources:read" && scope != "resources:write" {
+			return false
+		}
+		seen[scope] = true
+	}
+	return seen["resources:read"]
+}
+
+func (s *Service) Authenticate(ctx context.Context, token string) (string, string, []string, error) {
 	use, request, e := s.Provider.IntrospectToken(ctx, token, fosite.AccessToken, &Session{}, "resources:read")
 	if e != nil || use != fosite.AccessToken {
-		return "", "", fmt.Errorf("授权失效")
+		return "", "", nil, fmt.Errorf("授权失效")
 	}
 	session, ok := request.GetSession().(*Session)
 	if !ok {
-		return "", "", fmt.Errorf("会话无效")
+		return "", "", nil, fmt.Errorf("会话无效")
 	}
-	return session.Subject, session.GrantID, nil
+	return session.Subject, session.GrantID, append([]string(nil), request.GetGrantedScopes()...), nil
 }

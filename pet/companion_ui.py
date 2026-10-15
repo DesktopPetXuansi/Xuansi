@@ -97,6 +97,7 @@ class CompanionUI:
             ("日志：运行日志", pet.panel.open_logs),
             ("形象：更换桌宠形象", self.open_appearance),
             ("官网：资源库与模型管理", self.platform.present),
+            ("官网：上传本地模型", self.platform.open_upload),
             ("开启/关闭连续对话", pet.toggle_voice),
             ("看一眼屏幕", pet.look),
             ("休眠/唤醒", pet.toggle_sleep),

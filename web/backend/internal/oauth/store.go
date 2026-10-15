@@ -46,7 +46,7 @@ func (s *Store) GetClient(ctx context.Context, id string) (fosite.Client, error)
 	if id != "desktop-ai-pet" {
 		return nil, fosite.ErrNotFound
 	}
-	return &fosite.DefaultClient{ID: id, Public: true, RedirectURIs: []string{"http://127.0.0.1/oauth/callback", "http://[::1]/oauth/callback"}, GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"}, Scopes: []string{"resources:read"}}, nil
+	return &fosite.DefaultClient{ID: id, Public: true, RedirectURIs: []string{"http://127.0.0.1/oauth/callback", "http://[::1]/oauth/callback"}, GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"}, Scopes: []string{"resources:read", "resources:write"}}, nil
 }
 
 // 未启用 JWT 客户端认证；拒绝无关接口，避免接受没有持久化去重的断言。

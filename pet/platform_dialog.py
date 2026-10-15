@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from .platform_api import PlatformClient
 from .platform_auth import authorize, website_url
 from .platform_resources import installed_resources, read_installed
+from .platform_upload import UploadError
 
 LOG = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ LOG = logging.getLogger(__name__)
 class PlatformTask(QThread):
     completed = Signal(str, object)
     failed = Signal(str)
+    progress = Signal(str, int)
 
     def __init__(self, command, operation, parent):
         super().__init__(parent)
@@ -50,6 +52,8 @@ class PlatformTask(QThread):
             self.completed.emit(self.command, asyncio.run(execute()))
         except asyncio.CancelledError:
             self.failed.emit("资源操作已取消")
+        except UploadError as exc:
+            self.failed.emit(str(exc))
         except httpx.HTTPStatusError as exc:
             # HTTP 异常正文或 URL 可能包含令牌；界面和日志仅显示状态码。
             self.failed.emit(f"官网请求失败（HTTP {exc.response.status_code}），请检查账号权限或稍后重试")
@@ -78,6 +82,7 @@ class PlatformDialog(QDialog):
         self.owner = owner
         self.worker = None
         self.client = None
+        self.upload_dialog = None
         self.pending_settings = None
         self.shutting_down = False
         self.shutdown_emitted = False
@@ -85,7 +90,7 @@ class PlatformDialog(QDialog):
         self.request_url = owner.settings.platform_url
         owner.runtime.platform_settings_saved.connect(self.platform_saved)
         self.setWindowTitle("官网资源库 · 玄司")
-        self.resize(620, 540)
+        self.resize(680, 620)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("官网账号仅用于资源；聊天、录音、推理仍留在本机。"))
         self.url = QLineEdit(owner.settings.platform_url)
@@ -100,6 +105,10 @@ class PlatformDialog(QDialog):
             if label != "取消操作":
                 self.controls.append(button)
         layout.addLayout(row)
+        upload_button = QPushButton("上传本地 Live2D 模型")
+        upload_button.clicked.connect(self.open_upload)
+        self.controls.append(upload_button)
+        layout.addWidget(upload_button)
         reset_expression = QPushButton("结束当前表情，恢复视线和口型")
         reset_expression.clicked.connect(self.reset_expression)
         self.controls.append(reset_expression)
@@ -142,6 +151,8 @@ class PlatformDialog(QDialog):
         self.versions.setEnabled(not busy)
         for control in self.controls:
             control.setEnabled(not busy)
+        if self.upload_dialog:
+            self.upload_dialog.set_busy(busy)
 
     def start(self, command, operation):
         if self.shutting_down:
@@ -154,6 +165,7 @@ class PlatformDialog(QDialog):
         self.worker = PlatformTask(command, operation, self)
         self.worker.completed.connect(self.completed)
         self.worker.failed.connect(self.task_failed)
+        self.worker.progress.connect(self.task_progress, Qt.ConnectionType.QueuedConnection)
         self.worker.finished.connect(self.task_finished)
         self.worker.start()
 
@@ -162,6 +174,35 @@ class PlatformDialog(QDialog):
             self.pending_settings = None
             message = "资源已在本次运行中应用，但配置保存失败；重启将恢复上次选择。"
         self.status.setText(message)
+        if self.upload_dialog and self.worker and self.worker.command.startswith("upload-"):
+            self.upload_dialog.status.setText(message)
+
+    def task_progress(self, message, percent):
+        self.status.setText(message)
+        if self.upload_dialog:
+            self.upload_dialog.show_progress(message, percent)
+
+    def open_upload(self):
+        """托盘和资源库共用入口；模型选择窗口复用已有后台任务和退出协调。"""
+        if self.shutting_down or self.worker is not None and self.worker.isRunning():
+            self.status.setText("请先等待当前操作完成，或点击取消操作。")
+            return
+        if self.upload_dialog and self.upload_dialog.isVisible():
+            self.upload_dialog.raise_()
+            return
+        if (self.upload_dialog and getattr(self.upload_dialog.client, "pending_model_upload", None)
+                and self.upload_dialog.client.base_url == self.url.text().strip().rstrip("/")):
+            self.show()
+            self.upload_dialog.open()
+            return
+        from .platform_upload_dialog import ModelUploadDialog
+
+        if self.upload_dialog:
+            self.upload_dialog.deleteLater()
+        self.show()
+        self.upload_dialog = ModelUploadDialog(self)
+        self.upload_dialog.open()
+        self.upload_dialog.connect_account()
 
     def task_finished(self):
         self.set_busy(self.pending_settings is not None or self.shutting_down)
@@ -293,6 +334,9 @@ class PlatformDialog(QDialog):
     def completed(self, command, result):
         if self.shutting_down:
             return
+        if command.startswith("upload-") and self.upload_dialog:
+            self.upload_dialog.completed(command, result)
+            return
         try:
             if command == "login":
                 self.persist_fields({"platform_url": result})
@@ -354,6 +398,8 @@ class PlatformDialog(QDialog):
         self.shutting_down = True
         self.set_busy(True)
         self.cancel()
+        if self.upload_dialog:
+            self.upload_dialog.hide()
         self.hide()
         if self.worker is None:
             self.finish_shutdown()

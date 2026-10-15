@@ -253,7 +253,10 @@ export interface paths {
         /** /api/v1/resources */
         get: operations["get__api_v1_resources"];
         put?: never;
-        /** /api/v1/resources */
+        /**
+         * /api/v1/resources
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         post: operations["post__api_v1_resources"];
         delete?: never;
         options?: never;
@@ -293,7 +296,10 @@ export interface paths {
         delete: operations["delete__api_v1_resources_id"];
         options?: never;
         head?: never;
-        /** /api/v1/resources/{id} */
+        /**
+         * /api/v1/resources/{id}
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。 Bearer 仅允许 currentVersionId 字段，不允许编辑资料、状态或发布。
+         */
         patch: operations["patch__api_v1_resources_id"];
         trace?: never;
     };
@@ -307,7 +313,10 @@ export interface paths {
         /** /api/v1/resources/{id}/versions */
         get: operations["get__api_v1_resources_id_versions"];
         put?: never;
-        /** /api/v1/resources/{id}/versions */
+        /**
+         * /api/v1/resources/{id}/versions
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         post: operations["post__api_v1_resources_id_versions"];
         delete?: never;
         options?: never;
@@ -390,11 +399,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** /api/v1/uploads/{id} */
+        /**
+         * /api/v1/uploads/{id}
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         get: operations["get__api_v1_uploads_id"];
         put?: never;
         post?: never;
-        /** /api/v1/uploads/{id} */
+        /**
+         * /api/v1/uploads/{id}
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         delete: operations["delete__api_v1_uploads_id"];
         options?: never;
         head?: never;
@@ -427,7 +442,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** /api/v1/uploads/{id}/completion */
+        /**
+         * /api/v1/uploads/{id}/completion
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         post: operations["post__api_v1_uploads_id_completion"];
         delete?: never;
         options?: never;
@@ -443,7 +461,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** /api/v1/uploads/{id}/content */
+        /**
+         * /api/v1/uploads/{id}/content
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         put: operations["put__api_v1_uploads_id_content"];
         post?: never;
         delete?: never;
@@ -477,7 +498,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** /api/v1/me/library/{id} */
+        /**
+         * /api/v1/me/library/{id}
+         * @description 桌面客户端可通过明确授予 resources:read resources:write 的 Bearer 访问；需已验证邮箱，仅限本人资源与上传。
+         */
         put: operations["put__api_v1_me_library_id"];
         post?: never;
         /** /api/v1/me/library/{id} */
@@ -3132,6 +3156,7 @@ export interface operations {
                 response_type: string;
                 client_id: string;
                 redirect_uri: string;
+                /** @description 必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。 */
                 scope: string;
                 state: string;
                 code_challenge: string;
@@ -3174,6 +3199,7 @@ export interface operations {
                     response_type: string;
                     client_id: string;
                     redirect_uri: string;
+                    /** @description 必须申请 resources:read，可显式追加 resources:write；拒绝未知、重复或缺少读取权限的 scope。 */
                     scope: string;
                     state: string;
                     code_challenge: string;

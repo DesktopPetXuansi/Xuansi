@@ -1,5 +1,5 @@
 # Docker 是常规入口；便携模式复用当前工作区已准备的官方本机工具。
-param([switch]$Portable)
+param([switch]$Portable, [ValidateRange(1,65535)][int]$PostgresPort = 54329)
 $ErrorActionPreference = 'Stop'
 $taskWebRoot = Split-Path -Parent $PSScriptRoot
 if (-not $Portable) {
@@ -24,14 +24,14 @@ if (-not (Test-Path -LiteralPath (Join-Path $taskPgData 'PG_VERSION'))) {
 }
 & (Join-Path $taskPgBin 'pg_ctl.exe') -D $taskPgData status *> $null
 if ($LASTEXITCODE -ne 0) {
-    & (Join-Path $taskPgBin 'pg_ctl.exe') -D $taskPgData -l (Join-Path $taskRuntime 'postgres.log') -o '-h 127.0.0.1 -p 54329' -w start
+    & (Join-Path $taskPgBin 'pg_ctl.exe') -D $taskPgData -l (Join-Path $taskRuntime 'postgres.log') -o "-h 127.0.0.1 -p $PostgresPort" -w start
     if ($LASTEXITCODE -ne 0) { throw '本机开发数据库启动失败，请检查忽略目录中的 postgres.log' }
 }
 foreach ($taskDatabase in @('xuansi', 'xuansi_test')) {
-    $taskExists = & (Join-Path $taskPgBin 'psql.exe') -h 127.0.0.1 -p 54329 -U xuansi -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$taskDatabase'"
+    $taskExists = & (Join-Path $taskPgBin 'psql.exe') -h 127.0.0.1 -p $PostgresPort -U xuansi -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$taskDatabase'"
     if ($LASTEXITCODE -ne 0) { throw '本机数据库连接失败' }
     if ($taskExists -ne '1') {
-        & (Join-Path $taskPgBin 'createdb.exe') -h 127.0.0.1 -p 54329 -U xuansi $taskDatabase
+        & (Join-Path $taskPgBin 'createdb.exe') -h 127.0.0.1 -p $PostgresPort -U xuansi $taskDatabase
         if ($LASTEXITCODE -ne 0) { throw '开发数据库创建失败' }
     }
 }

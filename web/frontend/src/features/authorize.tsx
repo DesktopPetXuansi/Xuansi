@@ -8,6 +8,15 @@ import { useState } from "react";
 import { z } from "zod";
 export function Authorize() {
   const params = useSearchParams();
+  // 权限说明直接来自此次申请；旧只读授权保持原有文案。
+  const scopes = (params.get("scope") ?? "").trim().split(/\s+/);
+  const upload = scopes.includes("resources:write");
+  const validScope =
+    scopes.includes("resources:read") &&
+    new Set(scopes).size === scopes.length &&
+    scopes.every((scope) =>
+      ["resources:read", "resources:write"].includes(scope),
+    );
   const me = useMe();
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
@@ -52,16 +61,23 @@ export function Authorize() {
   return (
     <div className="container">
       <div className="narrow">
-        <Heading title="允许客户端读取资源？">
+        <Heading
+          title={upload ? "允许客户端上传模型？" : "允许客户端读取资源？"}
+        >
           请确认这是你刚刚在桌面客户端发起的操作。
         </Heading>
         <div className="panel">
           <h3>desktop-ai-pet</h3>
-          <p>申请权限：读取你的资源库、资源清单与下载资源包。</p>
+          <p>
+            申请权限：读取你的资源库、资源清单与下载资源包。
+            {upload && "上传你选择的本地模型，设为当前版本并加入资源库。"}
+          </p>
           <p className="muted">
             不会获取你的密码，不会上传聊天、截图、录音或本地记忆。你可以随时在会话与授权页面撤销。
           </p>
-          {me.isPending ? (
+          {!validScope ? (
+            <Notice>授权权限无效，请从客户端重新发起。</Notice>
+          ) : me.isPending ? (
             <Notice>正在检查账号…</Notice>
           ) : me.error ? (
             <Notice error={me.error} />
@@ -75,7 +91,7 @@ export function Authorize() {
           ) : (
             <div className="actions">
               <Button disabled={busy} onClick={allow}>
-                {busy ? "正在授权…" : "允许读取资源"}
+                {busy ? "正在授权…" : upload ? "允许上传模型" : "允许读取资源"}
               </Button>
               <Link href="/dashboard/sessions" className="quiet-link">
                 暂不授权
