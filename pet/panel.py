@@ -1,46 +1,34 @@
-"""原生控制面板：聊天、人设、长期记忆、偏好；只因明确点击而显示。"""
+"""同页控制中心：分区展开、统一保存，只因用户明确操作而显示。"""
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QTextCursor
+import logging
+
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QCheckBox,
+    QApplication,
+    QComboBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QMenuBar,
-    QPlainTextEdit,
+    QLayout,
     QPushButton,
     QScrollArea,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from .config import Settings
-from .log_viewer import LogViewer
-from .model_page import ModelPage
+from .control_section import ControlSection
+from .panel_content import common_controls, populate_sections
 from .panel_settings import PanelSettings
-from .preferences import PersonaPage, PreferencesPage
+from .panel_style import STYLE
 from .theme import configure_fonts
 
-STYLE = """
-QWidget { background: #f7f8f3; color: #293d33; font: 10pt "Microsoft YaHei UI"; }
-QLabel#title { font-size: 20pt; font-weight: 600; }
-QLabel#hint { color: #68766c; font-size: 9pt; }
-QLabel#status { background: #e7efe5; padding: 9px; border-radius: 6px; }
-QTabWidget::pane { border: 0; padding-top: 10px; }
-QTabBar::tab { padding: 9px 17px; background: transparent; border-bottom: 2px solid transparent; }
-QTabBar::tab:selected { border-bottom: 2px solid #497758; color: #32543d; }
-QPushButton { background: #e8ede3; border: 1px solid #c7d3c3; border-radius: 5px; padding: 8px 12px; }
-QPushButton:hover { background: #dae6d6; }
-QPushButton:checked, QPushButton#primary { background: #496e54; color: white; border-color: #496e54; }
-QLineEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox { background: #ffffff; border: 1px solid #cbd5c8; border-radius: 4px; padding: 6px; selection-background-color: #709078; }
-QLineEdit:focus, QPlainTextEdit:focus { border-color: #577b61; }
-QCheckBox { spacing: 8px; padding: 4px 0; }
-QCheckBox::indicator { width: 14px; height: 14px; border: 1px solid #8eaa93; border-radius: 3px; background: white; }
-QCheckBox::indicator:checked { background: #497758; border: 2px solid #2f543a; }
-QScrollArea { border: 0; }
-"""
+LOG = logging.getLogger(__name__)
+SECTIONS = (
+    ("chat", "对话"), ("persona", "人设与提示词"), ("memory", "长期记忆"),
+    ("preferences", "语音与行为"), ("model", "模型与快捷键"), ("appearance", "桌宠形象"),
+    ("resources", "官网资源"), ("upload", "上传本地 Live2D"), ("logs", "运行日志"),
+)
 
 
 class Panel(QWidget):
@@ -51,153 +39,116 @@ class Panel(QWidget):
     settings_requested = Signal(object)
     memory_requested = Signal(str)
     preview_requested = Signal(object)
-    message_added = Signal(str, str)
-    appearance_requested = Signal()
+    upload_requested = Signal()
     stop_requested = Signal()
     speech_requested = Signal(bool)
 
     def __init__(self, settings: Settings):
         super().__init__()
-        from PySide6.QtWidgets import QApplication
-
         configure_fonts(QApplication.instance())
         self.settings = settings
-        self.setWindowTitle(f"{settings.name} · 本地 AI 桌宠")
-        self.resize(510, 670)
-        self.setMinimumSize(460, 550)
+        self.setWindowTitle(f"{settings.name} · 控制中心")
+        self.resize(880, 760)
+        self.setMinimumSize(520, 480)
         self.setStyleSheet(STYLE)
+        self._opening_callbacks = {}
+        self.sections = {}
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 18, 22, 18)
-        bar = QMenuBar(self)
-        configuration = bar.addMenu("配置")
-        configuration.addAction("模型参数与快捷键", self.open_configuration)
-        configuration.addAction("人设与系统提示词", lambda: self.tabs.setCurrentIndex(1))
-        configuration.addAction("语音与行为", lambda: self.tabs.setCurrentIndex(3))
-        configuration.addSeparator()
-        self.audio_avoidance_action = configuration.addAction("声音回避（其他软件发声时静音）")
-        self.audio_avoidance_action.setCheckable(True)
-        self.audio_avoidance_action.setChecked(settings.audio_avoidance)
-        self.audio_avoidance_action.setToolTip("开启时避让其他软件声音；关闭时允许同时播放。自动保存。")
-        bar.addMenu("日志").addAction("运行日志", self.open_logs)
-        bar.addMenu("形象").addAction("更换桌宠形象…", self.appearance_requested.emit)
-        layout.setMenuBar(bar)
+        layout.setContentsMargins(20, 16, 20, 16)
         self.title = QLabel(settings.name)
         self.title.setObjectName("title")
         layout.addWidget(self.title)
-        subtitle = QLabel("在你身边，在这台电脑上。")
-        subtitle.setObjectName("hint")
-        layout.addWidget(subtitle)
         self.status = QLabel("已就绪 · 麦克风关闭")
         self.status.setObjectName("status")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        layout.addLayout(common_controls(self))
         self.live_transcript = QLabel("")
         self.live_transcript.setTextFormat(Qt.TextFormat.PlainText)
         self.live_transcript.setWordWrap(True)
         self.live_transcript.setObjectName("hint")
         layout.addWidget(self.live_transcript)
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
-        self._chat_page()
-        self.persona = PersonaPage(settings)
-        self.persona.save_requested.connect(self._save)
-        self.tabs.addTab(self.persona, "人设")
-        self._memory_page()
-        self.preferences = PreferencesPage(settings)
-        self.preferences.save_requested.connect(self._save)
-        self.preferences.preview_requested.connect(self._preview)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.preferences)
-        self.tabs.addTab(scroll, "偏好")
-        self.model_page = ModelPage(settings)
-        self.model_page.save_requested.connect(self._save)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.model_page)
-        self.tabs.addTab(scroll, "配置")
-        self.form = PanelSettings(self)
-        layout.addWidget(self.form.hint)
-        self.logs = LogViewer(STYLE)
-        self.logs.setWindowTitle(f"{settings.name} · 运行日志")
         self.audio_status = QLabel("声音回避已开启")
         self.audio_status.setObjectName("hint")
         self.audio_status.setWordWrap(True)
-        audio_row = QHBoxLayout()
-        audio_row.addWidget(self.audio_status, 1)
-        self.speech_button = QPushButton("朗读开启")
-        self.speech_button.setCheckable(True)
-        self.speech_button.setToolTip("直接开启或关闭朗读，不改变麦克风状态。")
-        self.speech_button.toggled.connect(self.speech_requested)
-        audio_row.addWidget(self.speech_button)
-        layout.addLayout(audio_row)
-        self.footer = QLabel("仅本机处理 · 双击托盘也能打开面板")
+        layout.addWidget(self.audio_status)
+        navigation = QHBoxLayout()
+        navigation.addWidget(QLabel("定位分区"))
+        self.navigation = QComboBox()
+        for key, title in SECTIONS:
+            self.navigation.addItem(title, key)
+        self.navigation.activated.connect(lambda index: self.open_section(self.navigation.itemData(index)))
+        navigation.addWidget(self.navigation, 1)
+        layout.addLayout(navigation)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        body = QWidget()
+        content = QVBoxLayout(body)
+        content.setContentsMargins(0, 0, 10, 0)
+        content.setSpacing(10)
+        content.setSizeConstraint(QLayout.SizeConstraint.SetMinAndMaxSize)
+        for key, title in SECTIONS:
+            section = ControlSection(key, title)
+            section.opening.connect(lambda key=key: self._prepare(key))
+            self.sections[key] = section
+            content.addWidget(section)
+        content.addStretch()
+        self.scroll.setWidget(body)
+        layout.addWidget(self.scroll, 1)
+        populate_sections(self)
+        self.form = PanelSettings(self)
+        layout.addWidget(self.form.hint)
+        actions = QHBoxLayout()
+        self.save_button = QPushButton("保存全部设置")
+        self.save_button.setObjectName("primary")
+        self.save_button.clicked.connect(self._save)
+        actions.addWidget(self.save_button)
+        close = QPushButton("收起控制中心")
+        close.clicked.connect(self.close)
+        actions.addWidget(close)
+        layout.addLayout(actions)
+        self.footer = QLabel("仅本机处理 · 快捷键和托盘均打开此控制中心")
         self.footer.setObjectName("hint")
+        self.footer.setWordWrap(True)
         layout.addWidget(self.footer)
+        self.escape = QShortcut(QKeySequence("Esc"), self)
+        self.escape.activated.connect(self.close)
+        self.sections["chat"].set_expanded(True)
 
-    def _chat_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 4, 0, 0)
-        self.chat = QPlainTextEdit()
-        self.chat.setReadOnly(True)
-        self.chat.setPlaceholderText(
-            "聊点什么，或者开启连续对话。\n\n想让我长期记住什么，可以说：\n“我喜欢简短的回答，请保存这个偏好。”"
-        )
-        self.chat.setMaximumBlockCount(250)
-        layout.addWidget(self.chat)
-        self.with_screen = QCheckBox("这次对话附上屏幕画面")
-        layout.addWidget(self.with_screen)
-        row = QHBoxLayout()
-        self.input = QLineEdit()
-        self.input.setMaxLength(2000)
-        self.input.setPlaceholderText("和我说句话…")
-        self.input.returnPressed.connect(self._send)
-        row.addWidget(self.input)
-        send = QPushButton("发送")
-        send.setObjectName("primary")
-        send.clicked.connect(self._send)
-        row.addWidget(send)
-        layout.addLayout(row)
-        row = QHBoxLayout()
-        self.voice_button = QPushButton("开启连续对话")
-        self.voice_button.setCheckable(True)
-        self.voice_button.toggled.connect(self.voice_requested)
-        row.addWidget(self.voice_button)
-        look = QPushButton("看一眼")
-        look.clicked.connect(self.look_requested)
-        row.addWidget(look)
-        self.sleep_button = QPushButton("休眠")
-        self.sleep_button.clicked.connect(self.sleep_requested)
-        row.addWidget(self.sleep_button)
-        self.stop_button = QPushButton("停止回复")
-        self.stop_button.setEnabled(False)
-        self.stop_button.setToolTip("停止本轮生成和播放，已开启的麦克风会继续聆听。")
-        self.stop_button.clicked.connect(self.stop_requested)
-        row.addWidget(self.stop_button)
-        layout.addLayout(row)
-        self.tabs.addTab(page, "聊天")
+    def mount_section(self, key, widget, on_open=None):
+        self._opening_callbacks[key] = on_open
+        self.sections[key].set_widget(widget)
 
-    def _memory_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        explanation = QLabel(
-            "长期记忆保存在本机，重启后仍在。\n明确要求才会保存，含糊时先确认；也可在下面手动编辑。"
-        )
-        explanation.setWordWrap(True)
-        layout.addWidget(explanation)
-        self.memory = QPlainTextEdit()
-        self.memory.setPlaceholderText("称呼、偏好、重要事项…\n不要填写密码、密钥和证件信息。")
-        layout.addWidget(self.memory)
-        row = QHBoxLayout()
-        save = QPushButton("保存记忆")
-        save.clicked.connect(lambda: self.memory_requested.emit(self.memory.toPlainText()))
-        row.addWidget(save)
-        clear = QPushButton("清空记忆")
-        clear.clicked.connect(self._clear_memory)
-        row.addWidget(clear)
-        layout.addLayout(row)
-        self.tabs.addTab(page, "记忆")
+    def _prepare(self, key):
+        callback = self._opening_callbacks.get(key)
+        if callback is not None:
+            callback()
+
+    def open_section(self, key):
+        self.show()
+        self.sections[key].set_expanded(True)
+        self.navigation.setCurrentIndex(self.navigation.findData(key))
+        self.raise_()
+        self.activateWindow()
+        # 等布局完成后定位标题；展开多个分区也不会切走或重建原表单。
+        QTimer.singleShot(0, lambda: self.sections[key].scroll_into_view(self.scroll))
+        LOG.info("控制中心定位分区 key=%s", key)
+
+    def collapse_section(self, key):
+        self.sections[key].set_expanded(False)
+
+    def open_configuration(self):
+        self.open_section("model")
+
+    def open_logs(self):
+        self.open_section("logs")
+
+    def toggle(self):
+        if self.isVisible() and self.isActiveWindow():
+            self.close()
+        else:
+            self.open_section("chat")
+            self.input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def _clear_memory(self):
         self.memory.clear()
@@ -210,17 +161,13 @@ class Panel(QWidget):
             self.send_requested.emit(text, self.with_screen.isChecked())
 
     def append(self, speaker: str, text: str):
-        # 纯文本显示，模型不能把回复变成 HTML、链接动作或脚本。
         self.chat.appendPlainText(f"{speaker}\n{text}\n")
         self.chat.moveCursor(QTextCursor.MoveOperation.End)
-        self.message_added.emit(speaker, text)
 
     def voice_state(self, enabled, paused=False):
         self.voice_button.blockSignals(True)
         self.voice_button.setChecked(enabled)
-        self.voice_button.setText(
-            "连续对话已暂停" if enabled and paused else "关闭连续对话" if enabled else "开启连续对话"
-        )
+        self.voice_button.setText("连续对话已暂停" if enabled and paused else "关闭连续对话" if enabled else "开启连续对话")
         self.voice_button.setToolTip("休眠期间暂停收音，唤醒后恢复；点击可取消恢复。" if enabled and paused else "")
         self.voice_button.blockSignals(False)
 
@@ -229,27 +176,21 @@ class Panel(QWidget):
 
     def _preview(self):
         try:
-            settings = self.preferences.apply(self.persona.apply(self.settings)).validate()
-            self.preview_requested.emit(settings)
+            self.preview_requested.emit(self.preferences.apply(self.persona.apply(self.settings)).validate())
         except ValueError as exc:
             self.status.setText(str(exc))
-
-    def open_configuration(self):
-        self.tabs.setCurrentIndex(4)
-        self.show()
-        self.raise_()
-        self.activateWindow()
-
-    def open_logs(self):
-        self.logs.show()
-        self.logs.raise_()
-        self.logs.activateWindow()
 
     def saving(self, enabled):
         self.form.saving = enabled
         self.form.refresh()
-        for button in (self.persona.save_button, self.preferences.save_button, self.model_page.save_button):
+        for button in (self.save_button, self.persona.save_button, self.preferences.save_button, self.model_page.save_button):
             button.setEnabled(not enabled)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        for key, section in self.sections.items():
+            if section.expanded:
+                self._prepare(key)
 
     def closeEvent(self, event):
         event.ignore()

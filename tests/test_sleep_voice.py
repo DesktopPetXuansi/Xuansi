@@ -10,8 +10,7 @@ from pet.app import DesktopPet
 from pet.companion_ui import CompanionUI
 from pet.config import Settings
 from pet.desktop import DesktopState
-from pet.panel import STYLE, Panel
-from pet.quick_chat import QuickChat
+from pet.panel import Panel
 
 
 class FakeRuntime:
@@ -69,7 +68,6 @@ def pet(monkeypatch):
     owner.pending = None
     owner.last_external = (0, 0)
     owner.panel = Panel(owner.settings)
-    quick = QuickChat(owner.settings, STYLE)
     owner.runtime = FakeRuntime(owner)
     owner.avatar = SimpleNamespace(
         paused=False,
@@ -77,31 +75,26 @@ def pet(monkeypatch):
         cancel_motion=lambda: None,
         set_animation=lambda animation: setattr(owner.avatar, "animation", animation),
     )
-    owner.ui = SimpleNamespace(owner=owner, quick=quick, hotkey=SimpleNamespace(active=1))
+    owner.ui = SimpleNamespace(owner=owner, hotkey=SimpleNamespace(active=1))
     owner.ui.refresh = lambda: CompanionUI.refresh(owner.ui)
     owner.panel.voice_requested.connect(owner.voice)
-    quick.voice_requested.connect(owner.voice)
     yield owner
     owner.panel.hide()
-    owner.panel.logs.hide()
-    quick.hide()
     owner.panel.deleteLater()
-    owner.panel.logs.deleteLater()
-    quick.deleteLater()
     owner.deleteLater()
     application.processEvents()
 
 
 def test_sleep_keeps_voice_selected_but_stops_physical_input(pet):
-    """关闭的是实际收音，两处开关仍保留用户已开启的选择。"""
+    """关闭的是实际收音，统一控制中心的开关仍保留用户已开启的选择。"""
     pet.voice(True)
     pet.toggle_sleep()
 
     assert pet.paused and not pet.runtime.listening
     assert pet.panel.voice_button.isChecked()
-    assert pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.window() is pet.panel
+    assert not hasattr(pet.ui, "quick")
     assert "休眠" in pet.panel.status.text()
-    assert "休眠" in pet.ui.quick.status.text()
 
 
 def test_wake_restores_previously_enabled_continuous_voice(pet):
@@ -110,7 +103,7 @@ def test_wake_restores_previously_enabled_continuous_voice(pet):
     pet.toggle_sleep()
 
     assert not pet.paused and pet.runtime.listening
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.isChecked()
 
 
 def test_wake_does_not_open_voice_that_was_never_enabled(pet):
@@ -118,17 +111,21 @@ def test_wake_does_not_open_voice_that_was_never_enabled(pet):
     pet.toggle_sleep()
 
     assert not pet.paused and not pet.runtime.listening
-    assert not pet.panel.voice_button.isChecked() and not pet.ui.quick.voice.isChecked()
+    assert not pet.panel.voice_button.isChecked()
 
 
-def test_user_can_turn_voice_off_while_asleep(pet):
+@pytest.mark.parametrize("from_panel", [False, True], ids=["controller", "control-center"])
+def test_user_can_turn_voice_off_while_asleep(pet, from_panel):
     pet.voice(True)
     pet.toggle_sleep()
-    # 托盘用 toggle_voice；此时物理输入已停，不能按 listening 反向切换。
-    pet.toggle_voice()
+    # 物理输入已停；控制中心和控制器都必须按保留的选择关闭。
+    if from_panel:
+        pet.panel.voice_button.click()
+    else:
+        pet.toggle_voice()
 
     assert pet.paused and not pet.runtime.listening
-    assert not pet.panel.voice_button.isChecked() and not pet.ui.quick.voice.isChecked()
+    assert not pet.panel.voice_button.isChecked()
     pet.toggle_sleep()
     assert not pet.runtime.listening
 
@@ -139,8 +136,8 @@ def test_delayed_input_close_keeps_sleep_message_and_voice_selection(pet):
     pet.on_microphone_state(pet.runtime.microphone_epoch, "麦克风已关闭")
 
     assert pet.paused and not pet.runtime.listening
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
-    assert "休眠" in pet.panel.status.text() and "休眠" in pet.ui.quick.status.text()
+    assert pet.panel.voice_button.isChecked()
+    assert "休眠" in pet.panel.status.text()
 
 
 def test_failed_wake_clears_selection_and_leaves_readable_failure(pet):
@@ -150,7 +147,7 @@ def test_failed_wake_clears_selection_and_leaves_readable_failure(pet):
     pet.on_microphone_state(pet.runtime.microphone_epoch, "麦克风无法开启，请检查输入设备")
 
     assert not pet.runtime.listening
-    assert not pet.panel.voice_button.isChecked() and not pet.ui.quick.voice.isChecked()
+    assert not pet.panel.voice_button.isChecked()
     assert "麦克风无法开启" in pet.panel.status.text()
     assert "麦克风无法开启" in pet.panel.chat.toPlainText()
     # 再次休眠唤醒也不能悄悄重试已经失败的开启选择。
@@ -167,14 +164,14 @@ def test_text_wakes_pet_then_resumes_voice_after_reply_without_preheat_collision
 
     assert not pet.paused and pet.busy and pet.runtime.pending_reply
     assert not pet.runtime.listening
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.isChecked()
     assert pet.runtime.interrupted_warmups == 0
 
     pet.runtime.pending_reply = False
     pet.on_finished(pet.runtime.epoch)
 
     assert not pet.busy and pet.runtime.listening
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.isChecked()
     assert pet.runtime.interrupted_warmups == 0
 
 
@@ -199,7 +196,7 @@ def test_suppressed_desktop_keeps_sleeping_voice_selection(pet, monkeypatch, sta
 
     assert pet.paused and pet.fullscreen and not pet.runtime.listening
     assert pet.voice_enabled
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.isChecked()
 
 
 @pytest.mark.parametrize("state", [DesktopState(0, False, False), DesktopState(123, False, True)])
@@ -221,4 +218,4 @@ def test_wake_defers_voice_until_desktop_is_available(pet, monkeypatch, state):
 
     assert not pet.fullscreen and pet.runtime.listening
     assert pet.voice_enabled
-    assert pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+    assert pet.panel.voice_button.isChecked()

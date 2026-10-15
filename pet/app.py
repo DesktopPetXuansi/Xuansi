@@ -155,14 +155,12 @@ class DesktopPet(QObject):
         )
         if not enabled:
             self.panel.live_transcript.clear()
-            self.ui.quick.live_transcript.clear()
             self.busy = False
             self.avatar.set_animation("sleep" if self.paused else "idle")
         LOG.info("连续对话选择 enabled=%s paused=%s", enabled, self.paused)
 
     def _sync_voice_state(self):
         self.panel.voice_state(self.voice_enabled, self.paused)
-        self.ui.quick.voice_state(self.voice_enabled, self.paused)
 
     def toggle_voice(self):
         self.voice(not self.voice_enabled)
@@ -186,14 +184,12 @@ class DesktopPet(QObject):
         if text.startswith("麦克风无法"):
             self.on_failed(self.runtime.epoch, text)
         self.panel.status.setText(text)
-        self.ui.quick.status.setText(text)
 
     def on_voice_update(self, microphone_epoch, update):
         if microphone_epoch != self.runtime.microphone_epoch or not self.runtime.listening or self.paused:
             return
         text = "" if update.final else "正在听：" + update.text[-100:]
         self.panel.live_transcript.setText(text)
-        self.ui.quick.live_transcript.setText(text)
         if update.final and not update.text:
             message = "未识别到有效语音 · 继续聆听，可重说或检查输入设备。"
             self.on_state(self.runtime.epoch, message)
@@ -216,7 +212,6 @@ class DesktopPet(QObject):
     def on_state(self, epoch, text):
         if epoch == self.runtime.epoch:
             self.panel.status.setText(text)
-            self.ui.quick.status.setText(text)
 
     def on_finished(self, epoch):
         if epoch == self.runtime.epoch:
@@ -302,13 +297,11 @@ class DesktopPet(QObject):
         self.runtime.toggle_microphone(False)
         self.runtime.cancel(release=True)
         self.panel.live_transcript.clear()
-        self.ui.quick.live_transcript.clear()
         self._sync_voice_state()
         self.avatar.bubble.hide()
         self.avatar.set_animation("sleep")
         status = "已休眠 · 连续对话已暂停，唤醒后恢复" if self.voice_enabled else "已休眠 · 麦克风关闭"
         self.panel.status.setText(status)
-        self.ui.quick.status.setText(status)
         self.pending = None
         self.busy = False
         self.ui.refresh()
@@ -327,7 +320,6 @@ class DesktopPet(QObject):
             if self.fullscreen:
                 status = "已唤醒 · 桌面恢复可用后继续连续对话"
         self.panel.status.setText(status)
-        self.ui.quick.status.setText(status)
         if self.voice_enabled and resume_voice and not self.fullscreen:
             self.voice(True)
         self.ui.refresh()
@@ -371,7 +363,7 @@ class DesktopPet(QObject):
         self.ui.refresh_icon()
         self.avatar.follow = settings.follow_mouse
         self.panel.title.setText(settings.name)
-        self.panel.setWindowTitle(f"{settings.name} · 本地 AI 桌宠")
+        self.panel.setWindowTitle(f"{settings.name} · 控制中心")
         self.panel.logs.setWindowTitle(f"{settings.name} · 运行日志")
         self.tray.setToolTip(f"{settings.name} · 本地桌宠")
         self.panel.status.setText("已保存；下次回应使用新设置")

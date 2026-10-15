@@ -11,7 +11,7 @@ from pet.live_input import VoiceUpdate
 @pytest.fixture
 def feedback():
     bubbles, messages, accepted = [], [], []
-    labels = {"panel": "", "quick": ""}
+    labels = {"panel": ""}
     transcript = SimpleNamespace(setText=lambda _: None)
     owner = SimpleNamespace(
         paused=False, fullscreen=False, busy=False, voice_enabled=True,
@@ -24,10 +24,6 @@ def feedback():
             status=SimpleNamespace(setText=lambda text: labels.update(panel=text)),
             with_screen=SimpleNamespace(isChecked=lambda: False),
         ),
-        ui=SimpleNamespace(quick=SimpleNamespace(
-            live_transcript=transcript,
-            status=SimpleNamespace(setText=lambda text: labels.update(quick=text)),
-        )),
     )
     owner.on_state = lambda *args: DesktopPet.on_state(owner, *args)
     owner.on_failed = lambda *args: DesktopPet.on_failed(owner, *args)
@@ -42,7 +38,8 @@ def test_repeated_empty_recognition_stays_quiet_and_listening(feedback):
 
     assert not bubbles and not messages and not accepted
     assert owner.runtime.listening and owner.voice_enabled and not owner.busy
-    assert labels["panel"] == labels["quick"] and "继续聆听" in labels["panel"]
+    assert "继续聆听" in labels["panel"]
+    assert not hasattr(owner, "ui")  # 反馈直接进入唯一控制中心，无需窗口同步。
 
     # 空话段之后仍接受正常一句，不用用户重新开麦。
     DesktopPet.on_voice_update(owner, 7, VoiceUpdate(3, "你好", final=True))
@@ -60,5 +57,5 @@ def test_actual_failure_keeps_visible_feedback(feedback):
 def test_stale_empty_recognition_cannot_overwrite_current_state(feedback):
     owner, bubbles, messages, accepted, labels = feedback
     DesktopPet.on_voice_update(owner, 6, VoiceUpdate(0, "", final=True))
-    assert labels == {"panel": "", "quick": ""}
+    assert labels == {"panel": ""}
     assert not bubbles and not messages and not accepted

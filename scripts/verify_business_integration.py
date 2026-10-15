@@ -52,10 +52,10 @@ def wait_until(predicate, message, seconds=90):
 
 
 def verify_memory_chat(pet, memory_path, clips, motions, mouth_levels, reply_bubbles, report):
-    """实际点击保存，再让快捷窗口经后台推理取回磁盘记忆、执行动作和朗读。"""
+    """实际点击保存，再让控制中心经后台推理取回磁盘记忆、执行动作和朗读。"""
     pet.open_panel()
     wait_until(lambda: "blink" in pet.runtime.motion_actions, "默认 Live2D 未公布眨眼能力", 10)
-    pet.panel.tabs.setCurrentIndex(2)
+    pet.panel.open_section("memory")
     pet.panel.memory.setPlainText("我喜欢喝绿茶。")
     save = next(button for button in pet.panel.findChildren(QPushButton) if button.text() == "保存记忆")
     QTest.mouseClick(save, Qt.MouseButton.LeftButton)
@@ -63,13 +63,14 @@ def verify_memory_chat(pet, memory_path, clips, motions, mouth_levels, reply_bub
     assert "绿茶" in MemoryStore(memory_path).read() and not pet.runtime.history
     report["memory_page_persists_and_clears_short_context"] = True
 
-    pet.ui.quick.show()
-    pet.ui.quick.input.setText("我喜欢喝什么？请眨一下眼，并出声用一句话回答。")
-    QTest.keyClick(pet.ui.quick.input, Qt.Key.Key_Return)
+    pet.panel.open_section("chat")
+    assert pet.panel.memory.window() is pet.panel
+    pet.panel.input.setText("我喜欢喝什么？请眨一下眼，并出声用一句话回答。")
+    QTest.keyClick(pet.panel.input, Qt.Key.Key_Return)
     wait_until(lambda: bool(pet.runtime.history) and not pet.busy
                and "绿茶" in pet.runtime.history[-1]["content"], "界面请求未完成记忆召回")
     answer = pet.runtime.history[-1]["content"]
-    assert answer in pet.panel.chat.toPlainText() and answer in pet.ui.quick.chat.toPlainText()
+    assert answer in pet.panel.chat.toPlainText()
     # 气泡定时收起，冷启动 TTS 可能晚于它；必须在回复到达时验证显示。
     assert reply_bubbles and reply_bubbles[-1], "回复到达时未显示气泡"
     assert clips, "真实 TTS 未交付音频"
@@ -77,7 +78,7 @@ def verify_memory_chat(pet, memory_path, clips, motions, mouth_levels, reply_bub
     assert any(level > 0 for level in mouth_levels), "实际播放阶段未提供有效口型响度"
     report.update({
         "persisted_memory_reaches_real_model": True,
-        "real_reply_reaches_both_windows_and_bubble": True,
+        "real_reply_reaches_control_center_and_bubble": True,
         "real_tts_emits_audio_and_mouth_levels": True,
         "real_model_motion_reaches_live2d": True,
     })
@@ -101,10 +102,10 @@ def verify_voice_sleep(pet, source, clips, updates, playback_checks, report):
                "界面开启的连续语音未完成回复或恢复收音")
     final_text = next(update.text for update in updates if update.final)
     assert "介绍一下自己" in final_text
-    assert final_text in pet.panel.chat.toPlainText() and final_text in pet.ui.quick.chat.toPlainText()
+    assert final_text in pet.panel.chat.toPlainText()
     assert pet.voice_enabled and pet.runtime.listening and playback_checks and all(playback_checks)
     report["real_asr_qt_request_llm_tts_roundtrip"] = True
-    report["voice_text_synchronized_and_listening_resumed"] = True
+    report["voice_text_reaches_control_center_and_listening_resumed"] = True
     report["playback_pauses_actual_input_pipeline"] = True
 
     # 唤醒用零输入，避免测试自身再次发起一轮对话。
@@ -116,7 +117,6 @@ def verify_voice_sleep(pet, source, clips, updates, playback_checks, report):
     wait_until(lambda: not pet.runtime.listening and not psutil.pid_exists(engine_pid),
                "休眠未关闭输入或释放模型", 20)
     assert pet.paused and pet.voice_enabled and pet.panel.voice_button.isChecked()
-    assert pet.ui.quick.voice.isChecked()
     report["sleep_preserves_selection_and_releases_real_engine"] = True
     pet.panel.sleep_button.click()
     wait_until(lambda: pet.runtime.listening and "实时聆听中" in pet.panel.status.text(),
@@ -148,7 +148,12 @@ def verify_close_settings(pet, settings_path, report):
 def verify_window_captures(pet, target, report):
     """抓图可能初始化隐藏预览；证据保存和两模型渲染都必须成功。"""
     screenshot_stem = target.stem.removesuffix("-report")
-    for name, window in (("panel", pet.panel), ("quick", pet.ui.quick)):
+    for name in ("chat", "appearance"):
+        pet.panel.open_section(name)
+        QTest.qWait(50)
+        window = pet.panel
+        assert pet.panel.sections[name].expanded
+        assert pet.ui.appearance.window() is pet.panel
         pixels = window.grab()
         assert not pixels.isNull(), f"{name} 窗口截图为空"
         assert pixels.save(str(target.parent / f"{screenshot_stem}-{name}.png")), f"{name} 窗口截图保存失败"

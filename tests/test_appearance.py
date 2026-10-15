@@ -32,12 +32,12 @@ def test_shape_change_preserves_live_conversation_and_other_settings():
 
 @pytest.mark.parametrize("identifier", ["a" * 64 + ".png", "b" * 64 + ".png", ""])
 def test_appearance_save_refreshes_even_same_image_without_resetting_voice(identifier):
-    """从形象窗口完成保存；相同标识也刷新，不进入完整配置的停麦路径。"""
+    """从同页形象区完成保存；相同标识也刷新，不进入完整配置的停麦路径。"""
     from pet.app import DesktopPet
 
     old = replace(Settings(), avatar_image="a" * 64 + ".png", persona="保留我的人设")
     applied, icons, completed = [], [], []
-    statuses = {"panel": "", "quick": ""}
+    statuses = {"panel": ""}
     panel = SimpleNamespace(
         settings=old,
         saving=lambda _: None,
@@ -54,10 +54,6 @@ def test_appearance_save_refreshes_even_same_image_without_resetting_voice(ident
     )  # 不提供关麦和取消接口；任何外观保存都不应调用它们。
     ui = SimpleNamespace(
         owner=owner, saving=True, closed=False, appearance_only=True, hotkey_staged=False,
-        quick=SimpleNamespace(
-            setWindowTitle=lambda _: None,
-            status=SimpleNamespace(setText=lambda text: statuses.update(quick=text)),
-        ),
         appearance=SimpleNamespace(saved=completed.append),
         refresh_icon=lambda: icons.append(owner.settings.avatar_image),
     )
@@ -73,7 +69,7 @@ def test_appearance_save_refreshes_even_same_image_without_resetting_voice(ident
     assert applied == [(identifier, {"force": True})] and icons == [identifier]
     assert completed == [""] and not ui.saving
     assert owner.runtime.listening and owner.busy and owner.voice_enabled
-    assert statuses["panel"] == statuses["quick"] and "已应用" in statuses["quick"]
+    assert "已应用" in statuses["panel"]
 
 
 def test_import_keeps_alpha_and_survives_source_removal(tmp_path):

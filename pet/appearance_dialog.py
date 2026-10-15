@@ -33,11 +33,18 @@ class ImportImage(QRunnable):
 class AppearanceDialog(QDialog):
     apply_requested = Signal(str)
 
-    def __init__(self, parent):
+    def __init__(self, parent, *, embedded=False):
         super().__init__(parent)
+        self.embedded = embedded
+        self.control_panel = parent
+        self.needs_prepare = True
+        if embedded:
+            # QDialog 即使有父级仍默认为顶层窗口，显式换成普通控件。
+            self.setParent(parent, Qt.WindowType.Widget)
         self.setWindowTitle("更换桌宠形象")
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.setFixedWidth(480)
+        if not embedded:
+            self.setFixedWidth(480)
         self.current = self.candidate = ""
         self.generation = 0
         self.loading = self.saving = False
@@ -99,9 +106,14 @@ class AppearanceDialog(QDialog):
         self.picker.setNameFilter("图片与透明动图 (*.png *.apng *.gif *.webp *.jpg *.jpeg *.bmp)")
         self.picker.fileSelected.connect(self.import_file)
         self.update_buttons()
+        if embedded:
+            for button in self.findChildren(QPushButton):
+                button.setAutoDefault(False)
+                button.setDefault(False)
 
     def present(self, identifier):
-        if not self.isVisible() and not self.saving:
+        if (self.needs_prepare or not self.isVisible()) and not self.saving:
+            self.needs_prepare = False
             self.generation += 1
             self.loading = False
             self.dirty = False
@@ -112,9 +124,10 @@ class AppearanceDialog(QDialog):
             else:
                 self.status.setText("当前：自定义形象" if identifier else "当前：默认玄司")
             self.update_buttons()
-        self.show()
-        self.raise_()
-        self.activateWindow()
+        if not self.embedded:
+            self.show()
+            self.raise_()
+            self.activateWindow()
         LOG.info("打开形象菜单")
 
     def browse(self):
@@ -192,10 +205,30 @@ class AppearanceDialog(QDialog):
 
     def closeEvent(self, event):
         self.picker.close()
+        if self.embedded:
+            self.control_panel.collapse_section("appearance")
+            event.ignore()
+            return
         super().closeEvent(event)
+
+    def accept(self):
+        if not self.embedded:
+            super().accept()
+
+    def reject(self):
+        if not self.embedded:
+            super().reject()
+
+    def keyPressEvent(self, event):
+        if self.embedded and event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)
 
     def hideEvent(self, event):
         # Esc、关闭按钮和父窗口关闭都拒收迟到导入；已接受的保存事务仍可完成。
         self.generation += 1
+        self.needs_prepare = True
+        self.picker.close()
         self.preview.stop()
         super().hideEvent(event)

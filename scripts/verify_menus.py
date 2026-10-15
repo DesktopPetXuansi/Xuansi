@@ -41,7 +41,7 @@ def main():
 
     async def chat(config, text, images, history, **_kwargs):
         report["request_uses_saved_sampling"] = config.temperature == 0.4 and config.max_tokens == 256
-        return "这是快捷对话验收回复。"
+        return "这是控制中心验收回复。"
 
     pet.runtime.engine.chat = chat
 
@@ -53,13 +53,21 @@ def main():
 
     def inspect():
         try:
-            menu = pet.panel.layout().menuBar()
-            report["panel_menus"] = [action.text() for action in menu.actions()]
-            report["tray_menus"] = [action.text() for action in pet.tray.contextMenu().actions()]
+            report["single_page_sections"] = set(pet.panel.sections) == {
+                "chat", "persona", "memory", "preferences", "model", "appearance",
+                "resources", "upload", "logs",
+            }
+            report["tray_has_three_entries"] = [
+                action.text() for action in pet.tray.contextMenu().actions()
+            ] == ["打开控制中心", "休眠/唤醒", "退出"]
             pet.panel.open_configuration()
+            report["configuration_stays_in_control_center"] = (
+                pet.panel.sections["model"].expanded
+                and pet.panel.model_page.window() is pet.panel
+            )
             pet.panel.model_page.temperature.setValue(0.4)
             pet.panel.model_page.tokens.setValue(256)
-            pet.panel.model_page.save_button.click()
+            pet.panel.save_button.click()
             report["configuration_saved"] = wait_until(lambda: pet.settings.temperature == 0.4)
             pet.panel.grab().save(str(output / "menu-configuration.png"))
             pet.panel.hide()
@@ -71,12 +79,14 @@ def main():
             )
             pet.panel.logs.path = log_path
             pet.panel.open_logs()
+            report["logs_stay_in_control_center"] = pet.panel.logs.window() is pet.panel
             report["logs_loaded"] = wait_until(lambda: "测试就绪" in pet.panel.logs.content.toPlainText())
             pet.panel.logs.level.setCurrentText("WARNING")
             report["logs_filter"] = "测试就绪" not in pet.panel.logs.content.toPlainText()
             pet.panel.logs.grab().save(str(output / "menu-logs.png"))
-            pet.panel.logs.hide()
+            pet.panel.collapse_section("logs")
             report["hidden_logs_stop_polling"] = not pet.panel.logs.timer.isActive()
+            pet.panel.hide()
 
             # 只向自己的线程投递 WM_HOTKEY，不向用户前景软件注入按键。
             identifier = pet.ui.hotkey.active
@@ -84,24 +94,25 @@ def main():
             ctypes.windll.user32.PostThreadMessageW(
                 ctypes.windll.kernel32.GetCurrentThreadId(), 0x0312, identifier, 0
             )
-            report["native_hotkey_opens_quick_chat"] = wait_until(pet.ui.quick.isVisible)
-            quick = pet.ui.quick
-            report["focus_received"] = quick.input.hasFocus()
-            frame = quick.frameGeometry()
-            area = quick.screen().availableGeometry()
-            report["quick_inside_work_area"] = area.contains(frame)
-            report["right_bottom_margin"] = [area.right() - frame.right(), area.bottom() - frame.bottom()]
-            quick.input.setText("快捷对话验收")
-            QTest.keyClick(quick.input, Qt.Key.Key_Return)
-            report["reply_in_both_windows"] = wait_until(
-                lambda: (
-                    "这是快捷对话验收回复。" in quick.chat.toPlainText()
-                    and "这是快捷对话验收回复。" in pet.panel.chat.toPlainText()
-                )
+            report["native_hotkey_opens_control_center"] = wait_until(pet.panel.isVisible)
+            panel = pet.panel
+            report["focus_received"] = panel.input.hasFocus()
+            report["chat_section_expanded"] = panel.sections["chat"].expanded
+            report["one_control_window"] = all(
+                widget.window() is panel
+                for widget in (panel.chat, pet.ui.appearance, pet.ui.platform, panel.logs)
             )
-            quick.grab().save(str(output / "menu-quick-chat.png"))
-            QTest.keyClick(quick.input, Qt.Key.Key_Escape)
-            report["escape_hides_quick_chat"] = wait_until(lambda: not quick.isVisible(), 0.5)
+            panel.input.setText("统一控制中心验收")
+            QTest.keyClick(panel.input, Qt.Key.Key_Return)
+            report["reply_reaches_single_chat_once"] = wait_until(
+                lambda: panel.chat.toPlainText().count("这是控制中心验收回复。") == 1
+            )
+            panel.grab().save(str(output / "menu-control-center.png"))
+            # Esc 保留原设置保存事务；完成后才允许隐藏同一个窗口。
+            QTest.keyClick(panel.input, Qt.Key.Key_Escape)
+            report["escape_saves_and_hides_control_center"] = wait_until(
+                lambda: not panel.isVisible() and not pet.ui.saving
+            )
             report["microphone_off"] = not pet.runtime.listening
             report["audio_monitor_alive"] = pet.runtime.audio_activity.thread.is_alive()
             report["audio_monitor_valid"] = pet.runtime.audio_activity._snapshot[0]

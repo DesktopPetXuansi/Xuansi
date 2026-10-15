@@ -57,7 +57,7 @@ def tray_matches_avatar(pet):
 def window_icons_match_tray(pet):
     """应用默认图标覆盖后续窗口，已有窗口也必须同步，不能只更新通知区。"""
     expected = pet.tray.icon().pixmap(64, 64).toImage()
-    windows = (pet.application, pet.panel, pet.ui.quick, pet.panel.logs, pet.ui.appearance)
+    windows = (pet.application, pet.panel)
     return all(window.windowIcon().pixmap(64, 64).toImage() == expected for window in windows)
 
 
@@ -133,14 +133,12 @@ def main():
                 frames[0].save(
                     source, save_all=True, append_images=frames[1:], duration=[80, 160, 100], loop=0
                 )
-                menu = next(
-                    action.menu()
-                    for action in pet.panel.layout().menuBar().actions()
-                    if action.text() == "形象"
-                )
-                menu.actions()[0].trigger()
+                pet.panel.open_section("appearance")
                 dialog = pet.ui.appearance
-                report["menu_opens_dialog"] = dialog.isVisible()
+                report["appearance_is_same_page"] = (
+                    dialog.isVisible() and dialog.window() is pet.panel
+                    and pet.panel.sections["appearance"].expanded
+                )
                 dialog.picker.setOption(QFileDialog.Option.DontUseNativeDialog, True)
                 dialog.choose.click()
                 dialog.picker.selectFile(str(source))
@@ -170,11 +168,11 @@ def main():
                 report["tray_uses_custom_frame"] = tray_matches_avatar(pet)
                 report["custom_shape_updates_all_window_icons"] = window_icons_match_tray(pet)
                 report["custom_shape_updates_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
-                report["appearance_status_synchronized"] = pet.panel.status.text() == pet.ui.quick.status.text()
+                report["appearance_status_visible"] = "已应用" in pet.panel.status.text()
                 report["custom_image_reaches_rendered_window"] = render_custom_shape(
                     pet.avatar, output / "appearance-custom-avatar.png"
                 )
-                dialog.close()
+                pet.panel.collapse_section("appearance")
                 report["hidden_preview_stops"] = not dialog.preview.timer.isActive()
                 source.unlink()
                 restarted = Avatar(settings.pet_size, load_settings(setting_path).avatar_image)
@@ -213,7 +211,7 @@ def main():
                 )
                 report["reimport_keeps_continuous_voice"] = (
                     pet.voice_enabled and pet.runtime.listening and pet.runtime.epoch == previous_epoch
-                    and pet.panel.voice_button.isChecked() and pet.ui.quick.voice.isChecked()
+                    and pet.panel.voice_button.isChecked()
                 )
                 report["reimport_refreshes_tray"] = tray_matches_avatar(pet)
                 report["reimport_refreshes_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
@@ -222,7 +220,7 @@ def main():
                 )
                 pet.voice_enabled = pet.runtime.listening = False
                 pet._sync_voice_state()
-                dialog.close()
+                pet.panel.collapse_section("appearance")
 
                 pet.avatar.clock.stop()
                 pet.avatar.frame = 2
@@ -258,7 +256,7 @@ def main():
                     pet.settings.avatar_image == identifier
                     and pet.avatar.image_id == identifier
                     and load_settings(setting_path).avatar_image == identifier
-                    and pet.panel.status.text() == pet.ui.quick.status.text()
+                    and "失败" in pet.panel.status.text()
                 )
                 runtime_module.save_settings = normal_save
                 dialog.apply_button.click()
@@ -276,8 +274,8 @@ def main():
                 report["restore_default_updates_all_window_icons"] = window_icons_match_tray(pet)
                 report["restore_default_updates_windows_taskbar_icon"] = native_window_icon_matches_tray(pet)
                 report["microphone_stays_off"] = not pet.runtime.listening
-                dialog.close()
-                # 后台导入尚未返回时按 Esc，迟到结果不得替换当前形象。
+                pet.panel.collapse_section("appearance")
+                # 后台导入尚未返回时收起形象区，迟到结果不得替换当前形象。
                 delayed = temporary / "late.png"
                 frames[0].save(delayed)
                 release, completed = threading.Event(), threading.Event()
@@ -291,11 +289,11 @@ def main():
                 dialog_module.import_image = slow_import
                 pet.ui.open_appearance()
                 dialog.import_file(str(delayed))
-                dialog.reject()
+                pet.panel.collapse_section("appearance")
                 release.set()
                 assert wait_until(completed.is_set)
                 QTest.qWait(50)
-                report["closed_menu_rejects_late_import"] = (
+                report["collapsed_section_rejects_late_import"] = (
                     dialog.candidate == "" and pet.settings.avatar_image == ""
                 )
                 report["all_passed"] = all(report.values())

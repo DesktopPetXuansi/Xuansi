@@ -20,10 +20,23 @@ def fixture_pet(monkeypatch):
     preview = SimpleNamespace(
         _live2d_active=True, _live2d_failed=False, _live2d_model=object(), context=lambda: "preview",
     )
+    panel = SimpleNamespace(
+        grab=lambda: image,
+        sections={key: SimpleNamespace(expanded=False) for key in ("chat", "appearance")},
+        opened=[],
+    )
+
+    def open_section(key):
+        # 模拟同页展开，不再为截图创建第二个控制窗口。
+        panel.sections[key].expanded = True
+        panel.opened.append(key)
+
+    panel.open_section = open_section
     pet = SimpleNamespace(
-        avatar=desktop, panel=SimpleNamespace(grab=lambda: image),
-        ui=SimpleNamespace(quick=SimpleNamespace(grab=lambda: image),
-                           appearance=SimpleNamespace(preview=SimpleNamespace(renderer=preview))),
+        avatar=desktop, panel=panel,
+        ui=SimpleNamespace(appearance=SimpleNamespace(
+            preview=SimpleNamespace(renderer=preview), window=lambda: panel,
+        )),
     )
     monkeypatch.setattr(verification, "QOpenGLContext", SimpleNamespace(areSharing=lambda *_: True), raising=False)
     return pet, image
@@ -35,6 +48,8 @@ def test_valid_window_captures_record_rendering_checks(monkeypatch, tmp_path):
 
     verification.verify_window_captures(pet, tmp_path / "business-report.json", report)
 
+    assert pet.panel.opened == ["chat", "appearance"]
+    assert all(section.expanded for section in pet.panel.sections.values())
     assert report["window_captures_saved"]
     assert report["capture_keeps_both_live2d_models"]
     assert report["capture_contexts_share_resources"]
@@ -57,7 +72,7 @@ def test_capture_rejects_png_fallback(monkeypatch, tmp_path, name):
     assert not report["passed"]
 
 
-@pytest.mark.parametrize("failure", ["empty", "save", "unshared", "blank_frame"])
+@pytest.mark.parametrize("failure", ["empty", "save", "unshared", "blank_frame", "separate_window"])
 def test_capture_rejects_missing_evidence_or_unshared_context(monkeypatch, tmp_path, failure):
     pet, image = fixture_pet(monkeypatch)
     if failure == "empty":
@@ -66,6 +81,8 @@ def test_capture_rejects_missing_evidence_or_unshared_context(monkeypatch, tmp_p
         image.save = lambda _: False
     elif failure == "unshared":
         monkeypatch.setattr(verification, "QOpenGLContext", SimpleNamespace(areSharing=lambda *_: False))
+    elif failure == "separate_window":
+        pet.ui.appearance.window = lambda: object()
     else:
         image.pixelColor = lambda *_: SimpleNamespace(alpha=lambda: 0)
     report = {"passed": False}

@@ -10,7 +10,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -69,9 +69,9 @@ def main():
         try:
             pet.open_panel()
             action = pet.panel.audio_avoidance_action
-            configuration = pet.panel.layout().menuBar().actions()[0].menu()
-            report["shared_action"] = (
-                action in configuration.actions() and action in pet.tray.contextMenu().actions()
+            control = pet.panel.audio_avoidance_button
+            report["same_page_action"] = (
+                control.defaultAction() is action and control.window() is pet.panel
             )
             report["default_checked"] = action.isChecked() and action.isCheckable()
             pet.panel.persona.name.setText("未保存的名字草稿")
@@ -83,16 +83,15 @@ def main():
             pet.voice_enabled = True
             pet.runtime.listening = True
             pet.panel.voice_state(True)
-            pet.ui.quick.voice_state(True)
-            action.trigger()
+            control.click()
             assert wait_until(lambda: not pet.ui.saving)
             report["saved_off_without_models"] = not load_settings(settings_path).audio_avoidance
-            report["both_menus_off"] = not action.isChecked()
+            report["control_off"] = not action.isChecked()
             report["gate_off"] = (
                 not pet.runtime.audio_activity.enabled and not pet.runtime.audio_activity.blocked
             )
             report["status_synchronized"] = (
-                "已关闭" in pet.panel.audio_status.text() and "已关闭" in pet.ui.quick.audio_status.text()
+                "已关闭" in pet.panel.audio_status.text() and not control.isChecked()
             )
             report["conversation_preserved"] = (
                 pet.runtime.epoch == epoch and pet.busy and pet.runtime.listening
@@ -109,7 +108,7 @@ def main():
                 raise OSError("synthetic save failure")
 
             runtime_module.save_settings = fail
-            action.trigger()
+            control.click()
             assert wait_until(lambda: not pet.ui.saving)
             report["failed_save_rolled_back"] = (
                 not action.isChecked()
@@ -120,7 +119,7 @@ def main():
                 and "失败" in pet.panel.status.text()
             )
             runtime_module.save_settings = lambda value: save_settings(value, settings_path)
-            action.trigger()
+            control.click()
             assert wait_until(lambda: not pet.ui.saving)
             report["reenabled_and_saved"] = (
                 action.isChecked()
@@ -128,10 +127,9 @@ def main():
                 and load_settings(settings_path).audio_avoidance
             )
             report["still_same_conversation"] = pet.runtime.epoch == epoch and pet.runtime.listening
-            configuration.popup(pet.panel.mapToGlobal(QPoint(10, 10)))
+            pet.panel.open_section("chat")
             QTest.qWait(120)
-            configuration.grab().save(str(output / "avoidance-menu.png"))
-            configuration.hide()
+            pet.panel.grab().save(str(output / "avoidance-control-center.png"))
             release.set()
             assert wait_until(lambda: not pet.busy)
             report["reply_completed"] = "开关不影响文字回复。" in pet.panel.chat.toPlainText()

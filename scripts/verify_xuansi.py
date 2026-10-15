@@ -21,7 +21,6 @@ from pet.desktop import USER32
 from pet.idle_blade_animation import idle_blade_pose
 from pet.live2d_session import configure_opengl_sharing
 from pet.panel import Panel
-from pet.quick_chat import QuickChat
 
 
 def main():
@@ -168,14 +167,13 @@ def main():
         avatar.mouseReleaseEvent(mouse(origin - QPoint(30, 20)))
         report["click_opens_drag_only_moves"] = len(clicks) == 1 and avatar.pos() == previous - QPoint(30, 20)
         panel = Panel(Settings())
-        quick = QuickChat(Settings(), "")
         report["all_titles_use_name"] = (
-            all("玄司" in widget.windowTitle() for widget in (panel, panel.logs, quick))
+            "玄司" in panel.windowTitle()
             and panel.title.text() == "玄司"
+            and panel.logs.window() is panel
         )
         panel.grab().save(str(output / "xuansi-panel.png"))
         panel.close()
-        quick.close()
 
         # 预览只合成自有素材；同一组帧在浅色和深色底色下检查发丝边缘。
         preview = Image.new("RGB", (720, 430), "#f7f6f2")

@@ -77,8 +77,11 @@ class PlatformTask(QThread):
 class PlatformDialog(QDialog):
     shutdown_done = Signal()
 
-    def __init__(self, owner):
+    def __init__(self, owner, *, embedded=False):
         super().__init__(owner.panel)
+        self.embedded = embedded
+        if embedded:
+            self.setParent(owner.panel, Qt.WindowType.Widget)
         self.owner = owner
         self.worker = None
         self.client = None
@@ -137,11 +140,20 @@ class PlatformDialog(QDialog):
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        if embedded:
+            for button in self.findChildren(QPushButton):
+                button.setAutoDefault(False)
+                button.setDefault(False)
 
     def present(self):
-        self.show()
-        self.raise_()
-        self.activateWindow()
+        if self.embedded:
+            self.owner.panel.open_section("resources")
+            # 分区展开回调负责刷新，避免与宿主重复启动同一任务。
+            return
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
         self.refresh_local()
 
     def set_busy(self, busy):
@@ -183,9 +195,14 @@ class PlatformDialog(QDialog):
             self.upload_dialog.show_progress(message, percent)
 
     def open_upload(self):
-        """托盘和资源库共用入口；模型选择窗口复用已有后台任务和退出协调。"""
+        """上传入口复用已有后台任务和退出协调，忙碌时定位到可见的操作状态。"""
         if self.shutting_down or self.worker is not None and self.worker.isRunning():
             self.status.setText("请先等待当前操作完成，或点击取消操作。")
+            if self.embedded and not self.shutting_down:
+                self.owner.panel.open_section("resources")
+            return
+        if self.embedded:
+            self.open_embedded_upload()
             return
         if self.upload_dialog and self.upload_dialog.isVisible():
             self.upload_dialog.raise_()
@@ -203,6 +220,25 @@ class PlatformDialog(QDialog):
         self.upload_dialog = ModelUploadDialog(self)
         self.upload_dialog.open()
         self.upload_dialog.connect_account()
+
+    def open_embedded_upload(self):
+        """复用同站点表单及入库回执，导航到控制中心的上传分区。"""
+        from .platform_upload_dialog import ModelUploadDialog
+
+        dialog = self.upload_dialog
+        requested_url = self.url.text().strip().rstrip("/")
+        if dialog and dialog.client and dialog.client.base_url != requested_url:
+            # 不将旧站点的账号、表单回执带到另一站点。
+            dialog.deleteLater()
+            self.upload_dialog = dialog = None
+        if dialog is None:
+            self.upload_dialog = dialog = ModelUploadDialog(self, embedded=True)
+            self.owner.panel.mount_section("upload", dialog)
+            self.owner.panel.open_section("upload")
+            dialog.connect_account()
+        else:
+            self.owner.panel.open_section("upload")
+        LOG.info("展开控制中心上传分区")
 
     def task_finished(self):
         self.set_busy(self.pending_settings is not None or self.shutting_down)
@@ -393,6 +429,20 @@ class PlatformDialog(QDialog):
         # 隐藏窗口不销毁后台工作；退出应用时由协调层取消并等待线程。
         self.hide()
         event.ignore()
+
+    def accept(self):
+        if not self.embedded:
+            super().accept()
+
+    def reject(self):
+        if not self.embedded:
+            super().reject()
+
+    def keyPressEvent(self, event):
+        if self.embedded and event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)
 
     def shutdown(self):
         self.shutting_down = True

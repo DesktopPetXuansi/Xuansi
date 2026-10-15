@@ -65,9 +65,9 @@ class ModelPage(QWidget):
         form.addRow(hint)
         self.hotkey = QKeySequenceEdit(QKeySequence(settings.chat_hotkey))
         self.hotkey.setMaximumSequenceLength(1)
-        form.addRow("右下角对话快捷键", self.hotkey)
+        form.addRow("控制中心快捷键", self.hotkey)
         hint = QLabel(
-            "点选后按下新组合，至少两个修饰键。再次按热键或 Esc 隐藏。\n其他软件发声时只显示文字；安静后不补播旧回复。"
+            "点选后按下新组合，至少两个修饰键。再次按快捷键或 Esc 收起控制中心。\n收起时保存未保存的配置；安静后不补播声音回避期间的旧回复。"
         )
         hint.setWordWrap(True)
         hint.setObjectName("hint")

@@ -38,8 +38,12 @@ def main():
         try:
             pet.open_panel()
             QTest.qWait(350)
-            for index, name in enumerate(("chat", "persona", "memory", "preferences")):
-                pet.panel.tabs.setCurrentIndex(index)
+            for name in (
+                "chat", "persona", "memory", "preferences", "model", "appearance",
+                "resources", "upload", "logs",
+            ):
+                pet.panel.open_section(name)
+                assert pet.panel.sections[name].expanded
                 QTest.qWait(100)
                 pet.panel.grab().save(str(output / f"panel-{name}.png"))
             pet.panel.hide()

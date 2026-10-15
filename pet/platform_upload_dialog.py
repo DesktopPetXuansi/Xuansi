@@ -28,15 +28,18 @@ LOG = logging.getLogger(__name__)
 
 
 class ModelUploadDialog(QDialog):
-    def __init__(self, platform):
+    def __init__(self, platform, *, embedded=False):
         super().__init__(platform)
+        self.embedded = embedded
+        if embedded:
+            self.setParent(platform, Qt.WindowType.Widget)
         self.platform = platform
         self.client = None
         self.connected = False
         self.busy = False
         self.resource_id = None
         self.setWindowTitle("上传 Live2D 模型 · 玄司")
-        self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setWindowModality(Qt.WindowModality.NonModal if embedded else Qt.WindowModality.WindowModal)
         self.resize(600, 460)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("选择本地模型，客户端会自动整理运行文件并上传。"))
@@ -89,6 +92,10 @@ class ModelUploadDialog(QDialog):
         for button in (self.submit_button, self.connect_button, self.view_button, self.cancel_button):
             actions.addWidget(button)
         layout.addLayout(actions)
+        if embedded:
+            for button in self.findChildren(QPushButton):
+                button.setAutoDefault(False)
+                button.setDefault(False)
         self.set_busy(False)
 
     def set_busy(self, busy):
@@ -104,7 +111,7 @@ class ModelUploadDialog(QDialog):
             self.view_button.show()
         self.submit_button.setEnabled(not busy and self.connected)
         self.submit_button.setText("完成加入资源库" if pending else "上传模型")
-        self.cancel_button.setText("取消操作" if busy else "关闭")
+        self.cancel_button.setText("取消操作" if busy else "收起" if self.embedded else "关闭")
 
     def connect_account(self):
         requested_url = self.platform.url.text().strip()
@@ -148,6 +155,16 @@ class ModelUploadDialog(QDialog):
     def submit(self):
         if not self.client or not self.source.text():
             self.status.setText("请先连接官网并选择本地模型。")
+            return
+        try:
+            requested_url = website_url(self.platform.url.text().strip())
+        except ValueError as exc:
+            self.status.setText(str(exc))
+            return
+        if requested_url != self.client.base_url:
+            # 同页可直接回到旧表单；提交时再次核对站点，原入库回执保留到切回原站点。
+            self.status.setText("官网地址已更改，请先点击“连接官网”再上传；原站点的未完成记录已保留。")
+            LOG.info("上传前官网地址已变更，等待重新连接")
             return
         metadata = {"name": self.name.text().strip(), "author": self.author.text().strip(),
                     "version": self.version.text().strip(), "license": self.license.text().strip()}
@@ -196,9 +213,32 @@ class ModelUploadDialog(QDialog):
             self.platform.cancel()
             self.status.setText("正在取消操作并清理上传…")
         else:
-            self.close()
+            if self.embedded:
+                self.platform.owner.panel.collapse_section("upload")
+                LOG.info("收起控制中心上传分区，保留上传表单与回执")
+            else:
+                self.close()
 
     def closeEvent(self, event):
+        if self.embedded:
+            self.cancel_or_close()
+            event.ignore()
+            return
         if self.busy:
             self.platform.cancel()
         super().closeEvent(event)
+
+    def accept(self):
+        if not self.embedded:
+            super().accept()
+
+    def reject(self):
+        if not self.embedded:
+            super().reject()
+
+    def keyPressEvent(self, event):
+        # 嵌入表单不采用 QDialog 的默认 Enter 提交与 Esc 关闭语义。
+        if self.embedded and event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)

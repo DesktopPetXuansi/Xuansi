@@ -1,6 +1,10 @@
 # Wiki Index
 
-> 3 pages | Last updated: 2026-10-15T07:23:52.755Z
+> 4 pages | Last updated: 2026-10-15T08:46:13.149Z
+
+## architecture
+
+- [控制中心单页与生命周期约定](控制中心单页与生命周期约定.md) — # 控制中心单页与生命周期约定
 
 ## convention
 

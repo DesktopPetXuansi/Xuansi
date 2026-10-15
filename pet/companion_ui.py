@@ -1,4 +1,4 @@
-"""托盘、热键和快捷窗口协调；设置保存与热键切换作为一次事务完成。"""
+"""托盘和热键统一唤起控制中心；设置与形象继续经原事务保存。"""
 
 import logging
 from dataclasses import replace
@@ -9,9 +9,7 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 from .appearance_dialog import AppearanceDialog
 from .config import ROOT
 from .hotkey import GlobalHotkey
-from .panel import STYLE
 from .platform_dialog import PlatformDialog
-from .quick_chat import QuickChat
 
 LOG = logging.getLogger(__name__)
 
@@ -23,15 +21,7 @@ class CompanionUI:
         self.appearance_only = False
         self.hotkey_staged = False
         self.closed = False
-        self.quick = QuickChat(owner.settings, STYLE)
-        self.quick.send_requested.connect(owner.send)
-        self.quick.voice_requested.connect(owner.voice)
-        self.quick.stop_requested.connect(owner.stop_reply)
-        self.quick.speech_requested.connect(owner.runtime.set_speech_enabled)
-        owner.panel.message_added.connect(self.quick.append)
-        owner.panel.with_screen.toggled.connect(self.quick.with_screen.setChecked)
-        self.quick.with_screen.toggled.connect(owner.panel.with_screen.setChecked)
-        self.hotkey = GlobalHotkey(owner.application, self.quick.toggle)
+        self.hotkey = GlobalHotkey(owner.application, owner.panel.toggle)
         try:
             self.hotkey.stage(owner.settings.chat_hotkey)
             self.hotkey.commit()
@@ -41,10 +31,13 @@ class CompanionUI:
         owner.panel.audio_avoidance_action.triggered.connect(self.toggle_avoidance)
         owner.runtime.settings_saved.connect(self.saved)
         owner.runtime.speech_changed.connect(self.refresh)
-        self.appearance = AppearanceDialog(owner.panel)
+        self.appearance = AppearanceDialog(owner.panel, embedded=True)
         self.appearance.apply_requested.connect(self.save_appearance)
-        owner.panel.appearance_requested.connect(self.open_appearance)
-        self.platform = PlatformDialog(owner)
+        owner.panel.mount_section("appearance", self.appearance,
+                                  on_open=lambda: self.appearance.present(owner.settings.avatar_image))
+        self.platform = PlatformDialog(owner, embedded=True)
+        owner.panel.mount_section("resources", self.platform, on_open=self.resources_opened)
+        owner.panel.upload_requested.connect(self.platform.open_upload)
         # 先显示角色创建 GL 上下文，再异步恢复本机已安装模型。
         from PySide6.QtCore import QTimer
 
@@ -59,7 +52,12 @@ class CompanionUI:
         self.save(replace(self.owner.settings, audio_avoidance=enabled), avoidance_only=True)
 
     def open_appearance(self):
-        self.appearance.present(self.owner.settings.avatar_image)
+        self.owner.panel.open_section("appearance")
+
+    def resources_opened(self):
+        # 展开和重新显示只刷新空闲资源列表，不抢占上传或正在保存的模型选择。
+        if self.platform.worker is None and self.platform.pending_settings is None and not self.platform.shutting_down:
+            self.platform.refresh_local()
 
     def save_appearance(self, identifier):
         if self.saving:
@@ -87,19 +85,8 @@ class CompanionUI:
         tray = QSystemTrayIcon(QIcon(str(ROOT / "assets/xuansi/icon.png")), pet)
         tray.setToolTip(f"{pet.settings.name} · 本地桌宠")
         menu = QMenu()
-        # 同一 QAction 同时加入两个菜单，勾选和禁用状态自然保持一致。
-        menu.addAction(pet.panel.audio_avoidance_action)
-        menu.addSeparator()
         for text, slot in [
-            ("快捷对话", self.quick.toggle),
-            ("打开对话与设置", pet.open_panel),
-            ("配置：模型参数与快捷键", pet.panel.open_configuration),
-            ("日志：运行日志", pet.panel.open_logs),
-            ("形象：更换桌宠形象", self.open_appearance),
-            ("官网：资源库与模型管理", self.platform.present),
-            ("官网：上传本地模型", self.platform.open_upload),
-            ("开启/关闭连续对话", pet.toggle_voice),
-            ("看一眼屏幕", pet.look),
+            ("打开控制中心", pet.open_panel),
             ("休眠/唤醒", pet.toggle_sleep),
             ("退出", pet.quit),
         ]:
@@ -124,7 +111,6 @@ class CompanionUI:
                 self.hotkey.stage(settings.chat_hotkey)
         except ValueError as exc:
             self.owner.panel.form.complete(str(exc))
-            self.quick.status.setText(str(exc))
             return
         self.saving = True
         self.appearance_only = appearance_only
@@ -132,7 +118,6 @@ class CompanionUI:
         self.owner.panel.saving(True)
         self.owner.panel.audio_avoidance_action.setEnabled(False)
         self.owner.panel.status.setText("正在保存配置…")
-        self.quick.status.setText("正在保存配置…")
         platform_changes = ({"platform_model_version": settings.platform_model_version,
                              "platform_expression_version": settings.platform_expression_version,
                              "avatar_image": settings.avatar_image}
@@ -151,12 +136,9 @@ class CompanionUI:
                 self.hotkey.rollback()
             else:
                 self.hotkey.commit()
-        if not error:
-            self.quick.setWindowTitle(f"{settings.name} · 快捷对话")
         # 保留本次保存的用途，不能仅凭字段差异判断；相同图片仍需重新加载。
         self.owner.apply_settings(settings, error, appearance_only=self.appearance_only)
         self.owner.panel.form.complete(error)
-        self.quick.status.setText(self.owner.panel.status.text())
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
             self.appearance.saved(error)
@@ -169,20 +151,18 @@ class CompanionUI:
         if self.hotkey.active is None:
             status += " · 热键不可用，请到配置更改"
         self.owner.panel.audio_status.setText(status)
-        self.quick.audio_status.setText(status)
-        for window in (self.owner.panel, self.quick):
-            window.speech_button.blockSignals(True)
-            window.speech_button.setChecked(enabled)
-            window.speech_button.setText("朗读开启" if enabled else "朗读关闭")
-            window.speech_button.blockSignals(False)
-            window.stop_button.setEnabled(self.owner.busy)
+        panel = self.owner.panel
+        panel.speech_button.blockSignals(True)
+        panel.speech_button.setChecked(enabled)
+        panel.speech_button.setText("朗读开启" if enabled else "朗读关闭")
+        panel.speech_button.blockSignals(False)
+        panel.stop_button.setEnabled(self.owner.busy)
 
     def close(self):
         self.closed = True
         self.hotkey.close()
-        self.quick.hide()
         self.owner.panel.logs.hide()
         self.appearance.close()
         self.platform.shutdown()
         self.tray.hide()
-        LOG.info("快捷窗口关闭，热键已注销")
+        LOG.info("控制中心退出，热键已注销")
