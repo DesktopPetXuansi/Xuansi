@@ -22,16 +22,26 @@ def fixture_pet(monkeypatch):
     )
     panel = SimpleNamespace(
         grab=lambda: image,
-        sections={key: SimpleNamespace(expanded=False) for key in ("chat", "appearance")},
+        sections={key: SimpleNamespace(active=False) for key in ("chat", "appearance")},
+        navigation=SimpleNamespace(current_key=None),
+        captured=[],
         opened=[],
     )
 
     def open_section(key):
-        # 模拟同页展开，不再为截图创建第二个控制窗口。
-        panel.sections[key].expanded = True
+        # 标签切换只激活当前页，各页和唯一控制窗口都持续复用。
+        for name, page in panel.sections.items():
+            page.active = name == key
+        panel.navigation.current_key = key
         panel.opened.append(key)
 
     panel.open_section = open_section
+
+    def grab():
+        panel.captured.append(panel.navigation.current_key)
+        return image
+
+    panel.grab = grab
     pet = SimpleNamespace(
         avatar=desktop, panel=panel,
         ui=SimpleNamespace(appearance=SimpleNamespace(
@@ -49,7 +59,8 @@ def test_valid_window_captures_record_rendering_checks(monkeypatch, tmp_path):
     verification.verify_window_captures(pet, tmp_path / "business-report.json", report)
 
     assert pet.panel.opened == ["chat", "appearance"]
-    assert all(section.expanded for section in pet.panel.sections.values())
+    assert pet.panel.captured == ["chat", "appearance"]
+    assert pet.panel.sections["appearance"].active and not pet.panel.sections["chat"].active
     assert report["window_captures_saved"]
     assert report["capture_keeps_both_live2d_models"]
     assert report["capture_contexts_share_resources"]

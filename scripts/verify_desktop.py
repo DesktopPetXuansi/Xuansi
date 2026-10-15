@@ -43,7 +43,7 @@ def main():
                 "resources", "upload", "logs",
             ):
                 pet.panel.open_section(name)
-                assert pet.panel.sections[name].expanded
+                assert pet.panel.sections[name].active
                 QTest.qWait(100)
                 pet.panel.grab().save(str(output / f"panel-{name}.png"))
             pet.panel.hide()

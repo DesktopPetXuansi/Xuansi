@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from pet.appearance_dialog import AppearanceDialog
 from pet.config import Settings
+from pet.panel import Panel as ControlPanel
 from pet.platform_dialog import PlatformDialog
 
 
@@ -233,5 +234,76 @@ def test_upload_entry_shows_busy_status_in_resource_section():
     assert platform.upload_dialog is None
     platform.worker = None
     panel.close()
+    panel.deleteLater()
+    application.processEvents()
+
+
+def test_real_tab_stack_stops_preview_but_preserves_background_upload(monkeypatch, tmp_path):
+    application = QApplication.instance() or QApplication([])
+    monkeypatch.setattr("pet.appearance_dialog.AppearancePreview", Preview)
+    panel = ControlPanel(Settings())
+    panel.logs.path = tmp_path / "control.log"
+    owner = SimpleNamespace(panel=panel, settings=Settings(), runtime=Runtime())
+    appearance = AppearanceDialog(panel, embedded=True)
+    platform = PlatformDialog(owner, embedded=True)
+    panel.mount_section("appearance", appearance, on_open=lambda: appearance.present(""))
+    panel.mount_section("resources", platform)
+    monkeypatch.setattr(platform, "start", lambda *_: None)
+    panel.open_section("appearance")
+    assert appearance.isVisible() and appearance.preview.images == [""]
+    previous_generation = appearance.generation
+    panel.open_section("chat")
+    assert not appearance.isVisible() and appearance.preview.stopped >= 1
+    appearance.imported(previous_generation, SimpleNamespace(), "")
+    assert appearance.candidate == ""
+    panel.open_section("appearance")
+    assert appearance.preview.images == ["", ""]
+
+    platform.open_upload()
+    upload = platform.upload_dialog
+    receipt = {"resourceId": "retained"}
+    upload.client = SimpleNamespace(base_url=platform.url.text(), pending_model_upload=receipt)
+    cancelled = []
+    platform.worker = SimpleNamespace(isRunning=lambda: True, cancel=lambda: cancelled.append(True))
+    upload.set_busy(True)
+    panel.open_section("chat")
+    assert not upload.isVisible() and not cancelled
+    panel.open_section("upload")
+    assert platform.upload_dialog is upload and upload.client.pending_model_upload is receipt
+    upload.cancel_button.click()
+    assert cancelled == [True]
+    assert all(widget.window() is panel for widget in (appearance, platform, upload))
+    platform.worker = None
+    panel.hide()
+    panel.deleteLater()
+    application.processEvents()
+
+
+@pytest.mark.parametrize("applied_changed", [False, True])
+def test_embedded_tab_retains_image_draft_until_applied_avatar_changes(monkeypatch, tmp_path, applied_changed):
+    application = QApplication.instance() or QApplication([])
+    monkeypatch.setattr("pet.appearance_dialog.AppearancePreview", Preview)
+    candidate_path = tmp_path / "candidate.png"
+    candidate_path.write_bytes(b"preview-fixture")
+    monkeypatch.setattr("pet.appearance_dialog.image_path", lambda _: candidate_path)
+    panel = ControlPanel(Settings())
+    panel.logs.path = tmp_path / "control.log"
+    current = [""]
+    appearance = AppearanceDialog(panel, embedded=True)
+    panel.mount_section("appearance", appearance, on_open=lambda: appearance.present(current[0]))
+    panel.open_section("appearance")
+    draft = "f" * 64 + ".png"
+    appearance.imported(appearance.generation, SimpleNamespace(
+        identifier=draft, frames=1, transparent=True, width=224, height=224), "")
+    assert appearance.candidate == draft and appearance.dirty
+    panel.open_section("chat")
+    if applied_changed:
+        current[0] = "e" * 64 + ".png"
+    panel.open_section("appearance")
+    assert appearance.candidate == (current[0] if applied_changed else draft)
+    assert appearance.dirty is not applied_changed
+    assert appearance.apply_button.isEnabled() is not applied_changed
+    assert appearance.preview.images[-1] == appearance.candidate
+    panel.hide()
     panel.deleteLater()
     application.processEvents()

@@ -53,7 +53,7 @@ def main():
 
     def inspect():
         try:
-            report["single_page_sections"] = set(pet.panel.sections) == {
+            report["control_tabs"] = set(pet.panel.sections) == {
                 "chat", "persona", "memory", "preferences", "model", "appearance",
                 "resources", "upload", "logs",
             }
@@ -62,7 +62,7 @@ def main():
             ] == ["打开控制中心", "休眠/唤醒", "退出"]
             pet.panel.open_configuration()
             report["configuration_stays_in_control_center"] = (
-                pet.panel.sections["model"].expanded
+                pet.panel.sections["model"].active
                 and pet.panel.model_page.window() is pet.panel
             )
             pet.panel.model_page.temperature.setValue(0.4)
@@ -97,7 +97,7 @@ def main():
             report["native_hotkey_opens_control_center"] = wait_until(pet.panel.isVisible)
             panel = pet.panel
             report["focus_received"] = panel.input.hasFocus()
-            report["chat_section_expanded"] = panel.sections["chat"].expanded
+            report["chat_tab_selected"] = panel.sections["chat"].active
             report["one_control_window"] = all(
                 widget.window() is panel
                 for widget in (panel.chat, pet.ui.appearance, pet.ui.platform, panel.logs)

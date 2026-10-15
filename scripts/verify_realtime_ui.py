@@ -32,8 +32,8 @@ def main():
         panel.show()
         panel.open_section("preferences")
         QTest.qWait(100)
-        report["same_page_voice_preferences"] = (
-            panel.sections["preferences"].expanded and panel.preferences.window() is panel
+        report["voice_preferences_in_same_window"] = (
+            panel.sections["preferences"].active and panel.preferences.window() is panel
         )
         report["default_enabled"] = panel.preferences.realtime.isChecked()
         DesktopPet.on_voice_update(host, 1, VoiceUpdate(0, "请你听我说完<b>文字</b>"))

@@ -91,7 +91,7 @@ class AppearanceDialog(QDialog):
         layout.addWidget(hint)
         row = QHBoxLayout()
         row.addStretch()
-        close = QPushButton("关闭")
+        close = QPushButton("返回对话" if embedded else "关闭")
         close.clicked.connect(self.close)
         row.addWidget(close)
         self.apply_button = QPushButton("应用形象")
@@ -113,17 +113,23 @@ class AppearanceDialog(QDialog):
 
     def present(self, identifier):
         if (self.needs_prepare or not self.isVisible()) and not self.saving:
+            # 标签切换只暂停预览；已应用形象未变时，继续展示未应用的候选。
+            preserve_draft = self.embedded and self.dirty and self.current == identifier
             self.needs_prepare = False
             self.generation += 1
             self.loading = False
-            self.dirty = False
-            self.current = self.candidate = identifier
-            self.preview.set_image(identifier)
-            if identifier and not image_path(identifier).is_file():
+            if not preserve_draft:
+                self.dirty = False
+                self.current = self.candidate = identifier
+            self.preview.set_image(self.candidate)
+            if self.candidate and not image_path(self.candidate).is_file():
                 self.status.setText("形象副本已丢失，暂时显示玄司；可重新选择或恢复默认")
+            elif preserve_draft:
+                self.status.setText("未应用的形象预览已保留，确认后点击“应用形象”。")
             else:
                 self.status.setText("当前：自定义形象" if identifier else "当前：默认玄司")
             self.update_buttons()
+            LOG.info("形象预览已准备 preserved_draft=%s", preserve_draft)
         if not self.embedded:
             self.show()
             self.raise_()

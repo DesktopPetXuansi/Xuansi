@@ -111,7 +111,7 @@ class ModelUploadDialog(QDialog):
             self.view_button.show()
         self.submit_button.setEnabled(not busy and self.connected)
         self.submit_button.setText("完成加入资源库" if pending else "上传模型")
-        self.cancel_button.setText("取消操作" if busy else "收起" if self.embedded else "关闭")
+        self.cancel_button.setText("取消操作" if busy else "返回对话" if self.embedded else "关闭")
 
     def connect_account(self):
         requested_url = self.platform.url.text().strip()
@@ -215,7 +215,7 @@ class ModelUploadDialog(QDialog):
         else:
             if self.embedded:
                 self.platform.owner.panel.collapse_section("upload")
-                LOG.info("收起控制中心上传分区，保留上传表单与回执")
+                LOG.info("从上传标签返回对话，保留上传表单与回执")
             else:
                 self.close()
 

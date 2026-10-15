@@ -152,7 +152,9 @@ def verify_window_captures(pet, target, report):
         pet.panel.open_section(name)
         QTest.qWait(50)
         window = pet.panel
-        assert pet.panel.sections[name].expanded
+        assert pet.panel.sections[name].active
+        assert sum(page.active for page in pet.panel.sections.values()) == 1
+        assert pet.panel.navigation.current_key == name
         assert pet.ui.appearance.window() is pet.panel
         pixels = window.grab()
         assert not pixels.isNull(), f"{name} 窗口截图为空"

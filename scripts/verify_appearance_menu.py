@@ -137,7 +137,7 @@ def main():
                 dialog = pet.ui.appearance
                 report["appearance_is_same_page"] = (
                     dialog.isVisible() and dialog.window() is pet.panel
-                    and pet.panel.sections["appearance"].expanded
+                    and pet.panel.sections["appearance"].active
                 )
                 dialog.picker.setOption(QFileDialog.Option.DontUseNativeDialog, True)
                 dialog.choose.click()

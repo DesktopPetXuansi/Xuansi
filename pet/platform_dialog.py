@@ -148,7 +148,7 @@ class PlatformDialog(QDialog):
     def present(self):
         if self.embedded:
             self.owner.panel.open_section("resources")
-            # 分区展开回调负责刷新，避免与宿主重复启动同一任务。
+            # 标签切换回调负责刷新，避免与宿主重复启动同一任务。
             return
         else:
             self.show()
@@ -222,7 +222,7 @@ class PlatformDialog(QDialog):
         self.upload_dialog.connect_account()
 
     def open_embedded_upload(self):
-        """复用同站点表单及入库回执，导航到控制中心的上传分区。"""
+        """复用同站点表单及入库回执，切换到控制中心的上传标签。"""
         from .platform_upload_dialog import ModelUploadDialog
 
         dialog = self.upload_dialog
@@ -238,7 +238,7 @@ class PlatformDialog(QDialog):
             dialog.connect_account()
         else:
             self.owner.panel.open_section("upload")
-        LOG.info("展开控制中心上传分区")
+        LOG.info("切换控制中心上传标签")
 
     def task_finished(self):
         self.set_busy(self.pending_settings is not None or self.shutting_down)

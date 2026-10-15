@@ -55,7 +55,7 @@ class CompanionUI:
         self.owner.panel.open_section("appearance")
 
     def resources_opened(self):
-        # 展开和重新显示只刷新空闲资源列表，不抢占上传或正在保存的模型选择。
+        # 切换标签与重新显示只刷新空闲资源列表，不抢占上传或正在保存的模型选择。
         if self.platform.worker is None and self.platform.pending_settings is None and not self.platform.shutting_down:
             self.platform.refresh_local()
 

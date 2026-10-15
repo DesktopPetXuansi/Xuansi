@@ -1,4 +1,4 @@
-"""原生单页验收：临时配置、内存账号替身，只采集本程序窗口，不启麦或联网。"""
+"""原生标签控制中心验收：临时配置、内存账号替身，只采集本程序窗口，不启麦或联网。"""
 
 import asyncio
 import json
@@ -11,9 +11,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTabBar
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pet.appearance_dialog import AppearanceDialog
@@ -85,21 +85,38 @@ def inspect(application, temporary, output):
         panel.input.setText("同一个控制中心")
         QTest.keyClick(panel.input, Qt.Key.Key_Return)
         report["chat_sends_once"] = messages == [("同一个控制中心", False)]
-        panel.append("玄司", "设置、形象、官网资源和日志都在这个页面。")
+        panel.append("玄司", "对话、设置、形象和资源集中在这个控制中心。")
+        bar = panel.navigation.bar
+        keys = tuple(panel.sections)
+        report["horizontal_chrome_style_tabs"] = (
+            isinstance(bar, QTabBar) and bar.count() == 9 and not bar.tabsClosable()
+            and bar.shape() in (QTabBar.Shape.RoundedNorth, QTabBar.Shape.TriangularNorth)
+            and len({bar.tabRect(index).center().y() for index in range(bar.count())}) == 1
+        )
+        panel.persona.name.setText("跨标签保留草稿")
+        for key in ("persona", "preferences", "model", "chat"):
+            bar.setCurrentIndex(keys.index(key))
+            QTest.qWait(20)
+            assert panel.navigation.current_key == key
+            assert panel.navigation.stack.currentWidget() is panel.sections[key]
+            assert sum(page.active for page in panel.sections.values()) == 1
+        report["tab_switch_preserves_draft"] = panel.persona.name.text() == "跨标签保留草稿"
+        report["one_current_page"] = panel.sections["chat"].active and not panel.sections["persona"].active
         assert panel.grab().save(str(output / "control-center-overview.png"))
         panel.open_configuration()
         panel.model_page.temperature.setValue(0.4)
         panel.save_button.click()
-        report["unified_save"] = load_settings(temporary / "settings.json").temperature == 0.4
+        saved = load_settings(temporary / "settings.json")
+        report["unified_save"] = saved.temperature == 0.4 and saved.name == "跨标签保留草稿"
         panel.open_logs()
         wait_until(lambda: "原生界面验收" in panel.logs.content.toPlainText())
         panel.collapse_section("logs")
-        report["collapsed_logs_stop"] = not panel.logs.timer.isActive()
+        report["leaving_logs_stops_polling"] = not panel.logs.timer.isActive()
         panel.open_section("appearance")
         wait_until(lambda: appearance.preview.renderer._live2d_active)
         report["native_preview_loaded"] = not appearance.preview.renderer._live2d_failed
         panel.collapse_section("appearance")
-        report["collapsed_preview_stops"] = not appearance.preview.renderer._live2d_active
+        report["leaving_appearance_stops_preview"] = not appearance.preview.renderer._live2d_active
         panel.open_section("appearance")
         wait_until(lambda: appearance.preview.renderer._live2d_active)
         report["preview_reopens"] = True
@@ -117,6 +134,8 @@ def inspect(application, temporary, output):
         assert panel.grab().save(str(output / "control-center-upload.png"))
         upload.submit_button.click()
         assert platform.worker is not None
+        panel.open_section("chat")
+        report["tab_switch_keeps_upload_running"] = platform.worker is not None
         panel.hide()
         wait_until(lambda: platform.worker is None)
         report["hidden_upload_completes"] = upload.progress.value() == 100 and bool(upload.resource_id)
@@ -126,8 +145,35 @@ def inspect(application, temporary, output):
         report["single_visible_control_window"] = [w for w in application.topLevelWidgets() if w.isVisible()] == [panel]
         panel.resize(560, 660)
         QTest.qWait(80)
-        report["narrow_window_usable"] = panel.width() == 560 and panel.scroll.horizontalScrollBar().maximum() == 0
+        navigation = panel.navigation
+        report["narrow_window_usable"] = (
+            panel.width() == 560
+            and panel.sections["upload"].horizontalScrollBar().maximum() == 0
+            and navigation.overflow_button.isVisible()
+        )
+        actions = navigation.menu.actions()
+        assert len(actions) == len(keys) == 9
+        visited, menu_visible = [], []
+        for index, key in enumerate(keys):
+            # InstantPopup 的菜单循环由定时器选择，实际验证窄窗列表入口可操作。
+            def choose(index=index):
+                menu_visible.append(navigation.menu.isVisible())
+                actions[index].trigger()
+                navigation.menu.close()
+
+            QTimer.singleShot(30, choose)
+            QTest.mouseClick(navigation.overflow_button, Qt.MouseButton.LeftButton)
+            QTest.qWait(40)
+            assert navigation.current_key == key
+            assert navigation.stack.currentWidget() is panel.sections[key]
+            assert sum(page.active for page in panel.sections.values()) == 1
+            visited.append(key)
+        report["narrow_tab_list_accesses_all_nine"] = visited == list(keys) and all(menu_visible)
+        report["narrow_switch_keeps_draft"] = panel.persona.name.text() == "跨标签保留草稿"
+        panel.open_section("upload")
+        QTest.qWait(50)
         assert panel.grab().save(str(output / "control-center-narrow.png"))
+        panel.open_section("chat")
         panel.input.setFocus()
         QTest.keyClick(panel.input, Qt.Key.Key_Escape)
         report["escape_hides_center"] = not panel.isVisible()

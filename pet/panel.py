@@ -1,23 +1,20 @@
-"""同页控制中心：分区展开、统一保存，只因用户明确操作而显示。"""
+"""统一控制中心：浏览器式标签导航，复用表单并沿用配置保存事务。"""
 
 import logging
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QHBoxLayout,
     QLabel,
-    QLayout,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from .config import Settings
-from .control_section import ControlSection
+from .control_navigation import ControlNavigation
 from .panel_content import common_controls, populate_sections
 from .panel_settings import PanelSettings
 from .panel_style import STYLE
@@ -52,52 +49,43 @@ class Panel(QWidget):
         self.setMinimumSize(520, 480)
         self.setStyleSheet(STYLE)
         self._opening_callbacks = {}
-        self.sections = {}
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.navigation = ControlNavigation(SECTIONS, self)
+        self.sections = self.navigation.pages
+        self.navigation.opening.connect(self._prepare)
+        layout.addWidget(self.navigation.header)
+        toolbar_widget = QWidget()
+        toolbar = QVBoxLayout(toolbar_widget)
+        toolbar.setContentsMargins(20, 12, 20, 8)
+        brand = QHBoxLayout()
         self.title = QLabel(settings.name)
-        self.title.setObjectName("title")
-        layout.addWidget(self.title)
+        self.title.setObjectName("productName")
+        brand.addWidget(self.title)
         self.status = QLabel("已就绪 · 麦克风关闭")
         self.status.setObjectName("status")
         self.status.setWordWrap(True)
-        layout.addWidget(self.status)
-        layout.addLayout(common_controls(self))
+        brand.addWidget(self.status, 1)
+        toolbar.addLayout(brand)
+        toolbar.addLayout(common_controls(self))
         self.live_transcript = QLabel("")
         self.live_transcript.setTextFormat(Qt.TextFormat.PlainText)
         self.live_transcript.setWordWrap(True)
         self.live_transcript.setObjectName("hint")
-        layout.addWidget(self.live_transcript)
+        toolbar.addWidget(self.live_transcript)
         self.audio_status = QLabel("声音回避已开启")
         self.audio_status.setObjectName("hint")
         self.audio_status.setWordWrap(True)
-        layout.addWidget(self.audio_status)
-        navigation = QHBoxLayout()
-        navigation.addWidget(QLabel("定位分区"))
-        self.navigation = QComboBox()
-        for key, title in SECTIONS:
-            self.navigation.addItem(title, key)
-        self.navigation.activated.connect(lambda index: self.open_section(self.navigation.itemData(index)))
-        navigation.addWidget(self.navigation, 1)
-        layout.addLayout(navigation)
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        body = QWidget()
-        content = QVBoxLayout(body)
-        content.setContentsMargins(0, 0, 10, 0)
-        content.setSpacing(10)
-        content.setSizeConstraint(QLayout.SizeConstraint.SetMinAndMaxSize)
-        for key, title in SECTIONS:
-            section = ControlSection(key, title)
-            section.opening.connect(lambda key=key: self._prepare(key))
-            self.sections[key] = section
-            content.addWidget(section)
-        content.addStretch()
-        self.scroll.setWidget(body)
-        layout.addWidget(self.scroll, 1)
+        toolbar.addWidget(self.audio_status)
+        layout.addWidget(toolbar_widget)
+        layout.addWidget(self.navigation.stack, 1)
         populate_sections(self)
         self.form = PanelSettings(self)
-        layout.addWidget(self.form.hint)
+        footer_widget = QWidget()
+        footer = QVBoxLayout(footer_widget)
+        footer.setContentsMargins(20, 8, 20, 12)
+        footer.addWidget(self.form.hint)
         actions = QHBoxLayout()
         self.save_button = QPushButton("保存全部设置")
         self.save_button.setObjectName("primary")
@@ -106,14 +94,14 @@ class Panel(QWidget):
         close = QPushButton("收起控制中心")
         close.clicked.connect(self.close)
         actions.addWidget(close)
-        layout.addLayout(actions)
-        self.footer = QLabel("仅本机处理 · 快捷键和托盘均打开此控制中心")
+        footer.addLayout(actions)
+        self.footer = QLabel("Ctrl+Tab 切换标签 · 快捷键和托盘均打开此控制中心")
         self.footer.setObjectName("hint")
         self.footer.setWordWrap(True)
-        layout.addWidget(self.footer)
+        footer.addWidget(self.footer)
+        layout.addWidget(footer_widget)
         self.escape = QShortcut(QKeySequence("Esc"), self)
         self.escape.activated.connect(self.close)
-        self.sections["chat"].set_expanded(True)
 
     def mount_section(self, key, widget, on_open=None):
         self._opening_callbacks[key] = on_open
@@ -121,21 +109,20 @@ class Panel(QWidget):
 
     def _prepare(self, key):
         callback = self._opening_callbacks.get(key)
-        if callback is not None:
+        if self.isVisible() and callback is not None:
             callback()
 
     def open_section(self, key):
+        self.navigation.select(key)
         self.show()
-        self.sections[key].set_expanded(True)
-        self.navigation.setCurrentIndex(self.navigation.findData(key))
         self.raise_()
         self.activateWindow()
-        # 等布局完成后定位标题；展开多个分区也不会切走或重建原表单。
-        QTimer.singleShot(0, lambda: self.sections[key].scroll_into_view(self.scroll))
-        LOG.info("控制中心定位分区 key=%s", key)
+        LOG.info("打开控制中心标签 key=%s", key)
 
     def collapse_section(self, key):
-        self.sections[key].set_expanded(False)
+        # 内嵌表单的返回/关闭只离开当前标签，退出时不能重新显示主窗口。
+        if self.navigation.current_key == key and key != "chat":
+            self.navigation.select("chat")
 
     def open_configuration(self):
         self.open_section("model")
@@ -188,9 +175,7 @@ class Panel(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        for key, section in self.sections.items():
-            if section.expanded:
-                self._prepare(key)
+        self._prepare(self.navigation.current_key)
 
     def closeEvent(self, event):
         event.ignore()
