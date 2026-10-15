@@ -11,9 +11,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTabBar
+from PySide6.QtWidgets import QApplication, QTabBar, QToolButton
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pet.appearance_dialog import AppearanceDialog
@@ -149,26 +149,22 @@ def inspect(application, temporary, output):
         report["narrow_window_usable"] = (
             panel.width() == 560
             and panel.sections["upload"].horizontalScrollBar().maximum() == 0
-            and navigation.overflow_button.isVisible()
         )
-        actions = navigation.menu.actions()
-        assert len(actions) == len(keys) == 9
-        visited, menu_visible = [], []
-        for index, key in enumerate(keys):
-            # InstantPopup 的菜单循环由定时器选择，实际验证窄窗列表入口可操作。
-            def choose(index=index):
-                menu_visible.append(navigation.menu.isVisible())
-                actions[index].trigger()
-                navigation.menu.close()
-
-            QTimer.singleShot(30, choose)
-            QTest.mouseClick(navigation.overflow_button, Qt.MouseButton.LeftButton)
+        report["no_corner_dropdown"] = not any(
+            button.arrowType() == Qt.ArrowType.DownArrow
+            for button in navigation.header.findChildren(QToolButton)
+        )
+        panel.open_section("chat")
+        navigation.bar.setFocus()
+        visited = []
+        for key in keys:
             QTest.qWait(40)
             assert navigation.current_key == key
             assert navigation.stack.currentWidget() is panel.sections[key]
             assert sum(page.active for page in panel.sections.values()) == 1
             visited.append(key)
-        report["narrow_tab_list_accesses_all_nine"] = visited == list(keys) and all(menu_visible)
+            QTest.keyClick(navigation.bar, Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
+        report["narrow_keyboard_accesses_all_nine"] = visited == list(keys)
         report["narrow_switch_keeps_draft"] = panel.persona.name.text() == "跨标签保留草稿"
         panel.open_section("upload")
         QTest.qWait(50)

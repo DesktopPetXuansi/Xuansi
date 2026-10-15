@@ -3,7 +3,7 @@
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QMenuBar, QTabBar
+from PySide6.QtWidgets import QApplication, QLabel, QMenuBar, QTabBar, QToolButton
 
 from pet.config import Settings
 from pet.panel import Panel
@@ -78,17 +78,21 @@ def test_unified_save_and_escape_preserve_the_existing_close_transaction(panel):
     assert not panel.isVisible()
 
 
-def test_clicking_a_tab_and_the_list_menu_use_the_same_navigation(panel):
+def test_header_without_dropdown_keeps_tabs_accessible_in_a_narrow_window(panel):
     bar = panel.navigation.bar
     QTest.mouseClick(bar, Qt.MouseButton.LeftButton, pos=bar.tabRect(1).center())
     assert panel.navigation.current_key == "persona" and panel.persona.isVisible()
-    for action in panel.navigation.menu.actions():
-        action.trigger()
-        assert panel.navigation.current_key == action.data()
-        assert panel.navigation.stack.currentWidget() is panel.sections[action.data()]
-        action.trigger()  # 重复选择当前标签也必须保留唯一的勾选项。
-        assert [item.data() for item in panel.navigation.menu.actions() if item.isChecked()] == [action.data()]
-    assert {action.data() for action in panel.navigation.menu.actions()} == set(panel.sections)
+    panel.resize(560, 660)
+    assert not any(button.arrowType() == Qt.ArrowType.DownArrow
+                   for button in panel.navigation.header.findChildren(QToolButton))
+    panel.open_section("chat")
+    bar.setFocus()
+    visited = []
+    for _ in panel.sections:
+        visited.append(panel.navigation.current_key)
+        QTest.keyClick(bar, Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
+    assert visited == list(panel.sections)
+    assert panel.navigation.current_key == "chat"
 
 
 def test_browser_keyboard_shortcuts_switch_tabs_without_sending_messages(panel):

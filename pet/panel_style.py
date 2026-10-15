@@ -15,10 +15,9 @@ QTabBar#controlTabs::tab { background: #dce8db; color: #526858; border: 0;
 QTabBar#controlTabs::tab:hover { background: #cbdcc8; color: #293d33; }
 QTabBar#controlTabs::tab:selected { background: #f7f8f3; color: #2f543a; font-weight: 600; }
 QTabBar#controlTabs::tab:focus { text-decoration: underline; }
-QToolButton#tabListButton, QTabBar#controlTabs QToolButton {
+QTabBar#controlTabs QToolButton {
     background: #ccddc9; border: 0; border-radius: 8px; padding: 7px; }
-QToolButton#tabListButton:hover, QTabBar#controlTabs QToolButton:hover { background: #bfd3bb; }
-QToolButton#tabListButton::menu-indicator { image: none; }
+QTabBar#controlTabs QToolButton:hover { background: #bfd3bb; }
 QMenu { background: #f7f8f3; border: 1px solid #c7d3c3; padding: 5px; }
 QMenu::item { padding: 7px 18px; border-radius: 4px; }
 QMenu::item:selected { background: #dae6d6; }
