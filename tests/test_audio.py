@@ -23,6 +23,32 @@ def test_formatted_reply_still_has_spoken_content():
     assert spoken == ["你好，我在这里。"]
 
 
+@pytest.mark.parametrize("text", ["😊", "无需回应", "普通文字"])
+def test_empty_tts_result_keeps_input_and_does_not_divide_by_zero(text):
+    spoken = []
+    models = AudioModels()
+
+    def generate(value, sid, speed):
+        spoken.append(value)
+        return SimpleNamespace(samples=np.empty(0), sample_rate=0)
+
+    models.tts = SimpleNamespace(generate=generate)
+    models.tts_engine = "fast"
+    samples, _ = models.synthesize(text, 0, 1.0)
+    assert len(samples) == 0
+    assert spoken == [text]  # 依据真实空波形处理，不能按正文字符过滤。
+
+
+def test_nonempty_tts_result_with_invalid_rate_is_reported():
+    models = AudioModels()
+    models.tts = SimpleNamespace(generate=lambda *_args, **_kwargs: SimpleNamespace(
+        samples=np.zeros(10), sample_rate=0,
+    ))
+    models.tts_engine = "fast"
+    with pytest.raises(RuntimeError, match="采样率"):
+        models.synthesize("你好", 0, 1.0)
+
+
 def test_synthesis_selection_does_not_guess_language_from_text():
     assert select_tts_engine("Hello, how are you?", "fast") == "fast"
     assert select_tts_engine("OpenAI can help.", "fast") == "fast"

@@ -132,6 +132,13 @@ class AudioModels:
                 self.tts_engine = selected_engine
             started = time.monotonic()
             result = self.tts.generate(clean, sid=speaker, speed=speed)
+            # 后端可能为无可发音内容返回空波形及零采样率；交给播放层跳过，保留其余分段。
+            # 依据真实音频结果处理，不根据聊天正文或符号猜测是否应该合成。
+            if not len(result.samples):
+                LOG.info("合成返回空波形 elapsed=%.2fs", time.monotonic() - started)
+                return np.empty(0, dtype=np.float32), result.sample_rate
+            if result.sample_rate <= 0:
+                raise RuntimeError("语音模型返回了无效采样率。")
             LOG.info(
                 "合成完成 audio=%.2fs elapsed=%.2fs",
                 len(result.samples) / result.sample_rate,
