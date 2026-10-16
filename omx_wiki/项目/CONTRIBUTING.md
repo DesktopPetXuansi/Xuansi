@@ -50,7 +50,7 @@ Qt 窗口操作留在主线程，HTTP/子进程优先异步，耗时计算和保
 
 真实模型检查占 GPU 和内存，原生窗口检查需要可用 Windows 桌面。不同脚本的数据隔离程度不同，不能笼统承诺所有验收工具都无副作用；普通单元测试不会替代真实声音听感、多屏混合 DPI 或日常流畅度评估。
 
-2026-10-16 候选 full 首轮报告 `data/verification/native-tools-full-first.json` 为 119 项、30 项失败；`native-tools-full-prompt2.json` 为 119 项、21 项失败；来源分离后的 `native-tools-full-source3.json` 为 119 项、18 项失败；严格提示定向复验 `strict-targeted4.json` 为 15 项、4 项失败，均为 `passed=false`。来源分离后 54 次负例仍有两次错误动作模拟受理；定向报告的 `negative_cases.runs=0` 不包含 `praise/` 命名案例，不能据此宣称零误执行。主代理最新完整 pytest 为 483 passed、2 skipped，同样不替代语义验收。分类、测量和剩余问题见[候选验收记录](../对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。报告位于本机忽略目录，继续复验另存名称，不能删改失败预期换取通过。
+2026-10-16 候选 full 首轮报告 `data/verification/native-tools-full-first.json` 为 119 项、30 项失败；`native-tools-full-prompt2.json` 为 119 项、21 项失败；来源分离后的 `native-tools-full-source3.json` 为 119 项、18 项失败；严格提示定向复验 `strict-targeted4.json` 为 15 项、4 项失败，均为 `passed=false`。来源分离后 54 次负例仍有两次错误动作模拟受理；定向报告的 `negative_cases.runs=0` 不包含 `praise/` 命名案例，不能据此宣称零误执行。主代理最新完整 pytest 为 500 passed、2 skipped，同样不替代语义验收。分类、测量和剩余问题见[候选验收记录](../对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。报告位于本机忽略目录，继续复验另存名称，不能删改失败预期换取通过。
 
 三个历史迁移入口默认输出 `*-native-tools-report.json`，不覆盖旧日期报告。新 full/speech 报告不包含历史短句识别、轻声 ASR、旧失败 NPZ 重放或实际 Kokoro/Melo 波形合成，不能据此宣称旧语音专项重新通过；实际音频和听感需要单独验收。
 
