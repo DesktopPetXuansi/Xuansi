@@ -9,6 +9,7 @@ import statistics
 import sys
 import tempfile
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -68,6 +69,10 @@ def benchmark(arguments, report):
             runtime.failed.connect(lambda epoch, text: active["errors"].append(text) if active is not None else None,
                                    Qt.ConnectionType.DirectConnection)
             settings = Settings(observe=False, speak_replies=True, temperature=0.7, gpu_layers=99)
+            if arguments.model_path:
+                settings = replace(settings, model_path=str(arguments.model_path.resolve()))
+            if arguments.projector_path:
+                settings = replace(settings, projector_path=str(arguments.projector_path.resolve()))
             report["settings"] = {"temperature": settings.temperature, "gpu_layers": settings.gpu_layers,
                                   "tts_engine": settings.tts_engine, "max_tokens": settings.max_tokens}
 
@@ -132,6 +137,8 @@ def main(argv=None):
     parser.add_argument("--label", required=True)
     parser.add_argument("--rounds", type=int, default=10)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--model-path", type=Path, help="仅本次基准使用的实验模型")
+    parser.add_argument("--projector-path", type=Path, help="实验模型匹配的投影文件")
     arguments = parser.parse_args(argv)
     if arguments.rounds < 1:
         parser.error("--rounds必须至少为1")

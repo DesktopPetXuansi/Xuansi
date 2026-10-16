@@ -219,9 +219,14 @@ class Verification:
 
 async def verify(arguments, report):
     settings = replace(Settings(), gpu_layers=arguments.gpu_layers, observe=False)
+    if arguments.model_path:
+        settings = replace(settings, model_path=str(arguments.model_path.resolve()))
+    if arguments.projector_path:
+        settings = replace(settings, projector_path=str(arguments.projector_path.resolve()))
     report["settings"] = {"temperature": settings.temperature, "top_p": settings.top_p,
                           "max_tokens": settings.max_tokens, "context_size": settings.context_size,
-                          "gpu_layers": settings.gpu_layers}
+                          "gpu_layers": settings.gpu_layers, "model_path": settings.model_path,
+                          "projector_path": settings.projector_path}
     engine = LocalEngine()
     with tempfile.TemporaryDirectory(prefix="native-tool-verification-") as folder:
         runner = Verification(engine, settings, report, arguments.output, Path(folder))
@@ -261,6 +266,8 @@ def main(argv=None):
     parser.add_argument("--suite", choices=("smoke", "full", "speech", "holdout"), default="smoke")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gpu-layers", type=int, default=99)
+    parser.add_argument("--model-path", type=Path, help="只覆盖本次验收模型，不修改应用默认设置")
+    parser.add_argument("--projector-path", type=Path, help="与本次实验模型匹配的视觉投影")
     arguments = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
