@@ -1,35 +1,8 @@
-"""解析本机 SSE，只交付可见正文；跨包推理标签保持隐藏。"""
+"""解析原生 SSE 的正文与工具差量，仅完整响应可进入对话执行层。"""
 
 import json
 
-
-class VisibleText:
-    def __init__(self):
-        self.pending = ""
-        self.thinking = False
-
-    def feed(self, text):
-        self.pending += text
-        output = []
-        while self.pending:
-            marker = "</think>" if self.thinking else "<think>"
-            index = self.pending.find(marker)
-            if index >= 0:
-                if not self.thinking:
-                    output.append(self.pending[:index])
-                self.pending = self.pending[index + len(marker) :]
-                self.thinking = not self.thinking
-                continue
-            # 留住可能被下一包补全的标签前缀，正文不等待整句。
-            keep = next(
-                (size for size in range(len(marker) - 1, 0, -1) if self.pending.endswith(marker[:size])), 0
-            )
-            end = len(self.pending) - keep
-            if not self.thinking:
-                output.append(self.pending[:end])
-            self.pending = self.pending[end:]
-            break
-        return "".join(output)
+from .tool_protocol import validate_reply
 
 
 async def sse_events(response):
@@ -38,45 +11,66 @@ async def sse_events(response):
     async for line in response.aiter_lines():
         if not line:
             if parts:
-                yield "\n".join(parts)
+                yield '\n'.join(parts)
                 parts, size = [], 0
-        elif line.startswith("data:"):
-            item = line[5:].removeprefix(" ")
+        elif line.startswith('data:'):
+            item = line[5:].removeprefix(' ')
             size += len(item)
-            if size > 65536:
-                raise RuntimeError("流式响应单条数据过大，请检查本机模型服务。")
+            if size > 1048576:
+                raise RuntimeError('流式响应单条数据过大，请检查本机模型服务。')
             parts.append(item)
     if parts:
-        yield "\n".join(parts)
+        yield '\n'.join(parts)
 
 
-async def read_completion(response, on_chunk):
-    visible = VisibleText()
-    result = ""
-    finished = False
-    async for data in sse_events(response):
-        if data.strip() == "[DONE]":
-            finished = True
-            break
-        try:
+async def read_completion(response):
+    """按 index 拼接函数参数，禁止将传输终止标记当作完整生成。"""
+    texts, calls = [], {}
+    finish_reason = None
+    try:
+        async for data in sse_events(response):
+            if data.strip() == '[DONE]':
+                break
             payload = json.loads(data)
-            if "error" in payload:
-                raise ValueError("server error")
-            choices = payload.get("choices", [])
+            if not isinstance(payload, dict) or 'error' in payload:
+                raise ValueError('服务错误')
+            choices = payload.get('choices', [])
+            if not isinstance(choices, list):
+                raise ValueError('无效候选')
             if not choices:
-                continue  # usage 包没有正文。
+                continue  # usage 包不代表回复结束。
+            if len(choices) != 1 or finish_reason is not None:
+                raise ValueError('结束后的重复数据')
             choice = choices[0]
-            content = choice.get("delta", {}).get("content")
-            if content is not None and not isinstance(content, str):
-                raise ValueError("invalid content")
-            finished = finished or choice.get("finish_reason") is not None
-        except (ValueError, TypeError, AttributeError, KeyError, IndexError) as exc:
-            # 不把服务端错误正文放到界面或日志，可能包含输入或私有路径。
-            raise RuntimeError("本机流式响应无效，请重试或检查模型配置。") from exc
-        text = visible.feed(content or "")[: max(0, 6000 - len(result))]
-        if text:
-            result += text
-            await on_chunk(text)
-    if not finished:
-        raise RuntimeError("流式回复中断，已停止朗读，请重试。")
-    return result.strip()
+            delta = choice.get('delta', {})
+            content = delta.get('content')
+            if content is not None:
+                if not isinstance(content, str):
+                    raise ValueError('无效正文')
+                texts.append(content)
+            fragments = delta.get('tool_calls', [])
+            if not isinstance(fragments, list):
+                raise ValueError('无效工具差量')
+            for fragment in fragments:
+                index = fragment.get('index')
+                if type(index) is not int or index < 0:
+                    raise ValueError('无效工具编号')
+                call = calls.setdefault(index, {'id': '', 'type': 'function',
+                                               'function': {'name': '', 'arguments': ''}})
+                if fragment.get('type', 'function') != 'function':
+                    raise ValueError('无效工具类型')
+                function = fragment.get('function', {})
+                for target, source, field in ((call, fragment, 'id'),
+                                               (call['function'], function, 'name'),
+                                               (call['function'], function, 'arguments')):
+                    value = source.get(field)
+                    if value is not None:
+                        if not isinstance(value, str):
+                            raise ValueError('无效工具字段')
+                        target[field] += value
+            finish_reason = choice.get('finish_reason')
+        if sorted(calls) != list(range(len(calls))):
+            raise ValueError('工具差量编号不连续')
+        return validate_reply(''.join(texts), [calls[index] for index in sorted(calls)], finish_reason)
+    except (ValueError, TypeError, AttributeError, KeyError, IndexError) as exc:
+        raise RuntimeError('本机流式响应无效或中断，请重试。') from exc

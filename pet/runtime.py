@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import threading
+import time
+import uuid
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +22,7 @@ from .live_dialogue import LiveDialogue
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
 from .speech_output import speak
+from .tool_protocol import Message
 
 LOG = logging.getLogger(__name__)
 
@@ -42,7 +45,7 @@ class Runtime(QObject):
     speech_changed = Signal()
     # 用 TTS 播放响度驱动口型；麦克风输入不会触发此信号。
     mouth_level = Signal(float)
-    motion_requested = Signal(int, str)
+    motion_requested = Signal(int, str, str)
 
     def __init__(self):
         super().__init__()
@@ -55,7 +58,8 @@ class Runtime(QObject):
         self.audio = AudioModels()
         self.audio_activity = AudioActivity()
         self.memory = MemoryStore()
-        self.history: list[dict[str, str]] = []
+        self.history: list[Message] = []
+        self.pending_motions: dict[str, tuple[int, str, asyncio.Future[dict[str, str]], float]] = {}
         self.job: asyncio.Task | None = None
         self.loop = asyncio.new_event_loop()
         self.control = asyncio.Lock()
@@ -104,7 +108,7 @@ class Runtime(QObject):
         if not self.should_speak(settings, kind) or self.audio_activity.blocked:
             return
         if selected_engine is None:
-            selected_engine = await self.engine.choose_tts(settings, answer)
+            selected_engine = settings.tts_engine
         if epoch != self.epoch or not self.should_speak(settings, kind) or not observation_current(observation):
             return
         await speak(
@@ -140,6 +144,37 @@ class Runtime(QObject):
         self.motion_actions = actions
         LOG.info("当前 Live2D 可用动作=%s", ",".join(self.motion_actions) or "无")
 
+    async def request_motion(self, epoch, action):
+        """后台等待Qt受理回执；不把已发出信号当作执行成功。"""
+        if epoch != self.epoch or action not in self.motion_actions:
+            return {"status": "rejected"}
+        request_id = uuid.uuid4().hex
+        future = self.loop.create_future()
+        self.pending_motions[request_id] = (epoch, action, future, time.monotonic() + 3)
+        self.motion_requested.emit(epoch, action, request_id)
+        try:
+            return await asyncio.wait_for(future, 3)
+        except TimeoutError:
+            LOG.warning("角色动作回执超时 epoch=%d", epoch)
+            return {"status": "unknown"}
+        finally:
+            self.pending_motions.pop(request_id, None)
+
+    def motion_pending(self, epoch, action, request_id):
+        """Qt 执行前验证唯一请求；超时的排队信号不能产生迟到动作。"""
+        pending = self.pending_motions.get(request_id)
+        return bool(pending and pending[0] == epoch == self.epoch and pending[1] == action
+                    and not pending[2].done() and time.monotonic() < pending[3])
+
+    def resolve_motion(self, request_id, accepted):
+        """界面线程只递交事实，Future统一回到所属事件循环完成。"""
+        def resolve():
+            pending = self.pending_motions.get(request_id)
+            if pending is not None and not pending[2].done():
+                future = pending[2]
+                future.set_result({"status": "accepted" if accepted else "rejected"})
+        self.loop.call_soon_threadsafe(resolve)
+
     def accept_voice(self, mic_epoch, update, settings, position=None):
         return self.schedule(self.live.accept(mic_epoch, update, settings, position))
 
@@ -160,9 +195,7 @@ class Runtime(QObject):
 
     async def _prepare_voice(self, settings):
         # 开麦时预热；预热合成只进内存，不调用播放接口，也不写入对话历史。
-        await self.engine.prepare_controls(
-            settings, speech_enabled=self.should_speak(settings), available_motions=self.motion_actions,
-        )
+        await self.engine.warmup(settings)
         if self.should_speak(settings):
             pending = asyncio.create_task(asyncio.to_thread(
                 self.audio.synthesize, "你好。", settings.speaker, settings.speed, settings.tts_engine

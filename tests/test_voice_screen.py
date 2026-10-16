@@ -1,6 +1,5 @@
 """用合成识别文字核对两条语音路径的截图入口，不读取真实屏幕或声卡。"""
 
-import asyncio
 import threading
 from dataclasses import replace
 from types import SimpleNamespace
@@ -15,6 +14,7 @@ from pet.events import MouseEvent, ObservationGate
 from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
+from pet.tool_protocol import AssistantReply, ToolCall
 
 # 覆盖无固定关键词的视觉指代、含关键词的否定/引用，以及显式附图选择。
 SCREEN_CASES = [
@@ -57,6 +57,12 @@ def realtime_runtime(monkeypatch, tmp_path):
     """运行真实异步调度与对话，不加载模型、声卡或用户记忆。"""
     monkeypatch.setattr("pet.runtime.sd.stop", lambda: None)
     runtime = Runtime()
+
+    async def start(_settings):
+        # 保留真实对话调度，隔离模型进程与 GPU。
+        pass
+
+    monkeypatch.setattr(runtime.engine, "start", start)
     runtime.audio_activity.set_enabled(False)
     runtime.memory = MemoryStore(tmp_path / "memory.json")
     runtime.microphone_epoch = 7
@@ -91,19 +97,21 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
 
     def capture(*args):
         captures.append(args)
-        return "synthetic-screen"
+        return b"synthetic-screen"
 
-    async def chat(_settings, recognized, images, _history, **_kwargs):
-        inputs.append((recognized, images))
-        return "合成测试回复。"
-
-    async def needs_screen(_settings, recognized, _history):
-        assert recognized == text
-        return expected_screen
+    async def complete(_settings, messages, *_args, **_kwargs):
+        user = next(turn for turn in reversed(messages) if turn["role"] == "user")
+        inputs.append((user["content"][0]["text"], any(
+            isinstance(turn.get("content"), list) and any(part["type"] == "image_url" for part in turn["content"])
+            for turn in messages
+        )))
+        if expected_screen and not inputs[-1][1]:
+            return AssistantReply("", (ToolCall("capture", "capture_screen", "{}"),), "tool_calls")
+        return AssistantReply("合成测试回复。")
 
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
-    realtime_runtime.engine.chat = chat
-    realtime_runtime.engine.needs_screen = needs_screen
+    monkeypatch.setattr("pet.model_tools.capture_screen", capture)
+    realtime_runtime.engine.complete = complete
     realtime_runtime.finished.connect(lambda _: completed.set(), Qt.ConnectionType.DirectConnection)
     realtime_runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
     update = VoiceUpdate(1, text, final=True)
@@ -113,8 +121,10 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
     assert completed.wait(3), "实时话段未完成"
     assert not failures
     assert captures == ([(*owner.last_external, capture_scope)] if expected_screen else [])
-    assert inputs == [(text, ["synthetic-screen"] if expected_screen else [])]
-    assert realtime_runtime.history[-2]["content"] == text
+    assert inputs[-1] == (text, expected_screen)
+    assert len(inputs) == (2 if expected_screen and not checked else 1)
+    user = next(turn for turn in reversed(realtime_runtime.history) if turn["role"] == "user")
+    assert user["content"][0]["text"] == text
     assert not realtime_runtime.microphone.muted.is_set()
 
 
@@ -146,60 +156,48 @@ def test_voice_screen_keeps_last_external_position_after_pet_window_input(
 
 @pytest.mark.parametrize("text, checked, expected_screen", SCREEN_CASES)
 def test_sentence_voice_and_voice_screen_keep_the_existing_capture_boundary(
-    monkeypatch, text, checked, expected_screen,
+    realtime_runtime, monkeypatch, text, checked, expected_screen,
 ):
-    """勾选框经 on_segment 选择 kind，再由真实整句识别对话决定是否截图。"""
+    """整句识别和实时识别共享原生工具循环；勾选仍显式附图。"""
     submitted, captures, replies, failures = [], [], [], []
-    signal = SimpleNamespace(emit=lambda *_: None)
-    settings = Settings(realtime_voice=False)
-    runtime = SimpleNamespace(
-        epoch=1,
-        microphone_epoch=7,
-        listening=True,
-        speech_override=None,
-        microphone=SimpleNamespace(muted=threading.Event()),
-        audio=SimpleNamespace(transcribe=lambda _: text),
-        memory=SimpleNamespace(context=lambda _, limit=700: ""),
-        history=[],
-        state=signal,
-        heard=signal,
-        finished=signal,
-        failed=SimpleNamespace(emit=lambda *args: failures.append(args)),
-        ask=lambda *args, **kwargs: submitted.append((args, kwargs)),
-    )
+    settings = replace(Settings(), realtime_voice=False, speak_replies=False)
+    runtime = realtime_runtime
+    runtime.audio.transcribe = lambda _: text
+    runtime.ask = lambda *args, **kwargs: submitted.append((args, kwargs))
+    runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
     owner = SimpleNamespace(
-        paused=False,
-        settings=settings,
-        last_external=(321, 432),
-        runtime=runtime,
-        panel=SimpleNamespace(with_screen=SimpleNamespace(isChecked=lambda: checked)),
-        _begin=lambda: None,
+        paused=False, settings=settings, last_external=(321, 432), runtime=runtime,
+        panel=SimpleNamespace(with_screen=SimpleNamespace(isChecked=lambda: checked)), _begin=lambda: None,
     )
-    samples = [0.0]  # 仅占位；识别器返回上面的合成文字。
+    samples = [0.0]
 
     def capture(*args):
         captures.append(args)
-        return "synthetic-screen"
+        return b"synthetic-screen"
 
-    async def generate(_runtime, _epoch, _settings, recognized, images, kind, _observation):
-        replies.append((recognized, images, kind))
+    async def complete(_settings, messages, *_args, **_kwargs):
+        user = next(turn for turn in reversed(messages) if turn["role"] == "user")
+        has_image = any(
+            isinstance(turn.get("content"), list) and any(part["type"] == "image_url" for part in turn["content"])
+            for turn in messages
+        )
+        assert user["content"][0]["text"] == text
+        if expected_screen and not has_image:
+            return AssistantReply("", (ToolCall("capture", "capture_screen", "{}"),), "tool_calls")
+        replies.append(has_image)
+        return AssistantReply("合成回复。")
 
-    async def needs_screen(_settings, recognized, _history):
-        assert recognized == text
-        return expected_screen
-
-    runtime.engine = SimpleNamespace(needs_screen=needs_screen)
-
+    runtime.engine.complete = complete
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
-    monkeypatch.setattr("pet.conversation.generate_reply", generate)
+    monkeypatch.setattr("pet.model_tools.capture_screen", capture)
     DesktopPet.on_segment(owner, 7, samples)
     args, kwargs = submitted[0]
     assert args == (settings, "")
     assert kwargs["kind"] == ("voice-screen" if checked else "voice")
     assert kwargs["position"] == owner.last_external
-    asyncio.run(converse(runtime, 1, settings, "", **kwargs))
+    runtime.schedule(converse(runtime, runtime.epoch, settings, "", **kwargs)).result(3)
 
     assert not failures
     assert captures == ([(*owner.last_external, settings.capture_scope)] if expected_screen else [])
-    assert replies == [(text, ["synthetic-screen"] if expected_screen else [], kwargs["kind"])]
+    assert replies == [expected_screen]
     assert not runtime.microphone.muted.is_set()

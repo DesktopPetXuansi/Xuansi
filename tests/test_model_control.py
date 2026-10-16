@@ -1,57 +1,47 @@
-"""无效执行计划不触发副作用，也不把模型私密正文写入错误或日志。"""
+"""无效原生工具不得触发副作用，回执和日志不暴露模型私密内容。"""
 
 import json
 import logging
+from types import SimpleNamespace
 
-import httpx
 import pytest
 
 from pet.config import Settings
-from pet.inference import LocalEngine
 from pet.memory import MemoryStore
-from pet.model_control import control_prompt, decide_control
-from pet.speech_control import ControlCallbacks
+from pet.model_tools import ToolContext
+from pet.tool_protocol import ToolCall
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("patch", [
-    {"voice": "toggle"},
-    {"tts": "guess"},
-    {"motion": "raise_hand"},
-    {"memory_intent": "none", "memory": "测试私密正文"},
-    {"memory_intent": "clarify", "memory": "测试私密正文"},
-    {"memory_intent": "save", "memory": None},
-    {"memory_intent": "save", "memory": "测试私密正文" * 200},
+@pytest.mark.parametrize("name, arguments", [
+    ("set_speech_enabled", {"enabled": "toggle"}),
+    ("set_speech_enabled", {"enabled": 1}),
+    ("select_tts_engine", {"engine": "guess"}),
+    ("play_motion", {"action": "raise_hand"}),
+    ("save_memory", {"note": None}),
+    ("save_memory", {"note": "测试私密正文" * 200}),
+    ("save_memory", {"note": "测试私密正文", "extra": True}),
 ])
-async def test_invalid_plan_never_changes_speech_motion_or_saved_memory(monkeypatch, tmp_path, caplog, patch):
+async def test_invalid_tool_never_changes_speech_motion_or_saved_memory(tmp_path, caplog, name, arguments):
+    changes, motions = [], []
     memory = MemoryStore(tmp_path / "memory.json")
-    changes, motions, voices = [], [], []
 
-    async def remember(note):
-        memory.remember(note)
+    async def request_motion(*args):
+        motions.append(args)
+        return {"status": "completed"}
 
-    async def handle(request):
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
-        decision = {"memory_intent": "none", "voice": "keep", "motion": "none", "memory": None,
-                    "tts": "fast", **patch}
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(decision)}}]})
-
-    async def start(_):
-        pass
-
-    engine = LocalEngine()
-    monkeypatch.setattr(engine, "start", start)
+    runtime = SimpleNamespace(
+        epoch=0, motion_actions=("blink",), memory=memory, history=[],
+        should_speak=lambda *_: True, set_speech_enabled=changes.append,
+        request_motion=request_motion,
+    )
+    context = ToolContext(runtime, 0, Settings(), "chat", "处理这次请求", None, None)
     caplog.set_level(logging.INFO)
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-        engine.client = client
-        with pytest.raises(RuntimeError, match="执行意图") as error:
-            await engine.chat(
-                Settings(), "处理这次请求", [], [],
-                on_speech=ControlCallbacks(changes.append, motions.append, ("blink",), remember, voices.append),
-            )
-    assert not changes and not motions and not voices and not memory.path.exists()
-    assert "测试私密正文" not in str(error.value) + caplog.text
+    result = await context.execute(ToolCall("invalid", name, json.dumps(arguments)))
+    assert json.loads(result["content"])["ok"] is False
+    assert not changes and not motions and not memory.path.exists()
+    assert context.selected_tts == "fast"
+    assert "测试私密正文" not in result["content"] + caplog.text
 
 
 @pytest.mark.asyncio
@@ -59,30 +49,18 @@ async def test_invalid_plan_never_changes_speech_motion_or_saved_memory(monkeypa
     ("请把你好翻译成英文，只给译文", "natural"),
     ("Please answer in Chinese: how are you?", "fast"),
 ])
-async def test_tts_uses_model_answer_language_instead_of_input_language(question, selected):
-    async def handle(request):
-        payload = json.loads(request.content)
-        assert "即将生成的回复" in payload["messages"][0]["content"]
-        assert "tts" in payload["grammar"]
-        assert payload["max_tokens"] >= 96
-        decision = {"memory_intent": "none", "voice": "keep", "motion": "none",
-                    "memory": None, "tts": selected}
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(decision)}}]})
-
-    messages = [{"role": "system", "content": control_prompt(True, (), False)},
-                {"role": "user", "content": question}]
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-        decision = await decide_control(client, messages, (), False)
-    assert decision.tts == selected
+async def test_tts_uses_model_tool_choice_instead_of_input_language(question, selected):
+    runtime = SimpleNamespace(epoch=0, motion_actions=(), should_speak=lambda *_: True)
+    context = ToolContext(runtime, 0, Settings(), "chat", question, None, None)
+    result = await context.execute(ToolCall("tts", "select_tts_engine", json.dumps({"engine": selected})))
+    assert json.loads(result["content"])["ok"]
+    assert context.selected_tts == selected
 
 
 @pytest.mark.asyncio
 async def test_explicit_natural_choice_is_not_overridden_by_model():
-    async def handle(_request):
-        decision = {"memory_intent": "none", "voice": "keep", "motion": "none",
-                    "memory": None, "tts": "fast"}
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(decision)}}]})
-
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-        with pytest.raises(RuntimeError, match="执行意图"):
-            await decide_control(client, [], (), False, requested_tts="natural")
+    runtime = SimpleNamespace(epoch=0, motion_actions=(), should_speak=lambda *_: True)
+    context = ToolContext(runtime, 0, Settings(tts_engine="natural"), "chat", "你好", None, None)
+    result = await context.execute(ToolCall("tts", "select_tts_engine", '{"engine":"fast"}'))
+    assert json.loads(result["content"])["result"]["engine"] == "natural"
+    assert context.selected_tts == "natural"

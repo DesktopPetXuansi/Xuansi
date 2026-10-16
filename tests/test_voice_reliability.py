@@ -1,19 +1,19 @@
-"""隔离控制采样与正文采样；受控 HTTP 不替代真实模型的语义验收。"""
+"""以受控模型验证上下文、工具语义和保存顺序；不宣称替代真实模型语义验收。"""
 
-import asyncio
+import copy
 import json
-import logging
-import re
-from dataclasses import dataclass, field
+from dataclasses import replace
 
 import httpx
 import pytest
+from PySide6.QtCore import Qt
 
 from pet.config import Settings
-from pet.inference import LocalEngine
-from pet.speech_control import ControlCallbacks
+from pet.inference import LocalEngine, request_messages
+from pet.memory import MemoryStore
+from pet.runtime import Runtime
+from pet.tool_protocol import AssistantReply, ToolCall
 
-LOG = logging.getLogger(__name__)
 BODY = "我理解你的意思，继续陪你聊。"
 CONTEXT = [
     {"role": "user", "content": "先不要出声，等我说现在可以了，你再恢复语音。"},
@@ -25,254 +25,144 @@ MEMORY_CONTEXT = [
 ]
 
 
-@dataclass
-class SamplingService:
-    """模拟已复现的边界：随机采样会误选控制头，确定性采样保留给定意图。"""
+@pytest.fixture
+def runtime(monkeypatch, tmp_path):
+    monkeypatch.setattr("pet.runtime.sd.stop", lambda: None)
+    monkeypatch.setattr("pet.runtime.sd.play", lambda *_: None)
+    monkeypatch.setattr("pet.runtime.sd.wait", lambda: None)
+    result = Runtime()
+    result.audio_activity.set_enabled(False)
+    result.memory = MemoryStore(tmp_path / "memory.json")
 
-    voice: str
-    wrong_voice: str
-    memory: str | None = None
-    memory_intent: str | None = None
-    authorization: str = "save"
-    body: str = BODY
-    control_temperatures: list[float] = field(default_factory=list)
-    body_temperatures: list[float] = field(default_factory=list)
-    control_messages: list[list[dict]] = field(default_factory=list)
-    authorization_messages: list[list[dict]] = field(default_factory=list)
-    authorization_temperatures: list[float] = field(default_factory=list)
-    body_messages: list[list[dict]] = field(default_factory=list)
-    saved_memory: list[str] = field(default_factory=list)
-    body_memory_counts: list[int] = field(default_factory=list)
-
-    async def __call__(self, request):
-        payload = json.loads(request.content)
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
-        assert request.url.path == "/v1/chat/completions"
-        grammar = payload.get("grammar", "")
-        authorization_check = "memory_intent" in grammar and "voice" not in grammar and "motion" not in grammar
-        response_format = payload.get("response_format", {})
-        json_control = (
-            response_format.get("type") in {"json_object", "json_schema"}
-            or "json_schema" in payload
-            or all(part in grammar for part in ("{", "voice", "memory"))
-        )
-        # 只读模型输出协议，不检查用户句子中的词，允许头/正文分开或正文固定头。
-        voices = set(re.findall(r'"(on|off|keep)"|\[voice:(on|off|keep)\]', grammar))
-        controls = not authorization_check and (json_control or len(voices) > 1)
-        has_body = not authorization_check and not json_control and (not grammar or r"[^\x00]+" in grammar)
-        temperature = payload["temperature"]
-        if authorization_check:
-            self.authorization_messages.append(payload["messages"])
-            self.authorization_temperatures.append(temperature)
-            assert not self.saved_memory, "独立授权复核必须先于保存执行"
-            assert all(word in payload["messages"][0]["content"] for word in ("记忆", "授权", "复核"))
-            content = json.dumps({"memory_intent": self.authorization})
-        elif controls:
-            self.control_messages.append(payload["messages"])
-            self.control_temperatures.append(temperature)
-            voice = self.voice if temperature == 0 else self.wrong_voice
-            content = (
-                json.dumps({
-                    "memory_intent": self.memory_intent or ("save" if self.memory is not None else "none"),
-                    "voice": voice, "motion": "none", "memory": self.memory,
-                    **({"tts": "fast"} if "tts" in grammar else {}),
-                }, ensure_ascii=False)
-                if json_control else f"[voice:{voice}][motion:none]\n"
-            )
-        else:
-            fixed = re.search(r"\[voice:(on|off|keep)\]", grammar)
-            content = f"[voice:{fixed[1]}][motion:none]\n" if fixed else ""
-        if has_body:
-            self.body_messages.append(payload["messages"])
-            self.body_temperatures.append(temperature)
-            self.body_memory_counts.append(len(self.saved_memory))
-            content += self.body
-        LOG.info("模拟模型采样 control=%s authorization=%s body=%s temperature=%s",
-                 controls, authorization_check, has_body, temperature)
-        if not payload["stream"]:
-            return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
-        # 故意把控制头跨包，验证决定先于首段正文交付。
-        chunks = [content[:5], content[5:16], content[16:]]
-        events = [
-            "data: " + json.dumps({"choices": [{"delta": {"content": chunk}}]}) + "\n\n"
-            for chunk in chunks if chunk
-        ]
-        return httpx.Response(200, text="".join(events) + "data: [DONE]\n\n")
-
-
-async def converse(monkeypatch, service, settings, text, enabled, streaming, history, *, remember=False):
-    events = []
-
-    async def start(_):
-        # 避免创建模型进程；仅保留真实推理层和解析器。
+    async def start(_settings):
+        # 仅替换 GPU 启动边界，保留真实运行时和工具执行器。
         pass
 
-    async def receive(chunk):
-        events.append(("text", chunk))
-
-    async def save_memory(note):
-        # 刻意让保存跨一次异步调度，正文请求必须等待实际完成。
-        events.append(("memory-start", note))
-        await asyncio.sleep(0)
-        service.saved_memory.append(note)
-        events.append(("memory", note))
-
-    def apply_speech(value):
-        events.append(("speech", value))
-
-    callbacks = (
-        ControlCallbacks(apply_speech, lambda action: None, (), remember=save_memory)
-        if remember else apply_speech
-    )
-    engine = LocalEngine()
-    monkeypatch.setattr(engine, "start", start)
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(service), base_url="http://127.0.0.1"
-    ) as client:
-        engine.client = client
-        answer = await engine.chat(
-            settings, text, [], history, on_chunk=receive if streaming else None,
-            on_speech=callbacks, speech_enabled=enabled,
-        )
-    return answer, events
-
-
-def assert_sampling_and_delivery(service, settings, answer, events, expected, streaming):
-    assert [value for kind, value in events if kind == "speech"] == expected
-    assert service.control_temperatures, "控制意图必须由模型判断，不能改成输入关键词匹配"
-    assert set(service.control_temperatures) == {0.0}, "控制采样不能继承用户的正文温度"
-    assert service.body_temperatures and set(service.body_temperatures) == {settings.temperature}
-    assert answer == BODY and "[voice:" not in answer
-    if streaming:
-        assert "".join(value for kind, value in events if kind == "text") == BODY
-        assert [kind for kind, _ in events[:len(expected)]] == ["speech"] * len(expected)
-
-
-def assert_confirmation_delivery(service, answer, events, expected, streaming):
-    # 待确认正文必须来自模型；没有授权仍不得写入，不能以固定回复冒充生成。
-    assert answer == service.body
-    assert service.control_temperatures and set(service.control_temperatures) == {0.0}
-    assert service.saved_memory == []
-    assert not any(kind == "memory-start" for kind, _ in events)
-    assert service.body_messages and service.body_temperatures
-    assert "未保存" in service.body_messages[-1][0]["content"]
-    assert "确认" in service.body_messages[-1][0]["content"]
-    assert [value for kind, value in events if kind == "speech"] == expected
-    if streaming:
-        assert "".join(value for kind, value in events if kind == "text") == service.body
-        assert [kind for kind, _ in events[:len(expected)]] == ["speech"] * len(expected)
+    monkeypatch.setattr(result.engine, "start", start)
+    yield result
+    result.cancel(release=True).result(5)
+    result.loop.call_soon_threadsafe(result.loop.stop)
+    result.thread.join(2)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("streaming", [True, False])
 @pytest.mark.parametrize("temperature", [0.35, 0.7, 1.1])
-async def test_ordinary_reply_keeps_speech_while_preserving_body_temperature(
-    monkeypatch, streaming, temperature
-):
+async def test_ordinary_reply_preserves_temperature_without_control_preflight(monkeypatch, streaming, temperature):
+    payloads = []
     settings = Settings(temperature=temperature)
-    service = SamplingService("keep", "off")
-    answer, events = await converse(
-        monkeypatch, service, settings, "你好喜出生用一句话介绍一下自己", True, streaming, []
-    )
-    assert_sampling_and_delivery(service, settings, answer, events, [], streaming)
+    engine = LocalEngine()
+
+    async def start(_settings):
+        pass
+
+    async def handle(request):
+        if request.url.path.endswith("/input_tokens"):
+            return httpx.Response(200, json={"input_tokens": 20})
+        payload = json.loads(request.content)
+        payloads.append(payload)
+        if not payload["stream"]:
+            return httpx.Response(200, json={"choices": [{"message": {"content": BODY}, "finish_reason": "stop"}]})
+        events = [
+            {"choices": [{"delta": {"content": BODY[:5]}}]},
+            {"choices": [{"delta": {"content": BODY[5:]}}]},
+            {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+        ]
+        return httpx.Response(200, text="".join("data: " + json.dumps(event) + "\n\n" for event in events) + "data: [DONE]\n\n")
+
+    monkeypatch.setattr(engine, "start", start)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
+        engine.client = client
+        answer = await engine.complete(settings, request_messages(settings, "你好，用一句话介绍自己", [], []), stream=streaming)
+    assert answer.content == BODY and not answer.tool_calls
+    assert len(payloads) == 1
+    assert payloads[0]["temperature"] == temperature
+    assert "grammar" not in payloads[0]
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("streaming", [True, False])
-@pytest.mark.parametrize(
-    "text, enabled, voice, expected, history",
-    [
-        pytest.param("今天工作有点累", True, "keep", [], [], id="ordinary-enabled"),
-        pytest.param("今天工作有点累", False, "keep", [], [], id="ordinary-muted"),
-        pytest.param("把‘请不要说话’翻译成英文。", True, "keep", [], [], id="quoted-request"),
-        pytest.param("不要关闭语音，我还想听你说。", True, "on", [True], [], id="negated-stop"),
-        pytest.param("我正在开会，你用文字陪我就好。", True, "off", [False], [], id="indirect-stop"),
-        pytest.param("现在可以了。", False, "on", [True], CONTEXT, id="contextual-resume"),
-    ],
-)
-async def test_control_sampling_preserves_model_semantics_and_recent_context(
-    monkeypatch, streaming, text, enabled, voice, expected, history
-):
-    settings = Settings()
-    wrong_voice = {"keep": "off" if enabled else "on", "off": "on", "on": "off"}[voice]
-    service = SamplingService(voice, wrong_voice)
-    answer, events = await converse(monkeypatch, service, settings, text, enabled, streaming, history)
-    assert_sampling_and_delivery(service, settings, answer, events, expected, streaming)
-    # 语义由模拟模型预先给定，确认真实推理层收到完整引用、否定或上下文。
-    assert any(
-        messages[-1]["content"][0]["text"] == text and messages[1:1 + len(history)] == history
-        for messages in service.control_messages
-    )
+@pytest.mark.parametrize("text, enabled, decision, history", [
+    pytest.param("今天工作有点累", True, None, [], id="ordinary-enabled"),
+    pytest.param("今天工作有点累", False, None, [], id="ordinary-muted"),
+    pytest.param("把‘请不要说话’翻译成英文。", True, None, [], id="quoted-request"),
+    pytest.param("不要关闭语音，我还想听你说。", True, True, [], id="negated-stop"),
+    pytest.param("我正在开会，你用文字陪我就好。", True, False, [], id="indirect-stop"),
+    pytest.param("现在可以了。", False, True, CONTEXT, id="contextual-resume"),
+])
+def test_native_tool_choice_preserves_model_semantics_and_recent_context(runtime, text, enabled, decision, history):
+    seen, changes = [], []
+    runtime.history = copy.deepcopy(history)
+    runtime.set_speech_enabled(enabled)
+    runtime.speech_changed.connect(lambda: changes.append(runtime.speech_override), Qt.ConnectionType.DirectConnection)
+
+    async def complete(_settings, messages, *_args, **_kwargs):
+        seen.append(copy.deepcopy(messages))
+        if decision is not None and messages[-1]["role"] != "tool":
+            return AssistantReply("", (ToolCall("speech", "set_speech_enabled", json.dumps({"enabled": decision})),), "tool_calls")
+        return AssistantReply(BODY)
+
+    runtime.engine.complete = complete
+    # 关闭保存偏好即可隔离音频；显式工具启用时仍会合成，因此使用无声合成替身。
+    import numpy as np
+    runtime.audio.synthesize = lambda *_: (np.zeros(80), 8000)
+    runtime.schedule(runtime._conversation(0, Settings(), text, "chat", None, None)).result(3)
+    assert runtime.speech_override is (enabled if decision is None else decision)
+    assert changes == ([] if decision is None else [decision])
+    assert seen[0][-1]["content"][0]["text"] == text
+    assert seen[0][1:1 + len(history)] == history
+    assert len(seen) == (1 if decision is None else 2)
+    if decision is not None:
+        assert json.loads(seen[-1][-1]["content"])["ok"]
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("streaming", [True, False])
-@pytest.mark.parametrize(
-    "text, memory, history",
-    [
-        pytest.param("我喜欢喝绿茶。", None, [], id="ordinary-preference"),
-        pytest.param("把‘记住我喜欢喝绿茶’翻译成英文。", None, [], id="quoted-memory"),
-        pytest.param("不要记住我喜欢喝绿茶。", None, [], id="negated-memory"),
-        pytest.param("如果我说记住这个口味，你会怎么办？", None, [], id="hypothetical-memory"),
-        pytest.param("这个故事让我记住了主角。", None, [], id="ordinary-mention"),
-        pytest.param("昨天我让你记住喜欢喝绿茶，你还记得吗？", None, [], id="historical-memory-request"),
-        pytest.param("记住我喜欢喝绿茶。", None, [], id="model-result-over-keyword"),
-        pytest.param(
-            "帮我把刚才那个口味偏好记下来。", "我喜欢喝绿茶", MEMORY_CONTEXT, id="contextual-memory"
-        ),
-    ],
-)
-async def test_only_model_memory_decision_is_awaited_once_before_reply(
-    monkeypatch, streaming, text, memory, history
-):
-    service = SamplingService("keep", "off", memory=memory)
-    settings = Settings()
-    answer, events = await converse(
-        monkeypatch, service, settings, text, True, streaming, history, remember=True
-    )
-    expected = [] if memory is None else [memory]
-    assert service.saved_memory == expected
-    assert [value for kind, value in events if kind == "memory"] == expected
-    assert service.body_memory_counts and set(service.body_memory_counts) == {len(expected)}
-    if memory is None:
-        assert service.authorization_messages == [], "初始判断不保存时不需要额外复核"
-    else:
-        assert len(service.authorization_messages) == 1
-        assert service.authorization_temperatures == [0.0]
-        assert service.authorization_messages[0][-1]["content"][0]["text"] == text
-        assert service.authorization_messages[0][1:1 + len(history)] == history
-    assert_sampling_and_delivery(service, settings, answer, events, [], streaming)
-    assert any(
-        messages[-1]["content"][0]["text"] == text and messages[1:1 + len(history)] == history
-        for messages in service.control_messages
-    )
+@pytest.mark.parametrize("text, note, history", [
+    pytest.param("我喜欢喝绿茶。", None, [], id="ordinary-preference"),
+    pytest.param("把‘记住我喜欢喝绿茶’翻译成英文。", None, [], id="quoted-memory"),
+    pytest.param("不要记住我喜欢喝绿茶。", None, [], id="negated-memory"),
+    pytest.param("如果我说记住这个口味，你会怎么办？", None, [], id="hypothetical-memory"),
+    pytest.param("这个故事让我记住了主角。", None, [], id="ordinary-mention"),
+    pytest.param("昨天我让你记住喜欢喝绿茶，你还记得吗？", None, [], id="historical-memory-request"),
+    pytest.param("记住我喜欢喝绿茶。", None, [], id="model-result-over-keyword"),
+    pytest.param("帮我把刚才那个口味偏好记下来。", "我喜欢喝绿茶", MEMORY_CONTEXT, id="contextual-memory"),
+])
+def test_only_model_tool_choice_saves_once_before_reply(runtime, monkeypatch, text, note, history):
+    seen, saved = [], []
+    runtime.history = copy.deepcopy(history)
+    remember = runtime.memory.remember
+
+    def save(value, source):
+        saved.append(value)
+        return remember(value, source)
+
+    async def complete(_settings, messages, *_args, **_kwargs):
+        seen.append(copy.deepcopy(messages))
+        if note is not None and messages[-1]["role"] != "tool":
+            assert not saved
+            return AssistantReply("", (ToolCall("save", "save_memory", json.dumps({"note": note})),), "tool_calls")
+        # 只有收到已执行结果，模型才进入确认轮次。
+        assert saved == ([] if note is None else [note])
+        if note is not None:
+            receipt = json.loads(messages[-1]["content"])
+            assert receipt["ok"] and receipt["result"]["saved"]
+        return AssistantReply(BODY)
+
+    monkeypatch.setattr(runtime.memory, "remember", save)
+    runtime.engine.complete = complete
+    runtime.schedule(runtime._conversation(0, replace(Settings(), speak_replies=False), text, "chat", None, None)).result(3)
+    assert runtime.memory.read() == (note or "")
+    assert saved == ([] if note is None else [note])
+    assert seen[0][-1]["content"][0]["text"] == text
+    assert seen[0][1:1 + len(history)] == history
+    assert len(seen) == (1 if note is None else 2)
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("streaming", [True, False])
-async def test_unclear_model_memory_decision_asks_for_confirmation_without_saving(monkeypatch, streaming):
-    service = SamplingService("keep", "off", memory_intent="clarify", body="你希望长期保存这个口味偏好吗？")
-    settings = Settings()
-    answer, events = await converse(
-        monkeypatch, service, settings, "地重我喜欢喝绿茶", True, streaming, [], remember=True
-    )
-    assert service.authorization_messages == []
-    assert_confirmation_delivery(service, answer, events, [], streaming)
+def test_unclear_model_request_asks_confirmation_without_saving(runtime):
+    replies = []
+    runtime.reply.connect(lambda _, answer, kind: replies.append(answer), Qt.ConnectionType.DirectConnection)
 
+    async def complete(*_args, **_kwargs):
+        return AssistantReply("你希望长期保存这个口味偏好吗？")
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("streaming", [True, False])
-@pytest.mark.parametrize("voice, changes", [("keep", []), ("off", [False])])
-async def test_memory_review_disagreement_never_saves_or_changes_speech_decision(
-    monkeypatch, streaming, voice, changes
-):
-    service = SamplingService(voice, "on", memory="我喜欢喝绿茶", authorization="none", body="请确认需要保存的事项。")
-    settings = Settings()
-    answer, events = await converse(
-        monkeypatch, service, settings, "店主我喜欢喝绿茶", True, streaming, [], remember=True
-    )
-    assert service.authorization_temperatures == [0.0]
-    assert len(service.authorization_messages) == 1
-    assert service.authorization_messages[0][-1]["content"][0]["text"] == "店主我喜欢喝绿茶"
-    assert_confirmation_delivery(service, answer, events, changes, streaming)
+    runtime.engine.complete = complete
+    runtime.schedule(runtime._conversation(0, replace(Settings(), speak_replies=False), "地重我喜欢喝绿茶", "chat", None, None)).result(3)
+    assert replies == ["你希望长期保存这个口味偏好吗？"]
+    assert not runtime.memory.read()

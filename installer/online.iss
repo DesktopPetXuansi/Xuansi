@@ -31,6 +31,15 @@ Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式（安装版）"; Flags: unchecked
 
+[InstallDelete]
+; 同目录升级只删除退役控制模块及其字节码，不触碰用户数据或其他模块。
+Type: files; Name: "{app}\pet\model_control.py"
+Type: files; Name: "{app}\pet\model_semantics.py"
+Type: files; Name: "{app}\pet\speech_control.py"
+Type: files; Name: "{app}\pet\__pycache__\model_control.*.pyc"
+Type: files; Name: "{app}\pet\__pycache__\model_semantics.*.pyc"
+Type: files; Name: "{app}\pet\__pycache__\speech_control.*.pyc"
+
 [Files]
 ; 桌面包不携带官网源码；运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs

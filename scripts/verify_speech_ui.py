@@ -19,6 +19,7 @@ from pet.config import ROOT, Settings
 from pet.desktop import DesktopState
 from pet.live2d_session import configure_opengl_sharing
 from pet.memory import MemoryStore
+from pet.tool_protocol import AssistantReply, ToolCall
 
 
 def wait_until(predicate):
@@ -50,14 +51,23 @@ def main():
         pet.resource_timer.stop()
         decisions = iter([False, True])
 
-        async def chat(*_, on_chunk, on_speech, **kwargs):
-            enabled = next(decisions)
-            on_speech(enabled)
-            text = "好的，我安静陪你。" if not enabled else "可以，现在继续用声音陪你。"
-            await on_chunk(text)
-            return text
+        async def complete(_settings, messages, *_args, **_kwargs):
+            if messages[-1]["role"] != "tool":
+                enabled = next(decisions)
+                return AssistantReply("", (ToolCall("speech-ui", "set_speech_enabled", json.dumps({"enabled": enabled})),), "tool_calls")
+            # 只有执行回执成功后才返回与开关状态对应的确认正文。
+            receipt = json.loads(messages[-1]["content"])
+            assert receipt["ok"]
+            enabled = receipt["result"]["enabled"]
+            return AssistantReply("好的，我安静陪你。" if not enabled else "可以，现在继续用声音陪你。")
 
-        pet.runtime.engine.chat = chat
+        async def start(_settings):
+            # Qt 验收仅用模型替身，不能启动 GPU 或真实输入设备。
+            pass
+
+        pet.runtime.engine.complete = complete
+        pet.runtime.engine.start = start
+        pet.runtime.engine.warmup = start
         pet.runtime.audio.synthesize = lambda *_: (np.zeros(80), 8000)
         closed = threading.Event()
         pet.runtime.shutdown_done.connect(closed.set, Qt.ConnectionType.DirectConnection)

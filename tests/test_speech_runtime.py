@@ -1,6 +1,7 @@
 """模型决定开关；用假音频验证真实运行时、麦克风代次及同轮恢复。"""
 
 import asyncio
+import json
 import threading
 from dataclasses import replace
 
@@ -12,6 +13,7 @@ from pet.config import Settings
 from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
+from pet.tool_protocol import AssistantReply, ToolCall
 
 
 @pytest.fixture
@@ -23,10 +25,11 @@ def runtime(monkeypatch, tmp_path):
     result.audio_activity.set_enabled(False)
     result.memory = MemoryStore(tmp_path / "memory.json")
 
-    async def choose_tts(settings, _text):
-        return settings.tts_engine
+    async def start(_settings):
+        # 替换模型进程边界，不触碰真实 GPU。
+        pass
 
-    monkeypatch.setattr(result.engine, "choose_tts", choose_tts)
+    monkeypatch.setattr(result.engine, "start", start)
     yield result
     result.cancel(release=True).result(5)
     result.loop.call_soon_threadsafe(result.loop.stop)
@@ -39,18 +42,18 @@ def test_model_can_mute_keep_silent_and_resume_in_same_turn(runtime):
     runtime.listening = True  # 仅模拟状态，不打开真实设备。
     runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_chunk, on_speech, speech_enabled):
-        decision = next(decisions)
-        if decision is not None:
-            on_speech(decision)
-        await on_chunk("完整的确认回复。")
-        return "完整的确认回复。"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] != "tool":
+            decision = next(decisions)
+            if decision is not None:
+                return AssistantReply("", (ToolCall("speech", "set_speech_enabled", json.dumps({"enabled": decision})),), "tool_calls")
+        return AssistantReply("完整的确认回复。")
 
     def synthesize(text, *_):
         clips.append(text)
         return np.zeros(80), 8000
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     for index, should_speak in enumerate([False, False, True]):
         # 刻意使用无关键词输入：执行的是模型动作，不能根据输入词语猜测。
@@ -59,24 +62,26 @@ def test_model_can_mute_keep_silent_and_resume_in_same_turn(runtime):
         assert runtime.listening and runtime.microphone_epoch == 0
         assert not runtime.microphone.muted.is_set()
         assert len(clips) == (1 if should_speak else 0)
-    assert len(replies) == 3 and len(runtime.history) == 6
+    assert len(replies) == 3
+    assert sum(turn["role"] == "user" for turn in runtime.history) == 3
 
 
 @pytest.mark.parametrize("kind", ["observation", "preview"])
 def test_mute_blocks_observation_and_preview_without_opening_microphone(runtime, kind):
     clips, calls = [], []
 
-    async def chat(*_, **kwargs):
-        calls.append(kwargs)
-        return "观察回应。"
+    async def chat(_settings, _messages, tools, **_kwargs):
+        calls.append({tool["function"]["name"] for tool in tools})
+        return AssistantReply("观察回应。")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = lambda *_: clips.append(True)
     runtime.set_speech_enabled(False)
     settings = replace(Settings(), speak_observations=True)
     runtime.schedule(runtime._conversation(0, settings, "测试", kind, None, None)).result(3)
     assert not clips and not runtime.listening
-    assert not calls or "on_speech" not in calls[0]
+    assert runtime.speech_override is False
+    assert not calls or "set_speech_enabled" not in calls[0]
 
 
 def test_preview_is_silent_when_saved_reply_preference_is_off(runtime):
@@ -100,13 +105,13 @@ def test_observation_fallback_speaks_when_only_reply_preference_is_off(runtime):
     clips = []
 
     async def chat(*_, **_kwargs):
-        return "观察回应。"
+        return AssistantReply("观察回应。")
 
     def synthesize(text, *_):
         clips.append(text)
         return np.zeros(80), 8000
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     settings = replace(Settings(), speak_replies=False, speak_observations=True)
     runtime.schedule(runtime._conversation(0, settings, "观察画面", "observation", None, None)).result(3)
@@ -115,49 +120,44 @@ def test_observation_fallback_speaks_when_only_reply_preference_is_off(runtime):
     assert not runtime.history and not runtime.listening
 
 
-@pytest.mark.parametrize("kind", ["preview", "observation"])
-def test_nonstreaming_voice_uses_model_selected_engine(runtime, kind):
-    """试听和观察也消费模型决定，同时沿用原有显式设置及朗读门控。"""
-    choices, clips = [], []
+def test_observation_voice_uses_model_selected_engine(runtime):
+    """观察通过原生工具选择引擎，试听沿用明确设置而不请求模型。"""
+    clips = []
 
-    async def chat(*_, **_kwargs):
-        return "Hello there."
-
-    async def choose_tts(settings, text):
-        choices.append((settings.tts_engine, text))
-        return "natural"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] != "tool":
+            return AssistantReply("", (ToolCall("tts", "select_tts_engine", '{"engine":"natural"}'),), "tool_calls")
+        return AssistantReply("Hello there.")
 
     def synthesize(text, _speaker, _speed, engine):
         clips.append((text, engine))
         return np.zeros(80), 8000
 
-    runtime.engine.chat = chat
-    runtime.engine.choose_tts = choose_tts
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     runtime.schedule(runtime._conversation(
-        0, replace(Settings(), speak_observations=True), "Hello there.", kind, None, None,
+        0, replace(Settings(), speak_observations=True), "Hello there.", "observation", None, None,
     )).result(3)
-    assert choices == [("fast", "Hello there.")]
     assert clips == [("Hello there.", "natural")]
 
 
 def test_late_model_decision_cannot_change_new_request_state(runtime):
     entered, release = threading.Event(), threading.Event()
 
-    async def chat(*_, on_chunk, on_speech, **kwargs):
+    async def chat(*_, **_kwargs):
         entered.set()
         await asyncio.to_thread(release.wait, 2)
-        on_speech(False)
-        await on_chunk("迟到的回复。")
-        return "迟到的回复。"
+        return AssistantReply("", (ToolCall("late", "set_speech_enabled", '{"enabled":false}'),), "tool_calls")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     future = runtime.schedule(runtime._conversation(0, Settings(), "旧请求", "chat", None, None))
     assert entered.wait(1)
     runtime.epoch += 1
     release.set()
     future.result(3)
-    assert runtime.speech_override is None and not runtime.history
+    assert runtime.speech_override is None
+    # 用户输入属于已经发生的事实；迟到工具及其虚构结果不得写入历史。
+    assert [turn["role"] for turn in runtime.history] == ["user"]
 
 
 def test_final_voice_can_resume_when_saved_reply_preference_is_off(runtime):
@@ -165,17 +165,17 @@ def test_final_voice_can_resume_when_saved_reply_preference_is_off(runtime):
     runtime.listening = True
     runtime.set_speech_enabled(False)
 
-    async def chat(*_, on_chunk, on_speech, speech_enabled):
-        assert not speech_enabled
-        on_speech(True)
-        await on_chunk("现在可以听到我了。")
-        return "现在可以听到我了。"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] != "tool":
+            assert runtime.speech_override is False
+            return AssistantReply("", (ToolCall("resume", "set_speech_enabled", '{"enabled":true}'),), "tool_calls")
+        return AssistantReply("现在可以听到我了。")
 
     def synthesize(text, *_):
         clips.append(text)
         return np.zeros(80), 8000
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     settings = replace(Settings(), speak_replies=False)
     runtime.accept_voice(0, VoiceUpdate(1, "恢复", final=True), settings).result(2)
@@ -198,13 +198,12 @@ def test_memory_is_written_only_after_model_understands_the_request(runtime, tex
     loaded = []
     runtime.memory_loaded.connect(loaded.append, Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_chunk, on_speech, **kwargs):
-        if model_note is not None:
-            await on_speech.remember(model_note)
-        await on_chunk("处理完毕。")
-        return "处理完毕。"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if model_note is not None and messages[-1]["role"] != "tool":
+            return AssistantReply("", (ToolCall("save", "save_memory", json.dumps({"note": model_note})),), "tool_calls")
+        return AssistantReply("处理完毕。")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(
         0, replace(Settings(), speak_replies=False), text, "chat", None, None,
     )).result(3)
@@ -230,15 +229,18 @@ def test_model_rewriting_cannot_remove_source_secret_labels(runtime, text, histo
     runtime.failed.connect(lambda _, message: failures.append(message), Qt.ConnectionType.DirectConnection)
     runtime.reply.connect(lambda _, answer, kind: replies.append(answer), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_speech, **kwargs):
-        await on_speech.remember("123456")
-        return "已保存。"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] != "tool":
+            return AssistantReply("", (ToolCall("secret", "save_memory", '{"note":"123456"}'),), "tool_calls")
+        receipt = json.loads(messages[-1]["content"])
+        assert receipt["ok"] is not sensitive
+        return AssistantReply("不能保存敏感资料。" if sensitive else "已保存。")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(
         0, replace(Settings(), speak_replies=False), text, "chat", None, None,
     )).result(3)
     assert runtime.memory.read() == ("" if sensitive else "123456")
-    assert bool(failures) is sensitive
-    assert bool(replies) is not sensitive
+    assert not failures
+    assert replies == (["不能保存敏感资料。"] if sensitive else ["已保存。"])
     assert "123456" not in "".join(failures)

@@ -127,16 +127,24 @@ class DesktopPet(QObject):
         if not self.fullscreen:
             self.avatar.bubble.present(message, self.avatar)
 
-    def _execute_motion(self, epoch, motion):
+    def _execute_motion(self, epoch, motion, request_id):
         """Qt 将后台决策排入界面线程后，再校验代次和桌宠状态。"""
-        if epoch != self.runtime.epoch or self.paused or self.fullscreen or not self.avatar.isVisible():
+        if (not self.runtime.motion_pending(epoch, motion, request_id)
+                or self.paused or self.fullscreen or not self.avatar.isVisible()):
+            self.runtime.resolve_motion(request_id, False)
             return
-        self.avatar.play_motion(motion)
+        try:
+            accepted = self.avatar.play_motion(motion)
+        except Exception as exc:
+            LOG.warning("角色动作未受理 type=%s", type(exc).__name__)
+            accepted = False
+        self.runtime.resolve_motion(request_id, bool(accepted))
 
     def send(self, text, with_screen=False):
         self._begin()
         self.panel.append("你", text)
-        self.runtime.ask(self.settings, text, position=self.last_external if with_screen else None)
+        self.runtime.ask(self.settings, text, kind="chat-screen" if with_screen else "chat",
+                         position=self.last_external)
 
     def look(self):
         self.send("请理解提供的画面，结合红圈标记的鼠标位置，用一句话和我聊聊。", True)
@@ -281,7 +289,7 @@ class DesktopPet(QObject):
         self._begin()
         prompt = (
             event.description() + "结合操作和局部画面，给出一句自然、简短的陪伴回应。"
-            "不要猜测操作已成功，不要朗读隐私内容，没有值得回应的内容就只说“无需回应”。"
+            "不要猜测操作已成功，不要朗读隐私内容；是否发言由你判断，没有值得评论的内容时结束本次观察。"
         )
         self.runtime.ask(
             self.settings, prompt, kind="observation", position=(event.x, event.y), observation=(hwnd, now)

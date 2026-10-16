@@ -2,16 +2,13 @@
 
 import asyncio
 import logging
-from contextlib import AsyncExitStack
-from dataclasses import replace
 
 import sounddevice as sd
 from mss.exception import ScreenShotError
 
 from .desktop import capture_screen, observation_current
-from .memory import durable_io
-from .speech_control import ControlCallbacks
 from .streaming_speech import SpeechStream
+from .tool_dialogue import run_dialogue
 
 LOG = logging.getLogger(__name__)
 
@@ -35,33 +32,15 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
             runtime.heard.emit(epoch, text)
         if epoch != runtime.epoch or not observation_current(observation):
             return
-        if kind in ("voice", "voice-final") and position is not None:
-            runtime.state.emit(epoch, "正在理解你的请求…")
-            if not await runtime.engine.needs_screen(settings, text, runtime.history):
-                position = None
-            if epoch != runtime.epoch or not observation_current(observation):
-                return
+        # 明确附图和自动观察直接提供当前画面；其他请求由模型选择截图工具。
         images = (
-            [await asyncio.to_thread(capture_screen, *position, settings.capture_scope)] if position else []
+            [await asyncio.to_thread(capture_screen, *position, settings.capture_scope)]
+            if position and kind in ("chat-screen", "voice-screen", "observation") else []
         )
         if epoch != runtime.epoch or not observation_current(observation):
             return
-        # 读取完整候选而非先截取700字；模型按实际token容量检索，保留末尾资料可达。
-        notes = await asyncio.to_thread(runtime.memory.context, text, limit=6000)
-        if epoch != runtime.epoch or not observation_current(observation):
-            return
-        if notes:
-            notes = await runtime.engine.select_memory(
-                settings, text, notes, [] if kind == "observation" else runtime.history,
-            )
-            if epoch != runtime.epoch or not observation_current(observation):
-                return
-            if notes:
-                settings = replace(
-                    settings, system_prompt=settings.system_prompt + "\n本地长期记忆（用户资料）：\n" + notes
-                )
         runtime.state.emit(epoch, "正在看画面并思考…" if images else "正在思考…")
-        await generate_reply(runtime, epoch, settings, text, images, kind, observation)
+        await generate_reply(runtime, epoch, settings, text, images, kind, observation, position)
     except asyncio.CancelledError:
         sd.stop()
         raise
@@ -91,99 +70,30 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         runtime.finished.emit(epoch)
 
 
-async def generate_reply(runtime, epoch, settings, text, images, kind, observation):
-    async with AsyncExitStack() as stack:
-        speech = None
-        selected_tts = settings.tts_engine
+async def generate_reply(runtime, epoch, settings, text, images, kind, observation, position=None):
+    result = await run_dialogue(runtime, epoch, settings, text, images, kind, position, observation)
+    if result.content is None or epoch != runtime.epoch or not observation_current(observation):
+        return
+    if not runtime.should_speak(settings, kind):
+        return
 
-        def current():
-            return epoch == runtime.epoch and observation_current(observation)
+    def current():
+        return epoch == runtime.epoch and observation_current(observation) and runtime.should_speak(settings, kind)
 
-        def change_speech(enabled):
-            if current():
-                runtime.set_speech_enabled(enabled)
-
-        def dispatch_motion(motion):
-            if current():
-                runtime.motion_requested.emit(epoch, motion)
-
-        async def remember(note):
-            # 这里只执行经模型理解并校验的明确事项；取消后不发起新的写入。
-            if current():
-                # 当前原句及近期用户资料保留敏感标签；助手提示不作为用户资料参与过滤。
-                source = "\n".join([
-                    *(turn["content"] for turn in runtime.history[-8:] if turn["role"] == "user"),
-                    text,
-                ])
-                await durable_io(runtime.memory.remember, note, source)
-                runtime.memory_loaded.emit(await asyncio.to_thread(runtime.memory.read))
-
-        def select_tts(engine):
-            nonlocal selected_tts
-            if current():
-                selected_tts = engine
-
-        controls = ControlCallbacks(
-            change_speech,
-            dispatch_motion,
-            runtime.motion_actions,
-            remember,
-            select_tts,
-        )
-
-        def speech_state(message):
-            if not current():
-                return
+    def speech_state(message):
+        if current():
             runtime.state.emit(epoch, message)
-            # 失败通知单独留在聊天记录中，避免被随后恢复聆听的状态覆盖。
+            # 合成和播放失败留下可检查的通知，不改变已经交付的原始正文。
             if message.startswith(("语音合成失败", "语音播放失败")):
                 runtime.failed.emit(epoch, message)
 
-        async def deliver(part):
-            nonlocal speech
-            if not current() or not runtime.should_speak(settings, kind):
-                return
-            # 控制头已被模型接口消费；到第一段正文才创建流水线，允许静音状态当轮恢复。
-            if speech is None:
-                speech = await stack.enter_async_context(
-                    SpeechStream(
-                        runtime.audio_activity,
-                        lambda part: runtime.audio.synthesize_selected(
-                            part, settings.speaker, settings.speed, settings.tts_engine, selected_tts
-                        ),
-                        lambda: current() and runtime.should_speak(settings, kind),
-                        speech_state,
-                        runtime.mouth_level.emit,
-                    )
-                )
-            await speech.feed(part)
-
-        # 只有用户对话允许模型切换朗读；自动观察不提供控制协议。
-        if kind != "observation":
-            answer = await runtime.engine.chat(
-                settings, text, images, runtime.history, on_chunk=deliver,
-                on_speech=controls, speech_enabled=runtime.should_speak(settings),
-            )
-        else:
-            answer = await runtime.engine.chat(settings, text, images, [])
-        if epoch != runtime.epoch or not observation_current(observation):
-            return
-        answer = (answer or "").strip()
-        if kind == "observation" and (not answer or "无需回应" == answer.strip("。 .\n")):
-            return
-        if not answer:
-            raise RuntimeError("本地模型没有生成回复，请重新发送这句话。")
-        if kind != "observation":
-            runtime.history = [
-                *runtime.history[-6:],
-                {"role": "user", "content": text[:2000]},
-                {"role": "assistant", "content": answer},
-            ]
-        runtime.reply.emit(epoch, answer, kind)
-        if speech is not None:
-            await speech.finish()
-        elif runtime.should_speak(settings, kind):
-            await runtime._speak(
-                epoch, settings, answer, observation, kind=kind,
-                selected_engine=selected_tts if kind != "observation" else None,
-            )
+    # 原生响应完整后才开始朗读，工具过程文字不进入音频流水线。
+    async with SpeechStream(
+        runtime.audio_activity,
+        lambda part: runtime.audio.synthesize_selected(
+            part, settings.speaker, settings.speed, settings.tts_engine, result.selected_tts,
+        ),
+        current, speech_state, runtime.mouth_level.emit,
+    ) as speech:
+        await speech.feed(result.content)
+        await speech.finish()

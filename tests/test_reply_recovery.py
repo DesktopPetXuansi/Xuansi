@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from pet.config import Settings
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
+from pet.tool_protocol import AssistantReply
 
 
 @pytest.fixture
@@ -21,10 +22,11 @@ def isolated_runtime(monkeypatch, tmp_path):
     runtime = Runtime()
     runtime.memory = MemoryStore(tmp_path / "memory.json")
 
-    async def select_memory(_settings, _query, notes, _history):
-        return notes
+    async def start(_settings):
+        # 用假模型服务隔离 GPU，保留真实运行时生命周期。
+        pass
 
-    monkeypatch.setattr(runtime.engine, "select_memory", select_memory)
+    monkeypatch.setattr(runtime.engine, "start", start)
     runtime.audio_activity.clock = lambda: 10.0
     runtime.audio_activity.update(False, now=10.0)
     yield runtime
@@ -34,8 +36,10 @@ def isolated_runtime(monkeypatch, tmp_path):
     runtime.thread.join(2)
 
 
-def test_direct_request_can_receive_no_response_phrase(isolated_runtime):
-    """自动观察的静默标记不能吞掉用户主动要求的正文。"""
+@pytest.mark.parametrize("kind", ["chat", "observation"])
+@pytest.mark.parametrize("body", ["无需回应", "（无需回应）", "  无需回应。\n"])
+def test_model_body_preserves_no_response_phrase(isolated_runtime, kind, body):
+    """所有入口的模型正文原样保留，观察静默只能通过工具协议表达。"""
     runtime = isolated_runtime
     replies = []
     runtime.reply.connect(
@@ -43,15 +47,15 @@ def test_direct_request_can_receive_no_response_phrase(isolated_runtime):
     )
 
     async def chat(*_, **_kwargs):
-        return "无需回应"
+        return AssistantReply(body)
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(
         runtime.epoch, replace(Settings(), speak_replies=False),
-        "请回复无需回应这四个字", "chat", None, None,
+        "请回复无需回应这四个字", kind, None, None,
     )).result(3)
 
-    assert replies == [("chat", "无需回应")]
+    assert replies == [(kind, body)]
 
 
 def test_empty_model_reply_emits_visible_failure(isolated_runtime):
@@ -63,9 +67,9 @@ def test_empty_model_reply_emits_visible_failure(isolated_runtime):
     )
 
     async def chat(*_, **_kwargs):
-        return "   "
+        return AssistantReply("   ")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(
         runtime.epoch, replace(Settings(), speak_replies=False), "你好", "chat", None, None,
     )).result(3)
@@ -86,7 +90,7 @@ def test_backend_failure_does_not_expose_private_error_body(isolated_runtime):
     async def chat(*_, **_kwargs):
         raise OSError("private-test-marker: synthetic personal input")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(
         runtime.epoch, replace(Settings(), speak_replies=False), "你好", "voice-final", None, None,
     )).result(3)
@@ -106,13 +110,13 @@ def test_cancel_recovers_listening_and_accepts_next_turn(isolated_runtime):
         lambda _, text, _kind: replies.append(text), Qt.ConnectionType.DirectConnection
     )
 
-    async def chat(_settings, text, *_args, **_kwargs):
-        if text == "第一轮":
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["content"][0]["text"] == "第一轮":
             started.set()
             await asyncio.sleep(30)
-        return "第二轮正常回复"
+        return AssistantReply("第二轮正常回复")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.listening = True
     settings = replace(Settings(), speak_replies=False)
     runtime.ask(settings, "第一轮")
@@ -150,13 +154,12 @@ def test_synthesis_failure_keeps_text_and_emits_durable_failure(isolated_runtime
     )
 
     async def chat(*_, on_chunk=None, **_kwargs):
-        await on_chunk("这是完整的文字回复。")
-        return "这是完整的文字回复。"
+        return AssistantReply("这是完整的文字回复。")
 
     def synthesize(*_):
         raise RuntimeError("private-synthesis-marker")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     runtime.schedule(runtime._conversation(
         runtime.epoch, Settings(), "你好", "chat", None, None,
@@ -181,9 +184,9 @@ def test_empty_offline_recognition_skips_failure_and_resumes_listening(isolated_
     runtime.listening = True
 
     async def chat(*_, **_kwargs):
-        return "下一轮正常回复"
+        return AssistantReply("下一轮正常回复")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     settings = replace(Settings(), speak_replies=False, realtime_voice=False)
     runtime.schedule(runtime._conversation(
         runtime.epoch, settings, "", "voice", None, [0.0],

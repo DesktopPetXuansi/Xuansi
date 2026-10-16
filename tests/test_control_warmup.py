@@ -1,102 +1,64 @@
 """开麦前只预热控制缓存；合成建议不可执行，失败与取消不打开真实输入。"""
 
 import asyncio
-import json
 import logging
 import threading
 
-import httpx
 import numpy as np
 import pytest
 from PySide6.QtCore import Qt
 
 from pet.config import Settings
-from pet.inference import LocalEngine, request_messages
+from pet.inference import LocalEngine
 from pet.memory import MemoryStore
-from pet.model_control import control_prompt
 from pet.runtime import Runtime
 
 LOG = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enabled, actions", [(True, ()), (False, ("blink",))])
-async def test_warmup_uses_actual_control_prompt_and_discards_all_execution_suggestions(
-    monkeypatch, enabled, actions
-):
-    settings = Settings(temperature=1.1, persona="测试人设，不参与控制分类")
-    payloads = []
+async def test_warmup_only_loads_model_without_generating_execution_suggestions(monkeypatch):
+    """预热仅准备资源，任何推理和保存都属于错误副作用。"""
+    engine = LocalEngine()
+    settings = Settings()
+    loaded = []
 
     async def start(value):
-        assert value is settings
+        loaded.append(value)
+
+    async def unexpected_complete(*_args, **_kwargs):
+        pytest.fail("资源预热不得发起对话或工具建议")
 
     def unexpected_save(*_args):
-        pytest.fail("预热不得执行模型提出的记忆保存")
+        pytest.fail("资源预热不得写入用户记忆")
 
-    async def handle(request):
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
-        payload = json.loads(request.content)
-        payloads.append(payload)
-        grammar = payload["grammar"]
-        if "voice" not in grammar:
-            decision = {"memory_intent": "save"}
-        else:
-            # 返回合法但有副作用的建议，缓存预热仍必须全部丢弃。
-            decision = {
-                "memory_intent": "save", "voice": "off" if enabled else "on",
-                "motion": "blink" if actions else "none", "memory": "预热合成事项", "tts": "fast",
-            }
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(decision)}}]})
-
-    engine = LocalEngine()
     monkeypatch.setattr(engine, "start", start)
+    monkeypatch.setattr(engine, "complete", unexpected_complete)
     monkeypatch.setattr(MemoryStore, "remember", unexpected_save)
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-        engine.client = client
-        result = await engine.prepare_controls(settings, speech_enabled=enabled, available_motions=actions)
-    assert result is None
-    # 预热与真实轮次共用控制解释器；正文风格仅辅助预测朗读语言。
-    assert control_prompt(enabled, actions, True, settings.tts_engine) in payloads[0]["messages"][0]["content"]
-    assert settings.persona in payloads[0]["messages"][0]["content"]
-    assert payloads[0]["messages"][-1] == request_messages(settings, "你好", [], [])[-1]
-    assert payloads[0]["max_tokens"] == 256
-    assert all(payload["temperature"] == 0.0 and payload["top_p"] == 1.0 for payload in payloads)
-    assert all(payload["stream"] is False for payload in payloads)
-    assert "save ::= " in payloads[0]["grammar"], "预热需覆盖实际允许保存记忆的完整控制协议"
-    assert ('\\\"blink\\\"' in payloads[0]["grammar"]) is bool(actions)
+    assert await engine.warmup(settings) is None
+    assert loaded == [settings]
+    assert engine.last_used > 0
 
 
 @pytest.mark.asyncio
-async def test_cancelled_control_warmup_stops_owned_inference(monkeypatch):
-    entered = asyncio.Event()
-    stopped = []
+async def test_cancelled_model_warmup_propagates_to_resource_loading(monkeypatch):
+    entered, stopped = asyncio.Event(), asyncio.Event()
+    engine = LocalEngine()
 
     async def start(_settings):
-        pass
-
-    async def stop():
-        stopped.append(True)
-
-    async def handle(request):
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
         entered.set()
-        await asyncio.Event().wait()
-
-    engine = LocalEngine()
-    monkeypatch.setattr(engine, "start", start)
-    monkeypatch.setattr(engine, "stop", stop)
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-        engine.client = client
-        task = asyncio.create_task(engine.prepare_controls(Settings()))
         try:
-            await asyncio.wait_for(entered.wait(), 1)
+            await asyncio.Future()
         finally:
-            task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-    assert stopped == [True]
+            stopped.set()
+
+    monkeypatch.setattr(engine, "start", start)
+    task = asyncio.create_task(engine.warmup(Settings()))
+    await asyncio.wait_for(entered.wait(), 1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert stopped.is_set()
 
 
 @pytest.fixture
@@ -148,19 +110,19 @@ def test_runtime_warms_current_control_state_without_playback_or_user_state_chan
     runtime.motion_actions = ("blink",)
     history = list(runtime.history)
 
-    async def prepare(settings, *, speech_enabled=True, available_motions=()):
-        prepared.append((settings, speech_enabled, available_motions))
-        LOG.info("模拟完整控制预热 speech_enabled=%s", speech_enabled)
+    async def prepare(settings):
+        prepared.append(settings)
+        LOG.info("模拟模型资源预热")
 
     def synthesize(*_args):
         synthesized.append(True)
         return np.zeros(1), 8000
 
-    monkeypatch.setattr(runtime.engine, "prepare_controls", prepare, raising=False)
+    monkeypatch.setattr(runtime.engine, "warmup", prepare, raising=False)
     monkeypatch.setattr(runtime.audio, "synthesize", synthesize)
     settings = Settings()
     runtime.schedule(runtime._prepare_voice(settings)).result(2)
-    assert prepared == [(settings, enabled, ("blink",))]
+    assert prepared == [settings]
     assert bool(synthesized) is enabled
     assert not played and not opened
     assert runtime.history == history and runtime.memory.read() == "原有人工测试记忆"
@@ -175,7 +137,7 @@ def test_failed_control_warmup_reports_failure_without_opening_microphone(isolat
     async def prepare(*_args, **_kwargs):
         raise RuntimeError("合成控制预热失败")
 
-    monkeypatch.setattr(runtime.engine, "prepare_controls", prepare, raising=False)
+    monkeypatch.setattr(runtime.engine, "warmup", prepare, raising=False)
     runtime.toggle_microphone(True, 7, realtime=True, settings=Settings()).result(2)
     assert not opened and not played
     assert any("麦克风无法开启" in state for state in states)
@@ -189,7 +151,7 @@ def test_cancelled_control_warmup_never_opens_microphone(isolated_runtime, monke
         started.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr(runtime.engine, "prepare_controls", prepare, raising=False)
+    monkeypatch.setattr(runtime.engine, "warmup", prepare, raising=False)
     warming = runtime.toggle_microphone(True, 7, realtime=True, settings=Settings())
     assert started.wait(1)
     runtime.toggle_microphone(False).result(2)

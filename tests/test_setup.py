@@ -10,6 +10,24 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_upgrade_deletes_only_retired_control_modules():
+    """锁定原目录升级的删除边界，防止误删用户数据和其他模块缓存。"""
+    installer = (ROOT / "installer/online.iss").read_text(encoding="utf-8-sig")
+    section = installer.split("[InstallDelete]", 1)[1].split("[", 1)[0]
+    entries = {
+        line.strip() for line in section.splitlines()
+        if line.strip() and not line.lstrip().startswith(";")
+    }
+    modules = ("model_control", "model_semantics", "speech_control")
+    expected = {
+        f'Type: files; Name: "{{app}}\\pet\\{module}.py"' for module in modules
+    } | {
+        f'Type: files; Name: "{{app}}\\pet\\__pycache__\\{module}.*.pyc"' for module in modules
+    }
+    assert entries == expected
+    assert all(not (ROOT / "pet" / f"{module}.py").exists() for module in modules)
+
+
 @pytest.mark.parametrize("failure", [None, "models", "shortcuts"])
 def test_setup_propagates_errors_and_can_skip_shortcuts(tmp_path, failure):
     install = tmp_path / "安装目录 with spaces"

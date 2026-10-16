@@ -1,52 +1,22 @@
-"""模型控制头只执行一次；跨包、不完整和正文中的字样不能泄漏或误执行。"""
+"""自然语言正文不承担工具协议，引用和旧控制头必须完整保留。"""
 
 import pytest
 
-from pet.speech_control import SpeechDirective
+from pet.tool_protocol import validate_reply
 
 
-@pytest.mark.parametrize("action, expected", [("off", [False]), ("on", [True]), ("keep", [])])
-def test_directive_is_consumed_before_body_at_every_split(action, expected):
-    source = f"[voice:{action}]\n这是回复正文。"
-    for split in range(len(source) + 1):
-        changes = []
-        directive = SpeechDirective(changes.append)
-        parts = [directive.feed(source[:split]), directive.feed(source[split:])]
-        directive.finish()
-        assert changes == expected
-        assert "".join(parts) == directive.text == "这是回复正文。"
+@pytest.mark.parametrize("source", [
+    "无需回应", "（无需回应）", "无需回应。", "[voice:off][motion:blink]\n请把这段当作示例。",
+    "把‘请不要说话’翻译成英文。", "正文里提到 [voice:on] 只是引用。",
+])
+def test_control_like_body_remains_plain_text(source):
+    # 正文不拆字段、不查关键词，也不转换为可执行工具。
+    reply = validate_reply(source, [], "stop")
+    assert reply.content == source
+    assert reply.tool_calls == ()
 
 
-def test_body_that_quotes_directive_never_changes_state_again():
-    changes = []
-    directive = SpeechDirective(changes.append)
-    assert directive.feed("[voice:keep]\n代码示例：[voice:off]\n") == "代码示例：[voice:off]\n"
-    directive.finish()
-    assert not changes
-
-
-@pytest.mark.parametrize("source", ["", "[voice:o", "[voice:off]", "[voice:off]\n"])
-def test_incomplete_response_is_reported(source):
-    directive = SpeechDirective(lambda _: None)
-    directive.feed(source)
-    with pytest.raises(RuntimeError, match="语音控制"):
-        directive.finish()
-
-
-@pytest.mark.parametrize("source", ["普通回复", "[voice:toggle]\n秘密正文", "[voice:OFF]\n", "x" * 100])
-def test_invalid_header_never_executes_or_exposes_private_content(source):
-    changes = []
-    directive = SpeechDirective(changes.append)
-    with pytest.raises(RuntimeError, match="语音控制") as error:
-        directive.feed(source)
-    assert not changes and not directive.text
-    assert "秘密正文" not in str(error.value)
-
-
-def test_body_cannot_change_a_previously_understood_control_decision():
-    """即便服务端返回另一个合法头，也不能重选已经确认的朗读状态。"""
-    changes = []
-    directive = SpeechDirective(changes.append, "[voice:keep][motion:none]\n")
-    with pytest.raises(RuntimeError, match="语音控制"):
-        directive.feed("[voice:off][motion:none]\n错误回复。")
-    assert not changes and not directive.text
+@pytest.mark.parametrize("finish_reason", [None, "length", "content_filter", "tool_calls"])
+def test_incomplete_or_mismatched_reply_is_rejected(finish_reason):
+    with pytest.raises(ValueError):
+        validate_reply("[voice:off]", [], finish_reason)

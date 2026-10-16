@@ -5,7 +5,6 @@ import json
 import threading
 from dataclasses import replace
 
-import httpx
 import numpy as np
 import pytest
 from PySide6.QtCore import Qt
@@ -14,6 +13,7 @@ from pet.config import Settings
 from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
+from pet.tool_protocol import AssistantReply, ToolCall
 
 
 @pytest.fixture
@@ -27,14 +27,11 @@ def runtime(monkeypatch, tmp_path):
     result.audio_activity.update(False, now=10.0)
     result.memory = MemoryStore(tmp_path / "memory.json")
 
-    async def select_memory(_settings, _query, notes, _history):
-        return notes
+    async def start(_settings):
+        # 测试不得启动真实 GPU 服务。
+        pass
 
-    async def choose_tts(settings, _text):
-        return settings.tts_engine
-
-    monkeypatch.setattr(result.engine, "select_memory", select_memory)
-    monkeypatch.setattr(result.engine, "choose_tts", choose_tts)
+    monkeypatch.setattr(result.engine, "start", start)
     yield result
     result.microphone.stop()
     result.microphone.join()
@@ -47,14 +44,13 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
     seen = []
 
     async def chat(*_, on_chunk=None, **_kwargs):
-        await on_chunk("你好")
-        return "你好"
+        return AssistantReply("你好")
 
     def synthesize(text, speaker, speed, engine="fast"):
         seen.append(engine)
         return np.zeros(100, dtype=np.float32), 8000
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     runtime.schedule(
         runtime._conversation(0, replace(Settings(), tts_engine="natural"), "你好", "chat", None, None)
@@ -62,42 +58,26 @@ def test_selected_voice_engine_reaches_synthesizer(runtime):
     assert seen == ["natural"]
 
 
-def test_real_control_chain_selects_tts_before_streaming_synthesis(runtime, monkeypatch):
-    """保留真实Engine、协议解析及流水线，只替换HTTP服务和音频设备边界。"""
+def test_native_tool_chain_selects_tts_before_synthesis(runtime):
+    """工具回执先进入模型上下文，最终正文再使用所选引擎朗读。"""
     events = []
 
-    async def start(_):
-        pass
-
-    async def handle(request):
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
-        payload = json.loads(request.content)
-        if "memory_intent" in payload["grammar"]:
-            events.append("control")
-            content = json.dumps({
-                "memory_intent": "none", "voice": "keep", "motion": "none", "memory": None,
-                "tts": "natural",
-            })
-            return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+    async def complete(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] != "tool":
+            events.append("tool")
+            return AssistantReply("", (ToolCall("tts-1", "select_tts_engine", '{"engine":"natural"}'),), "tool_calls")
         events.append("body")
-        content = "[voice:keep][motion:none]\nHello, how are you?"
-        event = json.dumps({"choices": [{"delta": {"content": content}}]})
-        return httpx.Response(200, text="data: " + event + "\n\ndata: [DONE]\n\n")
+        assert json.loads(messages[-1]["content"])["ok"]
+        return AssistantReply("Hello, how are you?")
 
     def synthesize(text, _speaker, _speed, engine):
         events.append(("audio", engine, text))
         return np.zeros(80, dtype=np.float32), 8000
 
-    async def run():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle), base_url="http://127.0.0.1") as client:
-            runtime.engine.client = client
-            await runtime._conversation(0, Settings(), "用英语向我问好", "chat", None, None)
-
-    monkeypatch.setattr(runtime.engine, "start", start)
+    runtime.engine.complete = complete
     runtime.audio.synthesize = synthesize
-    runtime.schedule(run()).result(3)
-    assert events[:2] == ["control", "body"]
+    runtime.schedule(runtime._conversation(0, Settings(), "用英语向我问好", "chat", None, None)).result(3)
+    assert events[:2] == ["tool", "body"]
     assert all(event[:2] == ("audio", "natural") for event in events[2:])
     assert "".join(event[2] for event in events[2:]) == "Hello, how are you?"
     assert runtime.history[-1]["content"] == "Hello, how are you?"
@@ -106,13 +86,13 @@ def test_real_control_chain_selects_tts_before_streaming_synthesis(runtime, monk
 def test_live_waits_for_endpoint_and_deduplicates(runtime):
     calls = []
 
-    async def chat(settings, text, images, history, on_chunk=None, on_speech=None, **_kwargs):
-        calls.append(text)
-        # 模拟该完整话段已经过模型理解；部分转写不进入推理，也不能写入记忆。
-        await on_speech.remember("我喜欢喝绿茶")
-        return "已保存这项偏好。"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        if messages[-1]["role"] == "tool":
+            return AssistantReply("已保存这项偏好。")
+        calls.append(messages[-1]["content"][0]["text"])
+        return AssistantReply("", (ToolCall("save-1", "save_memory", '{"note":"我喜欢喝绿茶"}'),), "tool_calls")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.listening = True
     settings = replace(Settings(), speak_replies=False)
     for text in ("记住我喜欢", "记住我喜欢喝绿茶"):
@@ -128,7 +108,7 @@ def test_live_waits_for_endpoint_and_deduplicates(runtime):
     runtime.accept_voice(0, event, settings).result(2)
     assert "绿茶" in runtime.memory.read()
     assert calls == [event.text]
-    assert runtime.history[-2]["content"] == event.text
+    assert next(turn for turn in runtime.history if turn["role"] == "user")["content"][0]["text"] == event.text
     runtime.microphone_epoch += 1
     runtime.accept_voice(0, VoiceUpdate(1, "旧麦克风的话", final=True), settings).result(2)
     assert len(calls) == 1
@@ -159,10 +139,10 @@ def test_text_request_interrupting_warmup_clears_listening_state(runtime, monkey
         await asyncio.sleep(30)
 
     async def chat(*_, **__):
-        return "文字回复继续正常工作。"
+        return AssistantReply("文字回复继续正常工作。")
 
     monkeypatch.setattr(runtime, "_prepare_voice", prepare)
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     warming = runtime.toggle_microphone(True, realtime=True, settings=Settings())
     assert started.wait(2)
     runtime.ask(replace(Settings(), speak_replies=False), "你好")
@@ -183,7 +163,7 @@ def test_clear_memory_cancels_old_request_and_history(runtime):
         finally:
             stopped.set()
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.ask(Settings(), "我喜欢什么")
     assert started.wait(2)
     saved = runtime.save_memory("")
@@ -194,11 +174,14 @@ def test_clear_memory_cancels_old_request_and_history(runtime):
     assert runtime.history == []
 
 
-def test_clear_memory_cancels_pending_model_retrieval(runtime):
-    """清空发生在检索阶段也要取消GPU请求，旧候选不得进入随后正文。"""
+def test_clear_memory_cancels_pending_tool_retrieval(runtime):
+    """按需检索发生时清空记忆，仍取消在途请求与旧历史。"""
     runtime.memory.save("我偏好清淡饮品")
     entered, stopped = threading.Event(), threading.Event()
     replies = []
+
+    async def complete(_settings, messages, *_args, **_kwargs):
+        return AssistantReply("", (ToolCall("lookup", "search_memory", '{"query":"饮品"}'),), "tool_calls")
 
     async def select_memory(*_):
         entered.set()
@@ -207,6 +190,7 @@ def test_clear_memory_cancels_pending_model_retrieval(runtime):
         finally:
             stopped.set()
 
+    runtime.engine.complete = complete
     runtime.engine.select_memory = select_memory
     runtime.reply.connect(lambda *args: replies.append(args), Qt.ConnectionType.DirectConnection)
     runtime.ask(Settings(), "推荐一种饮品")
@@ -261,13 +245,13 @@ def test_changed_window_discards_observation_before_speech(runtime, monkeypatch)
     current = True
     spoken = []
 
-    async def chat(*_):
+    async def chat(*_, **_kwargs):
         nonlocal current
         current = False
-        return "现在的画面已经过期了"
+        return AssistantReply("现在的画面已经过期了")
 
     monkeypatch.setattr("pet.conversation.observation_current", lambda _: current)
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = lambda *_: spoken.append(True)
     runtime.schedule(
         runtime._conversation(
@@ -282,10 +266,10 @@ def test_quiet_observation_finishes_with_ready_state(runtime):
     states = []
     runtime.state.connect(lambda _, text: states.append(text), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_):
-        return "无需回应"
+    async def chat(*_, **_kwargs):
+        return AssistantReply("", (ToolCall("quiet", "finish_observation", "{}"),), "tool_calls")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.schedule(runtime._conversation(0, Settings(), "观察", "observation", None, None)).result(3)
     assert states[-1] == "已就绪 · 麦克风关闭"
 
@@ -298,40 +282,41 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
         captures.append((x, y, scope, threading.get_ident()))
         return b"synthetic-screen"
 
-    async def chat(_settings, _text, images, _history, **_kwargs):
-        images_seen.append(images)
-        return "测试已看到整屏"
+    async def chat(_settings, messages, *_args, **_kwargs):
+        images_seen.append(messages[-1]["content"])
+        return AssistantReply("测试已看到整屏")
 
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     for scope in ("screen", "nearby"):
         settings = replace(Settings(), speak_replies=False, capture_scope=scope)
-        runtime.schedule(runtime._conversation(0, settings, "看画面", "chat", (-100, 50), None)).result(3)
+        runtime.schedule(runtime._conversation(0, settings, "看画面", "chat-screen", (-100, 50), None)).result(3)
     assert [(x, y, scope) for x, y, scope, _ in captures] == [(-100, 50, "screen"), (-100, 50, "nearby")]
     assert all(thread != main_thread and thread != runtime.thread.ident for _, _, _, thread in captures)
-    assert images_seen == [[b"synthetic-screen"], [b"synthetic-screen"]]
+    assert all(any(part.get("type") == "image_url" for part in content) for content in images_seen)
 
 
-def test_streaming_voice_plays_before_model_finishes_and_keeps_full_history(runtime, monkeypatch):
+def test_voice_starts_after_complete_reply_and_keeps_full_history(runtime, monkeypatch):
     played = threading.Event()
-    heard = []
-    replies = []
+    heard, replies = [], []
     runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
 
-    async def chat(*_, on_chunk=None, **_kwargs):
-        await on_chunk("这是第一段。")
-        assert await asyncio.to_thread(played.wait, 1)
-        await on_chunk("后面还有第二段。")
-        return "这是第一段。后面还有第二段。"
+    async def chat(*_, **_kwargs):
+        # 完整回复前不知道模型是否还会调用工具，不得抢先朗读。
+        assert not played.is_set()
+        await asyncio.sleep(0)
+        assert not played.is_set()
+        return AssistantReply("这是第一段。后面还有第二段。")
 
     def synthesize(text, *_):
         heard.append(text)
         return np.zeros(80, dtype=np.float32), 8000
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = synthesize
     monkeypatch.setattr("pet.runtime.sd.play", lambda *_: played.set())
     runtime.schedule(runtime._conversation(0, Settings(), "聊两句", "chat", None, None)).result(3)
+    assert played.is_set()
     assert "".join(heard) == replies[0] == runtime.history[-1]["content"]
 
 
@@ -340,13 +325,12 @@ def test_streaming_tts_failure_still_delivers_complete_text(runtime):
     runtime.reply.connect(lambda _, text, kind: replies.append(text), Qt.ConnectionType.DirectConnection)
 
     async def chat(*_, on_chunk=None, **_kwargs):
-        await on_chunk("文字回复仍然可用。")
-        return "文字回复仍然可用。"
+        return AssistantReply("文字回复仍然可用。")
 
     def fail(*_):
         raise RuntimeError("synthetic tts failure")
 
-    runtime.engine.chat = chat
+    runtime.engine.complete = chat
     runtime.audio.synthesize = fail
     runtime.schedule(runtime._conversation(0, Settings(), "你好", "chat", None, None)).result(3)
     assert replies == ["文字回复仍然可用。"]

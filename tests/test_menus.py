@@ -45,10 +45,12 @@ async def test_sampling_parameters_reach_request():
 
     async def response(request):
         data = json.loads(request.content)
-        if request.url.path == "/tokenize":
-            return httpx.Response(200, json={"tokens": [1]})
+        if request.url.path == "/v1/chat/completions/input_tokens":
+            return httpx.Response(200, json={"input_tokens": 1})
         captured.append(data)
-        return httpx.Response(200, json={"choices": [{"message": {"content": "参数测试"}}]})
+        return httpx.Response(200, json={"choices": [{
+            "finish_reason": "stop", "message": {"content": "参数测试"},
+        }]})
 
     engine = LocalEngine()
 
