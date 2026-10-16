@@ -1,6 +1,6 @@
 # 开发与验证
 
-当前项目为 Windows/Python 3.13/PySide6 应用，不是 Node 或 Rust 工程。核对日期：2026-10-11；目录、线程和调用链见 [项目文档](项目文档.md)，环境准备见 [安装与发布](../发布与安装/安装与发布.md)。
+当前项目为 Windows/Python 3.13/PySide6 应用，不是 Node 或 Rust 工程。核对日期：2026-10-16；0.6.0 候选验证中，公开安装包仍为 0.5.6。目录、线程和调用链见 [项目文档](项目文档.md)，环境准备见 [安装与发布](../发布与安装/安装与发布.md)。
 
 ## 开发约定
 
@@ -29,19 +29,32 @@ Qt 窗口操作留在主线程，HTTP/子进程优先异步，耗时计算和保
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 scripts/verify_appearance_preview.py --output data/verification/appearance-preview-recheck.json
-.\.venv\Scripts\python.exe -X utf8 scripts/verify_model_semantics.py --output data/verification/model-semantics-recheck.json
+.\.venv\Scripts\python.exe -X utf8 scripts/verify_native_tools.py --output data/verification/native-protocol-recheck.json
+.\.venv\Scripts\python.exe -X utf8 scripts/verify_tool_dialogue.py --suite full --output data/verification/native-dialogue-recheck.json
+.\.venv\Scripts\python.exe -X utf8 scripts/verify_tool_dialogue.py --suite speech --output data/verification/native-speech-recheck.json
 .\.venv\Scripts\python.exe -X utf8 scripts/verify_business_integration.py --output data/verification/business-integration-recheck.json
 ```
 
 | 脚本 | 验证范围与实际影响 |
 | --- | --- |
 | [verify_appearance_preview.py](../../scripts/verify_appearance_preview.py) | Windows/Qt/OpenGL 和本项目 Live2D，使用人工图片；不运行语言模型或启麦，报告及截图落盘 |
-| [verify_model_semantics.py](../../scripts/verify_model_semantics.py) | 真实 Qwen/mmproj、合成图片、控制及临时记忆；Melo→SenseVoice 内存音频往返和 Kokoro 合成，不启麦、不实际播放、不覆盖在线 Paraformer；支持 `--control-only`、`--clarify-only` |
+| [verify_tool_dialogue.py](../../scripts/verify_tool_dialogue.py) | 原生模型工具闭环；full 为54次负例、工具正例、观察画面、长记忆及暖机性能。临时记忆、合成截图、模拟动作回执，不实际合成或播放 |
+| [verify_native_tools.py](../../scripts/verify_native_tools.py) | 当前引擎的 auto/none/required、工具结果、携图续答和流式参数；只使用合成资料 |
+| [verify_model_semantics.py](../../scripts/verify_model_semantics.py) | 兼容迁移入口，默认 full；旧 `--control-only` 转 speech、`--clarify-only` 转 full，保留 `--output`；不重新覆盖历史 Melo→SenseVoice 或 Kokoro 波形 |
 | [verify_business_integration.py](../../scripts/verify_business_integration.py) | Qt 窗口与真实模型链、临时配置/记忆、捕获虚拟窗口；报告和截图落盘，音频使用测试接收器 |
-| [verify_voice_reliability.py](../../scripts/verify_voice_reliability.py) | 合成语音、识别、控制和自然保存授权；支持 `--repro-audio`，报告名固定，无 `--output` |
+| [verify_voice_reliability.py](../../scripts/verify_voice_reliability.py) | 委托原生工具 full 矩阵，支持 `--output`；旧 ASR/低音量/NPZ 重放退役，`--repro-audio` 明确报错，历史报告保留 |
+| [verify_model_speech.py](../../scripts/verify_model_speech.py) | 委托原生工具 speech 矩阵：开关、上下文恢复和合成引擎选择；不验证实际音频设备或波形 |
+| [verify_speech_ui.py](../../scripts/verify_speech_ui.py) | 原生 Qt 朗读开关与状态同步；模型原生工具替身、临时记忆及静音接收器，不启动 GPU 或真实麦克风 |
+| [verify_observation.py](../../scripts/verify_observation.py) | 受控静默协议、真实自然观察、独立显式看图三阶段；真实截图仅允许完整覆盖的人工窗口，使用临时记忆；受控静默不计作真实模型语义通过 |
 | 其他 [scripts/](../../scripts) 验收脚本 | 观察、菜单、形象、资源或音频专项；运行前读取脚本确认是否启麦、播放、截图及是否改写固定报告 |
 
 真实模型检查占 GPU 和内存，原生窗口检查需要可用 Windows 桌面。不同脚本的数据隔离程度不同，不能笼统承诺所有验收工具都无副作用；普通单元测试不会替代真实声音听感、多屏混合 DPI 或日常流畅度评估。
+
+2026-10-16 候选 full 首轮报告 `data/verification/native-tools-full-first.json` 为 119 项、30 项失败；`native-tools-full-prompt2.json` 为 119 项、21 项失败；来源分离后的 `native-tools-full-source3.json` 为 119 项、18 项失败；严格提示定向复验 `strict-targeted4.json` 为 15 项、4 项失败，均为 `passed=false`。来源分离后 54 次负例仍有两次错误动作模拟受理；定向报告的 `negative_cases.runs=0` 不包含 `praise/` 命名案例，不能据此宣称零误执行。主代理最新完整 pytest 为 483 passed、2 skipped，同样不替代语义验收。分类、测量和剩余问题见[候选验收记录](../对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。报告位于本机忽略目录，继续复验另存名称，不能删改失败预期换取通过。
+
+三个历史迁移入口默认输出 `*-native-tools-report.json`，不覆盖旧日期报告。新 full/speech 报告不包含历史短句识别、轻声 ASR、旧失败 NPZ 重放或实际 Kokoro/Melo 波形合成，不能据此宣称旧语音专项重新通过；实际音频和听感需要单独验收。
+
+后续 `scope-reasoning-direct.json`、`scope-reasoning-thinking512.json`、`scope-reasoning-thinking1024.json` 各含 25 项局部诊断，失败数分别为 12、3、0。生产入口采用单次原生请求的明确 1024 token 思考预算，容量计算也包含真实总生成额度，未新增前置分类。局部结果不等于完整 full 通过，性能和完整语义矩阵仍需针对实际生产配置另存报告。
 
 ## 生产入口冒烟
 
