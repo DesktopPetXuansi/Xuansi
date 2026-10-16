@@ -74,7 +74,9 @@ def benchmark(arguments, report):
             if arguments.projector_path:
                 settings = replace(settings, projector_path=str(arguments.projector_path.resolve()))
             report["settings"] = {"temperature": settings.temperature, "gpu_layers": settings.gpu_layers,
-                                  "tts_engine": settings.tts_engine, "max_tokens": settings.max_tokens}
+                                  "tts_engine": settings.tts_engine, "max_tokens": settings.max_tokens,
+                                  "context_size": settings.context_size, "model_path": settings.model_path,
+                                  "projector_path": settings.projector_path}
 
             async def warmup():
                 await runtime.engine.start(settings)

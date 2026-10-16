@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from pet.appearance_preview import PreviewAvatar
 from pet.avatar import ARM_RAISE_BINDING_VERIFIED, Avatar
+from pet.avatar_live2d import AvatarLive2D
 from pet.live2d_session import Live2DSession
 
 
@@ -23,6 +24,7 @@ def test_blink_keeps_close_hold_open_and_finish_timing(elapsed, eye_open, finish
     owner = SimpleNamespace(
         _motion_name="blink",
         _motion_started=10.0,
+        _motion_request_id=None,
         animation="idle",
         _live2d_model=SimpleNamespace(SetAutoBlinkEnable=auto_blink.append),
     )
@@ -32,6 +34,76 @@ def test_blink_keeps_close_hold_open_and_finish_timing(elapsed, eye_open, finish
     assert values == {"ParamEyeLOpen": pytest.approx(eye_open), "ParamEyeROpen": pytest.approx(eye_open)}
     assert (owner._motion_name is None) is finished
     assert auto_blink == ([True] if finished else [])
+
+
+def test_motion_completion_is_published_only_after_successful_draw():
+    """时序结束先生成末帧参数，绘制完成后才发送工具完成回执。"""
+    receipts = []
+    owner = SimpleNamespace(_motion_name='blink', _motion_started=10.0,
+                            _motion_request_id='request-1', _motion_completed_request=None,
+                            animation='idle', _live2d_model=SimpleNamespace(SetAutoBlinkEnable=lambda _: None),
+                            motion_finished=SimpleNamespace(emit=lambda *args: receipts.append(args)))
+    Avatar._motion_parameter_values(owner, 10.25)
+    assert receipts == []
+    Avatar._publish_motion_completion(owner)
+    Avatar._publish_motion_completion(owner)
+    assert receipts == [('request-1', 'completed')]
+
+
+def test_interrupted_motion_publishes_cancelled_receipt():
+    receipts = []
+    owner = SimpleNamespace(_motion_name='blink', _motion_started=10.0,
+                            _motion_request_id='request-2', _motion_completed_request=None,
+                            animation='idle', update=lambda: None,
+                            _live2d_model=SimpleNamespace(SetAutoBlinkEnable=lambda _: None,
+                                                         SetParameterValue=lambda *_: None),
+                            motion_finished=SimpleNamespace(emit=lambda *args: receipts.append(args)))
+    assert Avatar.cancel_motion(owner)
+    assert receipts == [('request-2', 'cancelled')]
+
+
+@pytest.mark.parametrize("stage", ["parameter", "update", "draw"])
+@pytest.mark.parametrize("elapsed", [0.04, 0.25])
+def test_render_failure_cannot_complete_motion_on_next_frame(monkeypatch, stage, elapsed):
+    """中途或末帧失败后，恢复绘制不能拿旧标记冒充动作完成。"""
+    receipts = []
+    fail_once = True
+
+    def render_step(current_stage):
+        nonlocal fail_once
+        if fail_once and stage == current_stage:
+            fail_once = False
+            raise RuntimeError("synthetic render failure")
+
+    model = SimpleNamespace(
+        SetAutoBlinkEnable=lambda _: None,
+        SetParameterValue=lambda name, _: render_step("parameter") if name == "ParamEyeLOpen" else None,
+        Update=lambda: render_step("update"), Draw=lambda: render_step("draw"),
+    )
+    owner = SimpleNamespace(
+        _live2d_active=True, _live2d_model=model,
+        _live2d_module=SimpleNamespace(clearBuffer=lambda *_: None),
+        _last_render=10.0, _platform_model_version="", animation="idle",
+        _gaze_x=0.0, _gaze_y=0.0, _mouth_level=0.0, _mouth_target=0.0,
+        _motion_name="blink", _motion_started=10.0,
+        _motion_request_id="request-failed", _motion_completed_request=None,
+        _idle_blade_visual=lambda _: None, _update_gaze=lambda _: None,
+        _update_sway=lambda _: None, _present_idle_blade=lambda _: None,
+        motion_finished=SimpleNamespace(emit=lambda *args: receipts.append(args)),
+    )
+    owner._motion_parameter_values = lambda now: Avatar._motion_parameter_values(owner, now)
+    owner._publish_motion_completion = lambda: Avatar._publish_motion_completion(owner)
+    owner._report_motion_render_failure = lambda: Avatar._report_motion_render_failure(owner)
+    monkeypatch.setattr("pet.avatar_live2d.time.monotonic", lambda: 10.0 + elapsed)
+
+    with pytest.raises(RuntimeError, match="synthetic render failure"):
+        AvatarLive2D.paintGL(owner)
+    monkeypatch.setattr("pet.avatar_live2d.time.monotonic", lambda: 11.0)
+    AvatarLive2D.paintGL(owner)
+
+    assert receipts == [("request-failed", "unknown")]
+    assert owner._motion_request_id is None and owner._motion_completed_request is None
+    assert owner._motion_name is None
 
 
 def test_arm_binding_stays_disabled_even_if_the_parameter_exists():

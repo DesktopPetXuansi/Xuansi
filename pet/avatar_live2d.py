@@ -243,21 +243,27 @@ class AvatarLive2D:
                 model.Update()
                 model.Draw()
                 return
-            if self.animation == "sleep":
-                model.SetParameterValue("ParamEyeLOpen", 0.0)
-                model.SetParameterValue("ParamEyeROpen", 0.0)
-                model.SetParameterValue("ParamMouthOpenY", 0.0)
-            else:
-                model.SetParameterValue("ParamEyeBallX", self._gaze_x)
-                model.SetParameterValue("ParamEyeBallY", self._gaze_y)
-                model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
-            self._update_sway(elapsed)
-            for parameter, value in self._motion_parameter_values(now).items():
-                model.SetParameterValue(parameter, value)
-            # 先设置当帧参数，再由 Cubism 计算网格变形并绘制。
-            live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
-            model.Update()
-            model.Draw()
+            try:
+                if self.animation == "sleep":
+                    model.SetParameterValue("ParamEyeLOpen", 0.0)
+                    model.SetParameterValue("ParamEyeROpen", 0.0)
+                    model.SetParameterValue("ParamMouthOpenY", 0.0)
+                else:
+                    model.SetParameterValue("ParamEyeBallX", self._gaze_x)
+                    model.SetParameterValue("ParamEyeBallY", self._gaze_y)
+                    model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
+                self._update_sway(elapsed)
+                for parameter, value in self._motion_parameter_values(now).items():
+                    model.SetParameterValue(parameter, value)
+                # 末帧写入、网格更新和绘制全部成功才允许确认动作完成。
+                live2d.clearBuffer(0.0, 0.0, 0.0, 0.0)
+                model.Update()
+                model.Draw()
+            except Exception:
+                self._report_motion_render_failure()
+                LOG.exception("玄司 Live2D 当帧绘制失败")
+                raise
+            self._publish_motion_completion()
             self._present_idle_blade(None)
             return
         # Live2D 与 PNG 回退都由 QOpenGLWidget 的绘制流程显示。

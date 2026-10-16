@@ -103,6 +103,16 @@ def main():
             report["same_settings_restore_default"] = (
                 pet.runtime.speech_override is None and pet.runtime.should_speak(pet.settings)
             )
+            # 使用真实 Qt/Live2D 绘制而非定时器伪造完成，不经过模型替身决定动作。
+            wait_until(lambda: "blink" in pet.avatar.available_motions)
+            motion = pet.runtime.schedule(pet.runtime.request_motion(pet.runtime.epoch, "blink"))
+            wait_until(motion.done)
+            report["motion_draw_completed"] = motion.result() == {"status": "completed"}
+            interrupted = pet.runtime.schedule(pet.runtime.request_motion(pet.runtime.epoch, "blink"))
+            wait_until(lambda: pet.avatar._motion_name == "blink")
+            pet.avatar.cancel_motion()
+            wait_until(interrupted.done)
+            report["motion_interruption_reported"] = interrupted.result() == {"status": "cancelled"}
             report["passed"] = all(report.values())
         finally:
             pet.quit()

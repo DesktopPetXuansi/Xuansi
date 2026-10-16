@@ -145,8 +145,8 @@ class Verification:
             runtime.speech_override = enabled
             self.active["speech_changes"].append(enabled)
         async def request_motion(epoch, action):
-            # 只确认模拟器受理，不冒充实际 Live2D 运行或动作完成。
-            receipt = {"status": "accepted", "fixture": "simulated-qt-receipt", "action": action}
+            # 模拟生产绘制结束收据；不冒充本脚本实际运行了 Live2D。
+            receipt = {"status": "completed", "fixture": "simulated-qt-completion", "action": action}
             self.active["motion_receipts"].append(receipt)
             return receipt
         def emit(epoch, content, kind):
@@ -273,7 +273,7 @@ def main(argv=None):
     logging.getLogger("httpx").setLevel(logging.WARNING)
     report = {"suite": arguments.suite, "checks": [], "passed": False,
               "fixtures": {"screen": "synthetic JPEG only", "memory": "temporary isolated files",
-                           "motion": "simulated Qt accepted receipt; actual Live2D not tested",
+                           "motion": "simulated Qt completion receipt; actual Live2D not tested",
                            "audio": "no microphone, synthesis or playback"},
               "measurement_notes": "首文字为生产reply.emit首次发布；完成请求数不含search_memory内部语义筛选。"
                                    "正文与工具结果原样记录，图片只保存合成载荷长度。"}

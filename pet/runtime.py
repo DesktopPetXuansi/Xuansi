@@ -145,7 +145,7 @@ class Runtime(QObject):
         LOG.info("当前 Live2D 可用动作=%s", ",".join(self.motion_actions) or "无")
 
     async def request_motion(self, epoch, action):
-        """后台等待Qt受理回执；不把已发出信号当作执行成功。"""
+        """等待Qt实际绘制结束或中断；发出信号和开始播放都不是完成。"""
         if epoch != self.epoch or action not in self.motion_actions:
             return {"status": "rejected"}
         request_id = uuid.uuid4().hex
@@ -166,13 +166,13 @@ class Runtime(QObject):
         return bool(pending and pending[0] == epoch == self.epoch and pending[1] == action
                     and not pending[2].done() and time.monotonic() < pending[3])
 
-    def resolve_motion(self, request_id, accepted):
+    def resolve_motion(self, request_id, status):
         """界面线程只递交事实，Future统一回到所属事件循环完成。"""
         def resolve():
             pending = self.pending_motions.get(request_id)
             if pending is not None and not pending[2].done():
                 future = pending[2]
-                future.set_result({"status": "accepted" if accepted else "rejected"})
+                future.set_result({"status": status})
         self.loop.call_soon_threadsafe(resolve)
 
     def accept_voice(self, mic_epoch, update, settings, position=None):

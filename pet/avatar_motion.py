@@ -42,6 +42,8 @@ class AvatarMotion:
         self._motion_capabilities = ()
         self._motion_name = None
         self._motion_started = None
+        self._motion_request_id = None
+        self._motion_completed_request = None
 
     @property
     def available_motions(self):
@@ -58,7 +60,7 @@ class AvatarMotion:
             actions.append("raise_hand")
         return tuple(actions)
 
-    def play_motion(self, motion):
+    def play_motion(self, motion, *, request_id=None):
         """在现有 Live2D 绘制帧上启动一次白名单动作。"""
         if motion not in self.available_motions:
             LOG.warning("忽略未绑定的玄司动作 action=%s", motion)
@@ -66,6 +68,7 @@ class AvatarMotion:
         self.cancel_motion()
         self._motion_name = motion
         self._motion_started = time.monotonic()
+        self._motion_request_id = request_id
         if motion == "blink":
             self._live2d_model.SetAutoBlinkEnable(False)
         LOG.info("玄司动作开始 action=%s", motion)
@@ -75,7 +78,11 @@ class AvatarMotion:
     def cancel_motion(self):
         """取消动作并把参数恢复到中立值；休眠时继续保持闭眼。"""
         motion, self._motion_name = self._motion_name, None
+        request_id = self._motion_request_id or self._motion_completed_request
+        self._motion_request_id = self._motion_completed_request = None
         self._motion_started = None
+        if request_id:
+            self.motion_finished.emit(request_id, "cancelled")
         if motion is None:
             return False
         model = self._live2d_model
@@ -101,9 +108,11 @@ class AvatarMotion:
             hold_end = close_end + BLINK_HOLD_SECONDS
             finish = hold_end + BLINK_OPEN_SECONDS
             if elapsed >= finish:
+                self._live2d_model.SetAutoBlinkEnable(self.animation != "sleep")
+                self._motion_completed_request = self._motion_request_id
+                self._motion_request_id = None
                 self._motion_name = None
                 self._motion_started = None
-                self._live2d_model.SetAutoBlinkEnable(self.animation != "sleep")
                 LOG.info("玄司动作结束 action=blink")
                 eye_open = 1.0
             elif elapsed < close_end:
@@ -118,6 +127,8 @@ class AvatarMotion:
             lower_start = ARM_RAISE_SECONDS + ARM_HOLD_SECONDS
             finish = lower_start + ARM_RAISE_SECONDS
             if elapsed >= finish:
+                self._motion_completed_request = self._motion_request_id
+                self._motion_request_id = None
                 self._motion_name = None
                 self._motion_started = None
                 LOG.info("玄司动作结束 action=raise_hand")
@@ -130,6 +141,29 @@ class AvatarMotion:
                 arm_value = ARM_RAISE_VALUE * (1.0 - _smoothstep((elapsed - lower_start) / ARM_RAISE_SECONDS))
             return {"ParamArmRA": arm_value}
         return {}
+
+    def _publish_motion_completion(self):
+        """末帧参数真正提交绘制后才确认完成；失败或未绘制时不伪造回执。"""
+        request_id, self._motion_completed_request = self._motion_completed_request, None
+        if request_id:
+            self.motion_finished.emit(request_id, "completed")
+            LOG.info("玄司动作完成回执 request_id=%s", request_id)
+
+    def _report_motion_render_failure(self):
+        """清除失败帧的动作状态，后续普通帧不得补发完成回执。"""
+        motion, self._motion_name = self._motion_name, None
+        request_id = self._motion_request_id or self._motion_completed_request
+        self._motion_request_id = self._motion_completed_request = None
+        self._motion_started = None
+        if request_id:
+            self.motion_finished.emit(request_id, "unknown")
+            LOG.warning("玄司动作绘制失败 request_id=%s", request_id)
+        if motion == "blink":
+            try:
+                self._live2d_model.SetAutoBlinkEnable(self.animation != "sleep")
+            except Exception:
+                # 恢复失败单独留痕，不能覆盖触发动作失败的原始异常。
+                LOG.exception("玄司自动眨眼恢复失败")
 
     def _refresh_motion_capabilities(self):
         actions = self.available_motions

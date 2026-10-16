@@ -52,6 +52,7 @@ from .live2d_session import SESSION as SESSION
 class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDynamics, QOpenGLWidget):
     open_requested = Signal()
     motion_capabilities_changed = Signal(object)
+    motion_finished = Signal(str, str)
 
     def __init__(self, size=160, image_id="", *, parent=None):
         super().__init__(parent, PASSIVE if parent is None else Qt.WindowType.Widget)

@@ -65,6 +65,7 @@ class DesktopPet(QObject):
         self.avatar.open_requested.connect(self.open_panel)
         self.runtime.mouth_level.connect(self.avatar.set_mouth_level)
         self.runtime.motion_requested.connect(self._execute_motion)
+        self.avatar.motion_finished.connect(self.runtime.resolve_motion)
         self.avatar.motion_capabilities_changed.connect(self.runtime.set_motion_actions)
         self.panel.send_requested.connect(self.send)
         self.panel.voice_requested.connect(self.voice)
@@ -131,14 +132,17 @@ class DesktopPet(QObject):
         """Qt 将后台决策排入界面线程后，再校验代次和桌宠状态。"""
         if (not self.runtime.motion_pending(epoch, motion, request_id)
                 or self.paused or self.fullscreen or not self.avatar.isVisible()):
-            self.runtime.resolve_motion(request_id, False)
+            self.runtime.resolve_motion(request_id, "rejected")
             return
         try:
-            accepted = self.avatar.play_motion(motion)
+            accepted = self.avatar.play_motion(motion, request_id=request_id)
         except Exception as exc:
             LOG.warning("角色动作未受理 type=%s", type(exc).__name__)
-            accepted = False
-        self.runtime.resolve_motion(request_id, bool(accepted))
+            self.runtime.resolve_motion(request_id, "unknown")
+            return
+        if not accepted:
+            self.runtime.resolve_motion(request_id, "rejected")
+        # 已开始的动作由渲染完成或中断信号回传，不能把受理当作完成。
 
     def send(self, text, with_screen=False):
         self._begin()

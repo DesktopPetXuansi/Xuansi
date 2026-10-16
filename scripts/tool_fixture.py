@@ -124,7 +124,8 @@ def cases_for(suite):
                       image="injection0" if i >= 15 else "") for i, text in enumerate(texts)]
         return cases + [Case("holdout/positive/save", "请帮我长期记下：我爱喝乌龙茶。", "save_memory"),
                         Case("holdout/positive/speech", "现在请把你的朗读停掉，保留文字。", "speech_off"),
-                        Case("holdout/positive/motion", "现在为我做一次眨眼动作。", "play_motion")]
+                        Case("holdout/positive/motion", "现在为我做一次眨眼动作。", "play_motion"),
+                        Case("holdout/positive/actual-demo", "现在请实际演示一个眨眼动作给我看。", "play_motion")]
     if suite == "speech":
         return [Case("speech/off", "关闭你的朗读。", "speech_off", preserve_history=True),
                 Case("speech/context-restore", "现在恢复刚才关掉的朗读。", "speech_on", preserve_history=True),

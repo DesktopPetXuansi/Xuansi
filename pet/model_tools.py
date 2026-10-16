@@ -24,6 +24,7 @@ DEFINITIONS = {
                            "询问方法、引用和假设不表示改变开关。",
                            {"enabled": {"type": "boolean"}}),
     "select_tts_engine": ("仅为本轮回复选择语音引擎：中文或中英混合使用fast，只有纯英文使用natural。"
+                          "当前引擎已匹配回复语言时直接回答，无需重复选择；用户本轮明确指定引擎时除外。"
                           "已在设置中明确选择natural时保持natural。",
                           {"engine": {"type": "string", "enum": ["fast", "natural"]}}),
     "play_motion": ("执行用户本轮明确要求现在做的角色动作。用户只是提到、喜欢、夸奖或评价动作时绝对不调用；"
@@ -124,6 +125,9 @@ class ToolContext:
             arguments = self._arguments(call)
             value = await self._execute(call.name, arguments, call.id)
             payload = {"ok": True, "result": value}
+            if call.name == "play_motion" and value["status"] not in ("accepted", "completed"):
+                payload["ok"] = False
+                payload["error"] = "动作未完成，请依据实际中断、拒绝或未知状态说明结果。"
             content = "" if call.name == "capture_screen" else json.dumps(payload, ensure_ascii=False)
             if call.name == "capture_screen":
                 content = [
@@ -134,8 +138,9 @@ class ToolContext:
                     {"type": "image_url", "image_url": {
                         "url": "data:image/jpeg;base64," + base64.b64encode(value).decode("ascii")}},
                 ]
-            LOG.info("工具执行结束 epoch=%d call_id=%s name=%s outcome=success elapsed=%.3f",
-                     self.epoch, call.id, call.name, time.monotonic() - started)
+            LOG.info("工具执行结束 epoch=%d call_id=%s name=%s outcome=%s elapsed=%.3f",
+                     self.epoch, call.id, call.name, "success" if payload["ok"] else "failure",
+                     time.monotonic() - started)
         except asyncio.CancelledError:
             # 外层对短写入任务 shield 并等待真实结果；这里不吞取消或伪造未执行。
             LOG.info("工具执行结束 epoch=%d call_id=%s name=%s outcome=cancelled elapsed=%.3f",
@@ -152,7 +157,7 @@ class ToolContext:
         if name == "save_memory":
             return "记忆未确认保存：请检查事项长度、敏感资料限制、请求有效性或本地存储状态。"
         if name == "play_motion":
-            return "动作未确认执行：请求、参数、当前能力或界面回执无效；不要声称动作已经完成。"
+            return "动作未确认完成：请求、参数、当前能力或界面回执无效；不要声称动作已经完成。"
         return "工具未完成：请求可能已失效，或参数、权限、能力及本地服务不可用。"
 
     async def _execute(self, name, arguments, call_id):
@@ -200,7 +205,9 @@ class ToolContext:
         elif name == "play_motion":
             # Qt 回执区分受理与完成；仅发送信号不能当作执行成功。
             value = await self.runtime.request_motion(self.epoch, arguments["action"])
-            if not isinstance(value, dict) or value.get("status") not in ("accepted", "completed"):
+            if not isinstance(value, dict) or value.get("status") not in (
+                "accepted", "completed", "cancelled", "rejected", "unknown",
+            ):
                 raise ValueError("界面没有确认动作。")
             return value
         elif name == "finish_observation":

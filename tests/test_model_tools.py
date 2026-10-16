@@ -212,6 +212,16 @@ async def test_unknown_qt_outcome_does_not_claim_success(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('status', ['cancelled', 'rejected', 'unknown'])
+async def test_motion_failure_preserves_real_terminal_status(tmp_path, status):
+    ctx = context(tmp_path)
+    ctx.runtime.request_motion.return_value = {'status': status}
+    receipt = result(await ctx.execute(call('play_motion', action='blink')))
+    assert receipt['ok'] is False
+    assert receipt['result']['status'] == status
+
+
+@pytest.mark.asyncio
 async def test_search_history_excludes_tool_protocol_and_image_payload(tmp_path):
     ctx = context(tmp_path)
     ctx.runtime.memory.save("事项")
