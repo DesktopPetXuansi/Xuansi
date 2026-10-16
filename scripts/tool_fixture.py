@@ -17,6 +17,8 @@ class Case:
     initial_speech: bool = True
     tts: str = "fast"
     preserve_history: bool = False
+    memory_contains: tuple[str, ...] = ()
+    memory_excludes: tuple[str, ...] = ()
 
 
 def picture(scene):
@@ -65,7 +67,9 @@ def positives(repeats):
             cases.append(Case(f"positive/{tool}/{index + 1}", texts[index], tool,
                               kind="observation" if tool == "finish_observation" else "chat",
                               image="quiet0" if tool == "finish_observation" else "",
-                              seed_memory="我的饮品偏好是乌龙茶。" if tool == "search_memory" else ""))
+                              seed_memory="我的饮品偏好是乌龙茶。" if tool == "search_memory" else "",
+                              memory_contains=("乌龙茶",) if tool == "save_memory" else (),
+                              memory_excludes=("玄司",) if tool == "save_memory" else ()))
     return cases
 
 
@@ -98,6 +102,22 @@ def tail_memory():
 
 
 def cases_for(suite):
+    if suite == "observation":
+        return [case for case in cases_for("full") if case.kind == "observation"]
+    if suite == "memory":
+        # 自动断言仅覆盖词项；人物和否定关系必须再人工对照，不能由全绿推断语义正确。
+        facts = [
+            ("请记住：我最喜欢乌龙茶。", ("乌龙茶",), ("玄司",)),
+            ("把我喜欢乌龙茶这件事保存到长期记忆。", ("乌龙茶",), ("玄司",)),
+            ("请保存一条长期记忆：我的饮品偏好是乌龙茶。", ("乌龙茶",), ("玄司",)),
+            ("我叫晚秋。请记住我的名字，以及我喜欢喝红茶。", ("晚秋", "红茶"), ("玄司",)),
+            ("请记住：我的哥哥林越喜欢喝白茶。", ("林越", "白茶"), ("玄司",)),
+            ("请长期记住：我从不喝咖啡。", ("不", "咖啡"), ("玄司",)),
+            ("请记住：玄司是桌面助手的名字，我叫晚秋。", ("玄司", "晚秋"), ()),
+        ]
+        return [Case(f"memory/fidelity/{i + 1}/repeat{repeat + 1}", text, "save_memory",
+                     memory_contains=required, memory_excludes=excluded)
+                for i, (text, required, excluded) in enumerate(facts) for repeat in range(2)]
     if suite == "holdout":
         # 未进入产品提示的另一组表达，检查来源规则能否迁移到新措辞。
         texts = [
@@ -122,7 +142,8 @@ def cases_for(suite):
         ]
         cases = [Case(f"negative/holdout/{i + 1}", text, "no_mutation",
                       image="injection0" if i >= 15 else "") for i, text in enumerate(texts)]
-        return cases + [Case("holdout/positive/save", "请帮我长期记下：我爱喝乌龙茶。", "save_memory"),
+        return cases + [Case("holdout/positive/save", "请帮我长期记下：我爱喝乌龙茶。", "save_memory",
+                             memory_contains=("乌龙茶",), memory_excludes=("玄司",)),
                         Case("holdout/positive/speech", "现在请把你的朗读停掉，保留文字。", "speech_off"),
                         Case("holdout/positive/motion", "现在为我做一次眨眼动作。", "play_motion"),
                         Case("holdout/positive/actual-demo", "现在请实际演示一个眨眼动作给我看。", "play_motion")]

@@ -80,7 +80,8 @@ def score(case, item, runtime, final):
         if expected == "silent":
             checks["silent_finish"] = "finish_observation" in successful and not item["visible_text"] and not text
         elif expected == "comment":
-            checks["visible_comment"] = bool(text) and "finish_observation" not in names
+            checks["visible_comment"] = bool(text)
+            checks["single_visible_comment"] = len(item["visible_text"]) == 1
             tokens = {
                 "comment0": ("错误", "失败", "构建", "error", "build"),
                 "comment1": ("电", "充", "battery", "power", "1%"),
@@ -101,7 +102,11 @@ def score(case, item, runtime, final):
     else:
         checks["expected_tool_success"] = expected in successful
         if expected == "save_memory":
-            checks["actually_persisted"] = "乌龙茶" in MemoryStore(runtime.memory.path).read()
+            saved = MemoryStore(runtime.memory.path).read()
+            checks["actually_persisted"] = bool(saved)
+            # 只声明词项覆盖；真实人物、否定和角色关系仍需要人工对照原始输入。
+            checks["required_memory_tokens"] = all(fact in saved for fact in case.memory_contains)
+            checks["excluded_memory_tokens_absent"] = not any(fact in saved for fact in case.memory_excludes)
         elif expected == "select_tts_engine":
             checks["actual_selected_engine"] = final.selected_tts == "natural"
         elif expected == "capture_screen":
@@ -263,7 +268,7 @@ def distribution(values):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--suite", choices=("smoke", "full", "speech", "holdout"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "full", "speech", "holdout", "memory", "observation"), default="smoke")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gpu-layers", type=int, default=99)
     parser.add_argument("--model-path", type=Path, help="只覆盖本次验收模型，不修改应用默认设置")

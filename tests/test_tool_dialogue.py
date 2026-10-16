@@ -96,15 +96,28 @@ async def test_observation_finishes_by_tool_without_touching_chat_history(runtim
 
 
 @pytest.mark.asyncio
-async def test_mixed_finish_observation_does_not_swallow_visible_content(runtime):
+@pytest.mark.parametrize("text", ["无需回应", "已工作4小时，记得休息一下吧。\n\n"])
+async def test_finish_observation_preserves_body_and_ends_without_repeating(runtime, text):
+    """结束工具与正文可共存；原文交付一次，且可供本轮朗读。"""
+    runtime.responses.append(AssistantReply(text, (ToolCall("end-1", "finish_observation", "{}"),), "tool_calls"))
+    result = await run(runtime, "observation")
+    assert result.content == text
+    assert runtime.replies == [(text, "observation")]
+    assert len(runtime.requests) == 1 and runtime.history == []
+
+
+@pytest.mark.asyncio
+async def test_finish_observation_cannot_hide_other_tool_calls(runtime):
+    """终结与其他工具混批仍拒绝，避免部分操作后就结束本轮。"""
     runtime.responses.extend([
-        AssistantReply("无需回应", (ToolCall("quiet-1", "finish_observation", "{}"),), "tool_calls"),
-        AssistantReply("本次画面已看清。"),
+        AssistantReply("", (ToolCall("end-1", "finish_observation", "{}"),
+                            ToolCall("search-1", "search_memory", '{"query":"偏好"}')), "tool_calls"),
+        AssistantReply("本轮没有执行混合工具调用。"),
     ])
     await run(runtime, "observation")
-    assert runtime.replies == [("无需回应", "observation"), ("本次画面已看清。", "observation")]
     receipt = runtime.requests[1][0][-1]
     assert json.loads(receipt["content"])["ok"] is False
+    assert not runtime.memory.read()
 
 
 @pytest.mark.asyncio
