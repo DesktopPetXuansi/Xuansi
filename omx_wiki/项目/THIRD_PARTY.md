@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | 历史猫精灵、动画定义 | [NekoAI](https://github.com/nucket/NekoAI)，提交 `6c3f1235063ee0748fc710977b0c4a93aa76bdea` | MIT，Copyright (c) 2026 Naudy Castellanos；原文保留于 [assets/neko/LICENSE](../../assets/neko/LICENSE)，当前默认形象不再加载。开发时的 `upstream-nekoai/` 副本不随本仓库发布 |
 | 当前玄司立绘、头像及 Live2D 派生素材 | 用户角色参考图，经图像工具及授权的本机处理制作，见 [素材来源](../Live2D与形象/素材/玄司素材说明.md) | 用户明确要求保留版权，见 [单独声明](../../assets/xuansi/LICENSE)；不属于 Apache-2.0 或 NekoAI 的 MIT 范围 |
-| 图文基础模型 | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | Apache-2.0；模型许可仍应随实际分发保留 |
-| GGUF 及视觉组件 | [unsloth/Qwen3.5-4B-GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF)，提交 `e87f176479d0855a907a41277aca2f8ee7a09523` | 上述模型的转换，按 HF LFS 摘要校验，不因格式转换获得新的无限制许可 |
+| 图文基础模型 | [Qwen/Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B)（本分支实验默认） | Apache-2.0；模型许可仍应随实际分发保留 |
+| GGUF 及视觉组件 | [unsloth/Qwen3.5-9B-GGUF](https://huggingface.co/unsloth/Qwen3.5-9B-GGUF)，提交 `3885219b6810b007914f3a7950a8d1b469d598a5`（本分支实验默认） | 上述模型的转换，按 HF LFS 摘要校验，不因格式转换获得新的无限制许可 |
 | 推理引擎 | [llama.cpp](https://github.com/ggml-org/llama.cpp)，b10930 Windows CUDA 12.4 | 引擎 MIT；随下载包提供的 CUDA 运行库另受 NVIDIA 条款约束，不能把整个二进制包统称 MIT |
 | 语音识别权重 | [SenseVoiceSmall](https://huggingface.co/FunAudioLLM/SenseVoiceSmall)，sherpa-onnx int8 2025-09-09 转换 | 模型卡指向 [FunASR Model License](https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE)，不是 Apache-2.0；模型目录中保留 `MODEL_LICENSE` |
 | 默认实时识别权重 | [sherpa-onnx-streaming-paraformer-bilingual-zh-en](https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en)，固定提交 `8e40c43232a1c5c66c82111efc5820d3accca11b` | 转换仓库模型卡标注 Apache-2.0，并指向 ModelScope 的 `damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online`。该标签是转换仓库声明，商业分发仍需核对原始权重许可与来源；本次未获得新的商业授权。encoder/decoder int8 使用 HF LFS SHA256，tokens 固定版本并校验实际下载摘要 |

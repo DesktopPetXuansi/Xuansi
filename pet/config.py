@@ -33,8 +33,8 @@ class Settings:
     speaker: int = 0
     speed: float = 1.08
     input_device: int = -1
-    model_path: str = str(MODELS / "Qwen3.5-4B-Q4_K_M.gguf")
-    projector_path: str = str(MODELS / "mmproj-F16.gguf")
+    model_path: str = str(MODELS / "qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf")
+    projector_path: str = str(MODELS / "qwen3.5-9b/mmproj-F16.gguf")
     gpu_layers: int = 99
     temperature: float = 0.7
     top_p: float = 0.9
