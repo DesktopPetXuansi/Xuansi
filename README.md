@@ -1,16 +1,55 @@
 # 玄司 Xuansi · 本地 AI 桌宠
 
-运行在 Windows 上的本地桌面 AI 伙伴，支持屏幕理解、聊天、语音、长期记忆与 Live2D 形象。
+玄司是运行在 Windows 上的桌面 AI 伙伴，支持屏幕理解、文字聊天、说完后回复的连续语音、明确授权的长期记忆和 Live2D 形象。名字、人设、模型参数、声音和形象可在软件中调整。首次安装联网下载，日常推理在本机运行，无需云端账号或 API 密钥。
 
-**0.6.0 默认采用 Qwen3.5-9B Q4_K_M 与匹配投影。** 原话、上下文、系统提示及原生工具直接交给模型，按需执行并回传结果。版本及来源以 `release.json` 和 [GitHub v0.6.0](https://github.com/DesktopPetXuansi/Xuansi/releases/tag/v0.6.0) 为准，实际发行状态见 [0.6.0 发布验收](omx_wiki/发布与安装/验收/安装包0.6.0发布验收.md)。已有配置不自动切换 9B，升级步骤见 [安装与发布](omx_wiki/发布与安装/安装与发布.md)，已知纯英文引擎选择偏差及测试范围见 [候选验收](omx_wiki/对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。
+<p align="center">
+  <img src="assets/xuansi/front.png" alt="玄司：黑发高马尾、黑金古风服装的桌面伙伴" width="220">
+</p>
 
-**全部项目文档已按模块统一整理到 [omx_wiki](omx_wiki/README.md)。**
+## 版本与发布
 
-- [项目介绍、下载与快速启动](omx_wiki/项目/项目介绍.md)
-- [客户端使用指南](omx_wiki/客户端/使用指南.md)
-- [从桌宠上传 Live2D](omx_wiki/客户端/官网资源上传.md)
-- [官网本地开发与运行](omx_wiki/官网/本地开发与运行.md)
-- [安装与发布](omx_wiki/发布与安装/安装与发布.md)
-- [开发与验证](omx_wiki/项目/CONTRIBUTING.md)
+0.6.0 默认采用 Qwen3.5-9B Q4_K_M 与匹配投影，包含原生工具对话、标签栏控制中心及官网资源接入。实际版本及源码来源以安装目录 `release.json` 和 [GitHub v0.6.0](https://github.com/DesktopPetXuansi/Xuansi/releases/tag/v0.6.0) 为准，构建、安装和公开状态见 [0.6.0 发布验收](omx_wiki/归档/发布与安装/验收/安装包0.6.0发布验收.md)。0.5.6 的前置判断流程作为历史保留，0.6.0 由模型自主直答或按需执行工具并回传结果。
 
-原创代码与文档采用 [Apache-2.0](LICENSE)，来源声明见 [NOTICE](NOTICE)。玄司图片及派生模型保留版权，详见 [素材许可](assets/xuansi/LICENSE) 和 [第三方来源与许可](omx_wiki/项目/THIRD_PARTY.md)。
+## 已实现能力
+
+- 屏幕理解：鼠标点击、拖拽结束、滚动和停留触发观察；整块显示器或鼠标附近两种范围，也可手动附图提问。
+- 聊天与记忆：本地图文对话、近期会话上下文；由模型按需查询和保存。提示要求明确请求保存、含糊时先询问，实际理解仍可能误判；也可直接手动编辑长期记忆。
+- 连续语音：手动启麦、实时转写、话段结束后生成并分段朗读。提交后暂停收音，回复处理及播放完成再恢复；不支持全双工口头插话。
+- 角色动画：默认 Live2D 眨眼、视线、响度口型及发丝衣摆摆动；直接动作请求目前只开放一次眨眼。满足空闲条件后播放预制拔刀姿态。
+- 形象替换：导入静态图片或透明 GIF/WebP/APNG，预览后应用；默认预览支持独立眨眼按钮。
+- 桌面控制：对话、设置、记忆、形象、官网资源、上传及日志集中在同一控制窗口，通过浏览器式横向标签切换，沿用暖白和草绿配色；角色点击、托盘和快捷键打开同一窗口。顶部提供语音、朗读、看屏幕、休眠、停止回复及声音回避；启动不自动开启麦克风。
+- 官网资源：在控制中心连接官网账号，直接选择本地 Live2D 模型文件夹或入口文件上传，自动整理、校验与加入资源库；也支持资源下载安装及离线使用。[客户端上传说明](omx_wiki/客户端/使用指南.md#官网资源与本地上传)。
+
+详细操作与能力边界见 [使用指南](omx_wiki/客户端/使用指南.md)，模块及调用顺序见 [项目文档](omx_wiki/项目/项目文档.md)。
+
+## 下载与安装
+
+从 [GitHub v0.6.0](https://github.com/DesktopPetXuansi/Xuansi/releases/tag/v0.6.0) 获取 Windows x64 在线安装包与 `SHA256SUMS.txt`，资源状态见发布验收。安装包内置 Python 3.13.15，无需预装 Python 或 Git。
+
+当前安装路线要求 **Windows 11 x64、兼容 CUDA 12.4 的 NVIDIA GPU 与驱动、D 盘**，这些限制来自现有安装器和下载构建。9B 主模型和投影放在 `D:\AI\Models\desktop-pet\qwen3.5-9b`，两份文件约 6.60 GB，另需容纳语音模型、下载缓存、解压文件、Python 环境和推理引擎。尚未建立跨设备的最低内存、显存和总磁盘容量要求。首次下载需要网络，不是离线安装包。
+
+安装完成后从开始菜单“玄司 AI 桌宠”启动。已有设置不会自动切换模型，需在“模型设置”选择 9B 与匹配投影并保存。升级前从托盘退出旧实例，再选择原安装目录安装；程序没有自动更新或跨目录数据迁移功能。包版本及来源查看安装目录的 `release.json`。
+
+完整前提、校验、源码安装、升级保留范围及构建步骤见 [安装与发布](omx_wiki/发布与安装/安装与发布.md)。
+
+## 从源码运行
+
+准备 Git 和 64 位 Python 3.13，执行：
+
+```powershell
+git clone https://github.com/DesktopPetXuansi/Xuansi.git
+cd Xuansi
+py -3.13 --version
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+.\.venv\Scripts\pythonw.exe -m pet
+```
+
+脚本创建项目内 `.venv` 并下载全部预设模型，包括可选 Kokoro；不设置开机启动。没有 D 盘时，需先按 [源码安装说明](omx_wiki/发布与安装/安装与发布.md#源码安装) 同步调整两处模型根目录；软件配置不能移动全部语音模型。
+
+## 文档与开发
+
+[文档索引](omx_wiki/README.md) 提供现行模块入口；开发命令和验收工具统一见 [开发与验证](omx_wiki/项目/CONTRIBUTING.md)。
+
+## 许可
+
+原创代码和文档采用 [Apache-2.0](LICENSE)，来源声明见 [NOTICE](NOTICE)。**玄司图片及其 Live2D 派生素材保留版权**，见 [素材声明](assets/xuansi/LICENSE)；历史 NekoAI 素材保留 MIT。模型、Qt、Live2D、语音资源和 CUDA 各自适用第三方条款，完整范围见 [THIRD_PARTY.md](omx_wiki/项目/THIRD_PARTY.md)。

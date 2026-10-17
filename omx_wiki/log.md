@@ -64,3 +64,18 @@
 ## [2026-10-15T13:37:43.851Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-17T03:44:54.587Z] add
+- **Pages:** README.md, 原生工具对话与9b发布验收-2026-10-17.md, 客户端-live2d-直接上传验收-2026-10-15.md, 控制中心单页与生命周期约定.md, 文档目录与维护约定.md, 本地运行与邮件测试约定.md
+- **Summary:** Refreshed wiki index and derived metadata surfaces
+
+## [2026-10-17T03:44:55.195Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+
+## [2026-10-17T03:44:55.963Z] query
+- **Pages:** 原生工具对话与9b发布验收-2026-10-17.md, 文档目录与维护约定.md, 控制中心单页与生命周期约定.md, 客户端-live2d-直接上传验收-2026-10-15.md, 本地运行与邮件测试约定.md
+- **Summary:** Query "原生工具" → 5 results (of 5 total)
+
+## [2026-10-17T03:44:56.713Z] query
+- **Pages:** 控制中心单页与生命周期约定.md, 原生工具对话与9b发布验收-2026-10-17.md, 客户端-live2d-直接上传验收-2026-10-15.md, 文档目录与维护约定.md, 本地运行与邮件测试约定.md
+- **Summary:** Query "生命周期" → 5 results (of 5 total)
