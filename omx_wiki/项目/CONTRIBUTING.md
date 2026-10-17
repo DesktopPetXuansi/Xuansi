@@ -1,6 +1,6 @@
 # 开发与验证
 
-当前项目为 Windows/Python 3.13/PySide6 应用，不是 Node 或 Rust 工程。核对日期：2026-10-16；0.6.0 候选验证中，公开安装包仍为 0.5.6。目录、线程和调用链见 [项目文档](项目文档.md)，环境准备见 [安装与发布](../发布与安装/安装与发布.md)。
+核对日期：2026-10-17。0.6.0 默认采用 Qwen3.5-9B Q4_K_M 与匹配投影，包含原生工具对话、标签栏控制中心及官网资源接入。用户已于 2026-10-17 接受已知差异并授权更新本机和 Release；实际版本及源码来源以安装目录 `release.json` 和 [GitHub v0.6.0](https://github.com/DesktopPetXuansi/Xuansi/releases/tag/v0.6.0) 为准，构建、安装和公开状态见 [0.6.0 发布验收](../发布与安装/验收/安装包0.6.0发布验收.md)。 实现与已知差异见 [模型自主工具对话](../对话与记忆/模型自主工具对话.md)，使用、配置和架构入口见 [文档索引](../README.md)。
 
 ## 开发约定
 
@@ -50,11 +50,11 @@ Qt 窗口操作留在主线程，HTTP/子进程优先异步，耗时计算和保
 
 真实模型检查占 GPU 和内存，原生窗口检查需要可用 Windows 桌面。不同脚本的数据隔离程度不同，不能笼统承诺所有验收工具都无副作用；普通单元测试不会替代真实声音听感、多屏混合 DPI 或日常流畅度评估。
 
-2026-10-16 候选 full 首轮报告 `data/verification/native-tools-full-first.json` 为 119 项、30 项失败；`native-tools-full-prompt2.json` 为 119 项、21 项失败；来源分离后的 `native-tools-full-source3.json` 为 119 项、18 项失败；严格提示定向复验 `strict-targeted4.json` 为 15 项、4 项失败，均为 `passed=false`。来源分离后 54 次负例仍有两次错误动作模拟受理；定向报告的 `negative_cases.runs=0` 不包含 `praise/` 命名案例，不能据此宣称零误执行。主代理最新完整 pytest 为 500 passed、2 skipped，同样不替代语义验收。分类、测量和剩余问题见[候选验收记录](../对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。报告位于本机忽略目录，继续复验另存名称，不能删改失败预期换取通过。
+2026-10-16 候选 full 首轮报告 `data/verification/native-tools-full-first.json` 为 119 项、30 项失败；`native-tools-full-prompt2.json` 为 119 项、21 项失败；来源分离后的 `native-tools-full-source3.json` 为 119 项、18 项失败；严格提示定向复验 `strict-targeted4.json` 为 15 项、4 项失败，均为 `passed=false`。来源分离后 54 次负例仍有两次错误动作模拟受理；定向报告的 `negative_cases.runs=0` 不包含 `praise/` 命名案例，不能据此宣称零误执行。独立源码完整 pytest 为 500 passed、2 skipped；原项目含用户 12 项未提交 UI 增量为 512 passed、2 skipped，二者 Ruff 均通过。未提交 UI 增量不进入本包，这些结果不替代语义验收。分类、测量和剩余问题见[候选验收记录](../对话与记忆/验收/模型自主工具对话候选验收-2026-10-16.md)。报告位于本机忽略目录，继续复验另存名称，不能删改失败预期换取通过。
 
 三个历史迁移入口默认输出 `*-native-tools-report.json`，不覆盖旧日期报告。新 full/speech 报告不包含历史短句识别、轻声 ASR、旧失败 NPZ 重放或实际 Kokoro/Melo 波形合成，不能据此宣称旧语音专项重新通过；实际音频和听感需要单独验收。
 
-后续 `scope-reasoning-direct.json`、`scope-reasoning-thinking512.json`、`scope-reasoning-thinking1024.json` 各含 25 项局部诊断，失败数分别为 12、3、0。生产入口采用单次原生请求的明确 1024 token 思考预算，容量计算也包含真实总生成额度，未新增前置分类。局部结果不等于完整 full 通过，性能和完整语义矩阵仍需针对实际生产配置另存报告。
+后续 `scope-reasoning-direct.json`、`scope-reasoning-thinking512.json`、`scope-reasoning-thinking1024.json` 各含 25 项局部诊断，失败数分别为 12、3、0。生产入口采用单次原生请求的明确 1024 token 思考预算，容量计算也包含真实总生成额度，未新增前置分类。局部结果不等于完整 full 通过，各轮结果见候选验收；9B 主体保真 full 保留 119 项／1 项脚本失败，119 项已人工审阅，14 条记忆的人物、角色及否定关系逐项正确；三项英文译句沿用 fast 的 P3 保留。其后仅调整观察结束协议，33 项观察和 22 项新表达分组复验通过；语音 6 项仍有 1 项纯英文未选 natural 而沿用 fast。未重新完整跑过 119 项，不能称全部语义全绿。 真实 Runtime + TTS 的 `dialogue-benchmark-terminal-9b.json` 十轮均通过、每轮一次生成请求，首文字／首波形／总耗时中位数为 1.6029／1.88525／3.6668 秒，正文长度中位数 27 字；此前 9B 首波形中位数 3.26355 秒也保留。播放端为模拟接收器，不能据此判断听感或保证延迟无退化。
 
 ## 生产入口冒烟
 
