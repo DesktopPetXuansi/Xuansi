@@ -262,3 +262,21 @@
 ## [2026-10-18T03:56:17.083Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-18T09:35:21.897Z] ingest
+- **Pages:** 安装与发行验收-0-7-0-2026-10-18.md
+- **Summary:** Created new page "安装与发行验收 0.7.0 2026-10-18"
+
+## [2026-10-18T09:35:21.905Z] add
+- **Pages:** 安装与发行验收-0-7-0-2026-10-18.md
+- **Summary:** Created wiki page 安装与发行验收-0-7-0-2026-10-18.md
+
+## [2026-10-18T09:35:46.036Z] lint
+- **Pages:** 安装与发行验收-0-7-0-2026-10-18.md
+- **Summary:** Lint: 1 issues (1 orphan, 0 stale, 0 broken, 0 contradictions)
+
+## [2026-10-18T09:36:15.836Z] ingest
+- **Pages:** 文档目录与维护约定.md
+- **Summary:** Updated "文档目录与维护约定" with new content
+## [2026-10-18T09:36:42.496Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
