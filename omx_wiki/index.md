@@ -1,6 +1,6 @@
 # Wiki Index
 
-> 7 pages | Last updated: 2026-10-18T03:30:11.423Z
+> 8 pages | Last updated: 2026-10-18T03:56:16.418Z
 
 ## architecture
 
@@ -13,6 +13,7 @@
 ## decision
 
 - [安装前适配与多模型接入约定](安装前适配与多模型接入约定.md) — # 安装前适配与多模型接入约定
+- [设置文案与高级参数约定](设置文案与高级参数约定.md) — # 设置文案与高级参数约定
 
 ## environment
 

@@ -243,3 +243,22 @@
 ## [2026-10-18T03:30:12.058Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-18T03:55:30.896Z] ingest
+- **Pages:** 设置文案与高级参数约定.md
+- **Summary:** Created new page "设置文案与高级参数约定"
+
+## [2026-10-18T03:55:30.902Z] add
+- **Pages:** 设置文案与高级参数约定.md
+- **Summary:** Created wiki page 设置文案与高级参数约定.md
+
+## [2026-10-18T03:55:31.509Z] lint
+- **Pages:** 设置文案与高级参数约定.md
+- **Summary:** Lint: 1 issues (1 orphan, 0 stale, 0 broken, 0 contradictions)
+
+## [2026-10-18T03:56:16.420Z] add
+- **Pages:** README.md, 原生工具对话与9b发布验收-2026-10-17.md, 安装前适配与多模型接入约定.md, 客户端-live2d-直接上传验收-2026-10-15.md, 客户端界面优化验收-2026-10-16.md, 控制中心单页与生命周期约定.md, 文档目录与维护约定.md, 本地运行与邮件测试约定.md, 设置文案与高级参数约定.md
+- **Summary:** Refreshed wiki index and derived metadata surfaces
+
+## [2026-10-18T03:56:17.083Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
