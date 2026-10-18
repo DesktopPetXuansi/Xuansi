@@ -280,3 +280,10 @@
 ## [2026-10-18T09:36:42.496Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-18T10:53:57.478Z] ingest
+- **Pages:** 控制中心单页与生命周期约定.md
+- **Summary:** Updated "控制中心单页与生命周期约定" with new content
+
+## [2026-10-18T10:54:37.125Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
