@@ -47,7 +47,11 @@ class AvatarLive2D:
         """Qt GL 线程先试载候选模型，成功才替换；磁盘校验由调用方后台完成。"""
         from .platform_resources import read_installed
 
-        manifest, path = prepared or read_installed(version_id)
+        if version_id:
+            manifest, path = prepared or read_installed(version_id)
+        else:
+            # 空版本只代表内置玄司，沿用同一原子试载流程和专用参数驱动。
+            manifest, path = {"kind": "MODEL", "resourceVersionId": ""}, LIVE2D_MODEL
         if manifest["kind"] != "MODEL" or manifest["resourceVersionId"] != version_id:
             raise ValueError("请选择已安装的 Live2D 模型")
         if not self._live2d_ready:
@@ -66,10 +70,16 @@ class AvatarLive2D:
             parameter_ids = frozenset(candidate.GetParamIds())
             if not parameter_ids:
                 raise ValueError("模型未加载有效参数")
+            if not version_id and (missing := set(LIVE2D_PARAMETERS) - parameter_ids):
+                raise ValueError(f"模型缺少绑定参数：{', '.join(sorted(missing))}")
             scale = self.devicePixelRatioF()
             candidate.Resize(round(self.width() * scale), round(self.height() * scale))
             candidate.SetAutoBlinkEnable(True)
             candidate.SetAutoBreathEnable(False)
+            if not version_id and self.animation == "sleep":
+                candidate.SetAutoBlinkEnable(False)
+                candidate.SetParameterValue("ParamEyeLOpen", 0.0)
+                candidate.SetParameterValue("ParamEyeROpen", 0.0)
             # 试算并绘制一帧验证原生渲染资源；旧模型仍然完整保留。
             candidate.Update()
             candidate.Draw()
@@ -84,8 +94,12 @@ class AvatarLive2D:
             self._platform_parameters = manifest.get("capabilities", {}).get("parameters", {})
             self.image_id = ""
             self.frames, self.durations, self.native_animation = frames, durations, native
+            self.frame = 0
+            self._shown_frame = None
             self._live2d_requested = True
             self._live2d_failed = False
+            self._last_render = time.monotonic()
+            self._load_idle_blade_frames()
             candidate = None
             if previous is not None:
                 previous.DestroyRenderer()

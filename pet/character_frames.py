@@ -13,7 +13,7 @@ LOG = logging.getLogger(__name__)
 STATES = ("idle", "thinking", "happy", "sleep", "walk_left", "walk_right")
 
 
-def load_pixmap(identifier=""):
+def load_pixmap(identifier="", *, strict=False):
     path = image_path(identifier)
     reader = QImageReader(str(path))
     size = reader.size()
@@ -21,8 +21,12 @@ def load_pixmap(identifier=""):
     original = QPixmap()
     if size.isValid() and max(size.width(), size.height()) <= 1536:
         original = QPixmap.fromImage(reader.read())
-    fallback = original.isNull() or QRegion(original.mask()).isEmpty()
+    # 完全不透明的 QPixmap 没有透明蒙版，不能把空蒙版误判成空白图。
+    fallback = original.isNull() or (original.hasAlphaChannel() and QRegion(original.mask()).isEmpty())
     if fallback:
+        if strict:
+            LOG.warning("所选形象副本无法读取，拒绝切换")
+            raise ValueError("所选图片已丢失、损坏或没有可见内容，请重新导入")
         LOG.warning("形象副本不可用，回退默认玄司")
         original = QPixmap(str(DEFAULT_IMAGE))
     if original.isNull():
@@ -30,7 +34,7 @@ def load_pixmap(identifier=""):
     return original, fallback
 
 
-def build_frames(height, identifier=""):
+def build_frames(height, identifier="", *, strict=False):
     started = time.perf_counter()
     width = round(height * 0.75)
     if identifier.endswith(".apng"):
@@ -41,8 +45,10 @@ def build_frames(height, identifier=""):
             frames, durations = loaded
             # 动图沿用原帧序，状态切换复用同一缓存，不额外扭曲原有动作。
             return {state: frames for state in STATES}, durations, True
+        if strict:
+            raise ValueError("所选动图已丢失或损坏，请重新导入")
         identifier = ""
-    original, _ = load_pixmap(identifier)
+    original, _ = load_pixmap(identifier, strict=strict)
     sprite = original.scaled(
         width - 12,
         height - 12,

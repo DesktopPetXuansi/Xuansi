@@ -140,13 +140,17 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
             return
         self._frame_mask()
 
-    def set_image(self, identifier, force=False):
-        if identifier == self.image_id and not force:
+    def set_image(self, identifier, force=False, *, strict=False):
+        if identifier == self.image_id and not force and not strict:
             return
+        if strict and not identifier:
+            # 显式恢复默认必须真正在 GL 中试载，不能把 PNG 回退当作成功。
+            self.select_platform_model("")
+            return
+        # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
+        frames, durations, native = build_frames(self.height(), identifier, strict=strict)
         self.cancel_motion()
         self.interrupt_idle_blade(fade=False)
-        # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
-        frames, durations, native = build_frames(self.height(), identifier)
         if self._platform_model_version:
             # 本机图片入口明确选择原有形象流程，解除平台模型选择。
             self._release_live2d()

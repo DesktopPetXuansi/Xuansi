@@ -145,7 +145,7 @@ def check_references(manifest, directory):
     entry = directory / manifest["entrypoint"]
     if manifest["kind"] not in {"MODEL", "MOTION", "EXPRESSION"}:
         return
-    document = json.loads(entry.read_text("utf-8"))
+    document = json.loads(entry.read_text("utf-8-sig"))
     if not isinstance(document, dict):
         raise ValueError("资源入口 JSON 无效")
     if manifest["kind"] == "EXPRESSION":
