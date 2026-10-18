@@ -10,4 +10,6 @@ def configure_fonts(app):
         path = Path("C:/Windows/Fonts") / name
         if path.exists():
             QFontDatabase.addApplicationFont(str(path))
-    app.setFont(QFont("Microsoft YaHei", 10))
+    font = QFont("Microsoft YaHei")
+    font.setPointSizeF(10.5)
+    app.setFont(font)

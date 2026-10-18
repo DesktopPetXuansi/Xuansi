@@ -21,6 +21,7 @@ class CompanionUI:
         self.appearance_only = False
         self.hotkey_staged = False
         self.closed = False
+        self.credential_snapshot = None
         self.hotkey = GlobalHotkey(owner.application, owner.panel.toggle)
         try:
             self.hotkey.stage(owner.settings.chat_hotkey)
@@ -36,6 +37,7 @@ class CompanionUI:
         owner.panel.mount_section("appearance", self.appearance,
                                   on_open=lambda: self.appearance.present(owner.settings.avatar_image))
         self.platform = PlatformDialog(owner, embedded=True)
+        self.platform.activity_changed.connect(owner.panel.footer.set_activity)
         owner.panel.mount_section("resources", self.platform, on_open=self.resources_opened)
         owner.panel.upload_requested.connect(self.platform.open_upload)
         # 先显示角色创建 GL 上下文，再异步恢复本机已安装模型。
@@ -83,7 +85,7 @@ class CompanionUI:
     def _tray(self):
         pet = self.owner
         tray = QSystemTrayIcon(QIcon(str(ROOT / "assets/xuansi/icon.png")), pet)
-        tray.setToolTip(f"{pet.settings.name} · 本地桌宠")
+        tray.setToolTip(f"{pet.settings.name} · 桌面伙伴")
         menu = QMenu()
         for text, slot in [
             ("打开控制中心", pet.open_panel),
@@ -118,12 +120,18 @@ class CompanionUI:
         self.owner.panel.saving(True)
         self.owner.panel.audio_avoidance_action.setEnabled(False)
         self.owner.panel.status.setText("正在保存配置…")
+        # Key 只沿本次内存事务传递；它不是 Settings 的字段。
+        model_page = getattr(self.owner.panel, 'model_page', None)
+        self.credential_snapshot = (model_page.credential_draft()
+                                    if model_page is not None and not (appearance_only or avoidance_only) else None)
         platform_changes = ({"platform_model_version": settings.platform_model_version,
                              "platform_expression_version": settings.platform_expression_version,
                              "avatar_image": settings.avatar_image}
                             if appearance_only else None)
-        self.owner.runtime.persist(settings, validate_models=not (appearance_only or avoidance_only),
-                                   platform_changes=platform_changes)
+        options = {'validate_models': not (appearance_only or avoidance_only), 'platform_changes': platform_changes}
+        if self.credential_snapshot is not None:
+            options['credential_change'] = self.credential_snapshot
+        self.owner.runtime.persist(settings, **options)
 
     def saved(self, settings, error):
         if self.closed:
@@ -138,6 +146,9 @@ class CompanionUI:
                 self.hotkey.commit()
         # 保留本次保存的用途，不能仅凭字段差异判断；相同图片仍需重新加载。
         self.owner.apply_settings(settings, error, appearance_only=self.appearance_only)
+        if not self.appearance_only and not error and self.credential_snapshot is not None:
+            self.owner.panel.model_page.credentials_saved(self.credential_snapshot)
+        self.credential_snapshot = None
         self.owner.panel.form.complete(error)
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
@@ -152,6 +163,8 @@ class CompanionUI:
             status += " · 热键不可用，请到配置更改"
         self.owner.panel.audio_status.setText(status)
         panel = self.owner.panel
+        panel.speech_button.setEnabled('tts' in self.owner.settings.ai.voice_components)
+        panel.voice_button.setEnabled(bool(set(self.owner.settings.ai.voice_components) & {'asr', 'realtime'}))
         panel.speech_button.blockSignals(True)
         panel.speech_button.setChecked(enabled)
         panel.speech_button.setText("朗读开启" if enabled else "朗读关闭")

@@ -27,6 +27,7 @@ class DesktopPet(QObject):
         self.application = application
         self.settings = settings or load_settings()
         self.paused, self.busy, self.fullscreen = False, False, False
+        self.pressure = False
         # 用户开关与实际收音分别记录；休眠只暂停设备，不清掉用户选择。
         self.voice_enabled = False
         self.last_external = cursor_position()
@@ -45,6 +46,9 @@ class DesktopPet(QObject):
         self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
         self.panel = Panel(self.settings)
+        preference = ('首选在线 · ' + self.settings.ai.profile.model if self.settings.ai.policy == 'online_first'
+                      else '首选本地 · ' + self.settings.ai.local_model)
+        self.panel.footer.set_provider(preference + ' · 尚未连接')
         self.gate = ObservationGate(self.settings.interval)
         self.monitor = MouseMonitor()
         self._connect()
@@ -80,6 +84,7 @@ class DesktopPet(QObject):
         self.runtime.devices_loaded.connect(
             lambda devices: self.panel.preferences.set_devices(devices, self.settings.input_device)
         )
+        self.runtime.provider_changed.connect(self._provider_changed)
         self.runtime.reply.connect(self.on_reply)
         self.runtime.failed.connect(self.on_failed)
         self.runtime.heard.connect(
@@ -99,6 +104,20 @@ class DesktopPet(QObject):
         self.idle_action.record_input(time.monotonic())
         self.avatar.interrupt_idle_blade()
         self.avatar.cancel_motion()
+
+    def _provider_changed(self, event):
+        """区分首选和实际位置；状态独立于资源和后台上传提示。"""
+        label = ('在线 · ' if event.online else '本地 · ') + event.current
+        if event.reason == 'resource':
+            label += ' · 资源回退'
+        if event.online and not self.settings.ai.cloud_memory:
+            label += ' · 在线记忆检索未启用'
+        if event.online and not self.settings.ai.profile.is_verified('image', 'tools'):
+            label += ' · 图片与工具待验证'
+        self.panel.footer.set_provider(label)
+        self.panel.footer.setAccessibleDescription(f'首选 {event.preferred}；当前 {label}')
+        self.tray.setToolTip(f'{self.settings.name} · {label}')
+        LOG.info('界面已同步实际推理位置 online=%s reason=%s', event.online, event.reason)
 
     def open_panel(self):
         # 只有显式点击才显示并激活可输入窗口。
@@ -377,13 +396,15 @@ class DesktopPet(QObject):
         self.panel.title.setText(settings.name)
         self.panel.setWindowTitle(f"{settings.name} · 控制中心")
         self.panel.logs.setWindowTitle(f"{settings.name} · 运行日志")
-        self.tray.setToolTip(f"{settings.name} · 本地桌宠")
+        self.tray.setToolTip(f"{settings.name} · 桌面伙伴")
+        self.panel.footer.set_provider('设置已更新 · 等待下次连接')
         self.panel.status.setText("已保存；下次回应使用新设置")
 
     def _resources(self):
         self.ui.refresh()
         state = desktop_state()
         available = psutil.virtual_memory().available / 2**30
+        self._adjust_resource_pressure(available)
         # 锁屏/切换用户/显示器不可用时常没有前景窗口，此时停止抓图。
         suppressed = state.fullscreen or not state.hwnd
         if suppressed != self.fullscreen:
@@ -414,9 +435,20 @@ class DesktopPet(QObject):
         ):
             self.runtime.cancel(release=True)
         self.panel.footer.setText(
-            f"仅本机处理 · 可用内存 {available:.1f} GB · 麦克风"
+            f"可用内存 {available:.1f} GB · 麦克风"
             + ("开启" if self.runtime.listening else "关闭")
         )
+
+    def _adjust_resource_pressure(self, available):
+        # 这是后台调度余量，不是模型硬件最低配置；恢复边界留出余量避免反复跳变。
+        previous = self.pressure
+        self.pressure = available < (5 if previous else 4)
+        self.gate.interval = self.settings.interval * (3 if self.pressure else 1)
+        interval = 66 if self.pressure and not self.busy else 33
+        if self.avatar.render_clock.interval() != interval:
+            self.avatar.render_clock.setInterval(interval)
+        if previous != self.pressure:
+            LOG.info('后台资源调度调整 pressure=%s', self.pressure)
 
     def _update_idle_action(self, state, now):
         """仅在桌面可用且默认 Live2D 空闲时推进五分钟待机计时。"""

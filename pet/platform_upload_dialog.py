@@ -9,20 +9,14 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
-    QFormLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QProgressBar,
     QPushButton,
-    QVBoxLayout,
 )
 
-from .avatar_live2d import LIVE2D_MODEL
 from .platform_api import PlatformClient
 from .platform_auth import authorize, website_url
+from .platform_layout import upload_layout
 from .platform_resources import read_installed
-from .platform_upload import DEFAULT_LICENSE, UploadError
+from .platform_upload import UploadError
 
 LOG = logging.getLogger(__name__)
 
@@ -41,57 +35,8 @@ class ModelUploadDialog(QDialog):
         self.setWindowTitle("上传 Live2D 模型 · 玄司")
         self.setWindowModality(Qt.WindowModality.NonModal if embedded else Qt.WindowModality.WindowModal)
         self.resize(600, 460)
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("选择本地模型，客户端会自动整理运行文件并上传。"))
-        self.connection = QLabel("首次连接需要在浏览器中登录并允许上传模型。")
-        self.connection.setTextFormat(Qt.TextFormat.PlainText)
-        self.connection.setWordWrap(True)
-        layout.addWidget(self.connection)
-        initial = "" if platform.owner.settings.avatar_image else str(LIVE2D_MODEL)
-        self.source = QLineEdit(initial)
-        self.source.setReadOnly(True)
-        self.source.setAccessibleName("本地模型文件或文件夹")
-        layout.addWidget(self.source)
-        buttons = QHBoxLayout()
-        self.file_button = QPushButton("选择模型文件")
-        self.folder_button = QPushButton("选择模型文件夹")
-        self.file_button.clicked.connect(self.browse_file)
-        self.folder_button.clicked.connect(self.browse_folder)
-        buttons.addWidget(self.file_button)
-        buttons.addWidget(self.folder_button)
-        layout.addLayout(buttons)
-        fields = QFormLayout()
-        self.name = QLineEdit(Path(initial).name.removesuffix(".model3.json") if initial else "")
-        self.author = QLineEdit()
-        self.version = QLineEdit("1.0.0")
-        self.license = QLineEdit(DEFAULT_LICENSE)
-        self.name.setMaxLength(120)
-        for label, field in [("模型名称", self.name), ("模型作者", self.author),
-                             ("版本号", self.version), ("使用许可", self.license)]:
-            field.setAccessibleName(label)
-            fields.addRow(label, field)
-        layout.addLayout(fields)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        layout.addWidget(self.progress)
-        self.status = QLabel("正在连接官网账号…")
-        self.status.setTextFormat(Qt.TextFormat.PlainText)
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
-        actions = QHBoxLayout()
-        self.submit_button = QPushButton("上传模型")
-        self.connect_button = QPushButton("连接官网")
-        self.cancel_button = QPushButton("关闭")
-        self.view_button = QPushButton("在官网查看")
-        self.submit_button.clicked.connect(self.submit)
-        self.connect_button.clicked.connect(self.connect_account)
-        self.cancel_button.clicked.connect(self.cancel_or_close)
-        self.view_button.clicked.connect(self.view_resource)
-        self.view_button.hide()
-        for button in (self.submit_button, self.connect_button, self.view_button, self.cancel_button):
-            actions.addWidget(button)
-        layout.addLayout(actions)
+        upload_layout(self)
+        LOG.debug("模型上传页分组布局已构建")
         if embedded:
             for button in self.findChildren(QPushButton):
                 button.setAutoDefault(False)

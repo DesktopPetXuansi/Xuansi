@@ -8,19 +8,14 @@ from dataclasses import replace
 import httpx
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QComboBox,
     QDialog,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QListWidget,
     QListWidgetItem,
     QPushButton,
-    QVBoxLayout,
 )
 
 from .platform_api import PlatformClient
 from .platform_auth import authorize, website_url
+from .platform_layout import resource_layout
 from .platform_resources import installed_resources, read_installed
 from .platform_upload import UploadError
 
@@ -76,6 +71,7 @@ class PlatformTask(QThread):
 
 class PlatformDialog(QDialog):
     shutdown_done = Signal()
+    activity_changed = Signal(str)
 
     def __init__(self, owner, *, embedded=False):
         super().__init__(owner.panel)
@@ -94,52 +90,8 @@ class PlatformDialog(QDialog):
         owner.runtime.platform_settings_saved.connect(self.platform_saved)
         self.setWindowTitle("官网资源库 · 玄司")
         self.resize(680, 620)
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("官网账号仅用于资源；聊天、录音、推理仍留在本机。"))
-        self.url = QLineEdit(owner.settings.platform_url)
-        layout.addWidget(self.url)
-        row = QHBoxLayout()
-        self.controls = []
-        for label, slot in [("浏览器登录", self.login), ("刷新官网资源", self.refresh_remote),
-                            ("退出官网账号", self.logout), ("取消操作", self.cancel)]:
-            button = QPushButton(label)
-            button.clicked.connect(slot)
-            row.addWidget(button)
-            if label != "取消操作":
-                self.controls.append(button)
-        layout.addLayout(row)
-        upload_button = QPushButton("上传本地 Live2D 模型")
-        upload_button.clicked.connect(self.open_upload)
-        self.controls.append(upload_button)
-        layout.addWidget(upload_button)
-        reset_expression = QPushButton("结束当前表情，恢复视线和口型")
-        reset_expression.clicked.connect(self.reset_expression)
-        self.controls.append(reset_expression)
-        layout.addWidget(reset_expression)
-        self.remote = QListWidget()
-        self.remote.currentRowChanged.connect(self.load_versions)
-        layout.addWidget(self.remote)
-        self.versions = QComboBox()
-        layout.addWidget(self.versions)
-        button = QPushButton("下载安装所选版本")
-        button.clicked.connect(self.download)
-        self.controls.append(button)
-        layout.addWidget(button)
-        layout.addWidget(QLabel("本机已安装资源（无需登录，断网也可使用）"))
-        self.local = QListWidget()
-        layout.addWidget(self.local)
-        row = QHBoxLayout()
-        for label, slot in [("刷新本机资源", self.refresh_local), ("应用模型 / 动作 / 表情", self.apply_selected),
-                            ("恢复默认玄司", self.restore_default)]:
-            button = QPushButton(label)
-            button.clicked.connect(slot)
-            self.controls.append(button)
-            row.addWidget(button)
-        layout.addLayout(row)
-        self.status = QLabel("使用浏览器登录，或直接使用本机资源。")
-        self.status.setTextFormat(Qt.TextFormat.PlainText)
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
+        resource_layout(self)
+        LOG.debug("官网资源页分组布局已构建")
         if embedded:
             for button in self.findChildren(QPushButton):
                 button.setAutoDefault(False)
@@ -157,6 +109,8 @@ class PlatformDialog(QDialog):
         self.refresh_local()
 
     def set_busy(self, busy):
+        # 宿主显示跨页操作状态；不新增轮询，也不改变当前任务的取消/保存边界。
+        self.activity_changed.emit("官网资源 · 正在处理…" if busy else "")
         self.url.setEnabled(not busy)
         self.remote.setEnabled(not busy)
         self.local.setEnabled(not busy)
@@ -191,6 +145,7 @@ class PlatformDialog(QDialog):
 
     def task_progress(self, message, percent):
         self.status.setText(message)
+        self.activity_changed.emit("官网资源 · " + message)
         if self.upload_dialog:
             self.upload_dialog.show_progress(message, percent)
 
@@ -384,18 +339,26 @@ class PlatformDialog(QDialog):
                 for resource in result:
                     self.remote.addItem(f"{resource['name']} · {resource['kind']}")
                 self.remote.blockSignals(False)
+                self.remote.setVisible(bool(result))
+                self.remote_state.setText(f"已加载 {len(result)} 项资源；选择资源查看版本。" if result
+                                          else "官网暂无可下载资源，可稍后刷新或使用本机资源。")
                 self.status.setText("选择资源查看可用版本；动作和表情须匹配当前模型。")
             elif command == "versions":
                 for version in result:
                     if version["validationStatus"] == "READY":
                         self.versions.addItem(version["version"], version["id"])
-                self.status.setText("版本列表已更新。")
+                self.status.setText("版本列表已更新。" if self.versions.count()
+                                    else "当前资源暂无通过校验的可下载版本，请选择其他资源。")
             elif command == "local":
                 self.local.clear()
                 for manifest in result:
                     item = QListWidgetItem(f"{manifest['entrypoint']} · {manifest['kind']} · {manifest['version']}")
+                    item.setToolTip(item.text())
                     item.setData(Qt.ItemDataRole.UserRole, manifest["resourceVersionId"])
                     self.local.addItem(item)
+                self.local.setVisible(bool(result))
+                self.local_state.setText(f"已安装 {len(result)} 项资源；选择后应用。" if result
+                                         else "本机尚未安装资源，可从官网下载后应用。")
                 self.status.setText("本机资源已更新。下载后请选择并应用。")
             elif command in {"apply", "restore"}:
                 prepared, expression = result

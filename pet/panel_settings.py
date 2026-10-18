@@ -36,6 +36,7 @@ class PanelSettings:
             for widget_type, signal in changes:
                 for widget in page.findChildren(widget_type):
                     getattr(widget, signal).connect(self.refresh)
+        panel.model_page.ai_page.changed.connect(self.refresh)
         self.refresh()
 
     def read(self):
@@ -51,7 +52,7 @@ class PanelSettings:
                 QKeySequence.SequenceFormat.PortableText
             ),
         )
-        return self.read() != saved
+        return self.panel.model_page.credential_changed() or self.read() != saved
 
     def refresh(self, *_):
         if self.saving:
@@ -62,8 +63,8 @@ class PanelSettings:
         except ValueError:
             changed = True
         self.hint.setText(
-            "有未保存的配置修改 · 关闭时保存，并结束对话、关闭麦克风"
-            if changed else "配置已保存 · 关闭窗口时自动保存修改"
+            "有未保存的设置 · 收起时保存"
+            if changed else "配置已保存"
         )
 
     def request(self):
@@ -94,6 +95,7 @@ class PanelSettings:
                 pass  # 保存期间继续编辑的无效草稿留在窗口中。
 
     def close(self):
+        self.panel.model_page.ai_page.cancel_validation()
         self.closing = True
         if self.saving:
             return

@@ -6,16 +6,14 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from .config import Settings
 from .control_navigation import ControlNavigation
-from .panel_content import common_controls, populate_sections
+from .panel_chrome import create_footer, create_header
+from .panel_content import populate_sections
 from .panel_settings import PanelSettings
 from .panel_style import STYLE
 from .theme import configure_fonts
@@ -56,52 +54,14 @@ class Panel(QWidget):
         self.sections = self.navigation.pages
         self.navigation.opening.connect(self._prepare)
         layout.addWidget(self.navigation.header)
-        toolbar_widget = QWidget()
-        toolbar = QVBoxLayout(toolbar_widget)
-        toolbar.setContentsMargins(20, 12, 20, 8)
-        brand = QHBoxLayout()
-        self.title = QLabel(settings.name)
-        self.title.setObjectName("productName")
-        brand.addWidget(self.title)
-        self.status = QLabel("已就绪 · 麦克风关闭")
-        self.status.setObjectName("status")
-        self.status.setWordWrap(True)
-        brand.addWidget(self.status, 1)
-        toolbar.addLayout(brand)
-        toolbar.addLayout(common_controls(self))
-        self.live_transcript = QLabel("")
-        self.live_transcript.setTextFormat(Qt.TextFormat.PlainText)
-        self.live_transcript.setWordWrap(True)
-        self.live_transcript.setObjectName("hint")
-        toolbar.addWidget(self.live_transcript)
-        self.audio_status = QLabel("声音回避已开启")
-        self.audio_status.setObjectName("hint")
-        self.audio_status.setWordWrap(True)
-        toolbar.addWidget(self.audio_status)
-        layout.addWidget(toolbar_widget)
+        layout.addWidget(create_header(self))
         layout.addWidget(self.navigation.stack, 1)
         populate_sections(self)
         self.form = PanelSettings(self)
-        footer_widget = QWidget()
-        footer = QVBoxLayout(footer_widget)
-        footer.setContentsMargins(20, 8, 20, 12)
-        footer.addWidget(self.form.hint)
-        actions = QHBoxLayout()
-        self.save_button = QPushButton("保存全部设置")
-        self.save_button.setObjectName("primary")
-        self.save_button.clicked.connect(self._save)
-        actions.addWidget(self.save_button)
-        close = QPushButton("收起控制中心")
-        close.clicked.connect(self.close)
-        actions.addWidget(close)
-        footer.addLayout(actions)
-        self.footer = QLabel("Ctrl+Tab 切换标签 · 快捷键和托盘均打开此控制中心")
-        self.footer.setObjectName("hint")
-        self.footer.setWordWrap(True)
-        footer.addWidget(self.footer)
-        layout.addWidget(footer_widget)
+        layout.addWidget(create_footer(self))
         self.escape = QShortcut(QKeySequence("Esc"), self)
         self.escape.activated.connect(self.close)
+        LOG.info("控制中心布局已就绪，保留九标签及原有保存事务")
 
     def mount_section(self, key, widget, on_open=None):
         self._opening_callbacks[key] = on_open
