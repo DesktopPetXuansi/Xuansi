@@ -38,11 +38,11 @@ class AudioActivity:
     @property
     def status(self):
         if not self.enabled:
-            return "声音回避已关闭 · 允许同时播放"
+            return "已关闭：朗读可与其他软件同时播放"
         valid, checked, _ = self._snapshot
         if not valid or self.clock() - checked > 0.6:
-            return "声音检测暂不可用 · 仅文字"
-        return "其他软件有声音 · 仅文字" if self.blocked else "声音回避已开启"
+            return "暂时无法检测其他声音 · 只显示文字，不朗读"
+        return "其他软件正在发声 · 只显示文字，不朗读" if self.blocked else "已开启：其他软件发声时暂停朗读"
 
     def update(self, present, now=None):
         now = self.clock() if now is None else now

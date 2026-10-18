@@ -1,28 +1,18 @@
 """原生模型策略表单；API Key 仅在密码框与保存事务快照的内存中存在。"""
 
 import logging
+from contextlib import ExitStack
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QThreadPool, Signal
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QFileDialog,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtCore import QSignalBlocker, Qt, QThreadPool, Signal
+from PySide6.QtWidgets import QWidget
 
-from .ai.catalog import MODELS as LOCAL_MODELS
 from .ai.settings import CAPABILITIES
+from .ai_setup_form import KEY_LINKS, SERVICE_NAMES, create_setup_form
 from .ai_tasks import AIResults, ProbeDevice, ValidateProfile
-from .settings_forms import field_row, form_group, form_hint
+from .panel_style import COLORS
 
 LOG = logging.getLogger(__name__)
 
@@ -36,57 +26,21 @@ class AIPage(QWidget):
         # 验证成功只是草稿；只有配置保存回执可以更新已持久化凭据基准。
         self._saved_profile = settings.profile
         self._credential_ref = settings.profile.credential_ref
+        self._key_endpoint = ""
         self._validation = None
         self._generation = 0
         # 工作任务持有信号对象直到完成，窗口销毁时 Qt 自动断开接收者。
         self.results = AIResults()
         self.results.validation.connect(self.validation_complete)
         self.results.device.connect(self._device_complete)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        strategy = form_group(layout, "模型与回退策略")
-        self.policy = QComboBox()
-        for title, value in (("仅本地", "local_only"), ("本地优先 · 允许在线兜底", "local_first"),
-                             ("优先在线", "online_first")):
-            self.policy.addItem(title, value)
-        self.policy.setCurrentIndex(self.policy.findData(settings.policy))
-        field_row(strategy, "运行策略", self.policy)
-        self.local_model = QComboBox()
-        self.local_model.addItem("标准本地 · Qwen3.5 9B", "qwen3.5-9b")
-        light_status = ('语义验收未通过' if LOCAL_MODELS['qwen3.5-4b'].verification == 'failed'
-                        else '业务待验证')
-        self.local_model.addItem(f'轻量本地 · Qwen3.5 4B（实验：{light_status}）', 'qwen3.5-4b')
-        if self.local_model.findData(settings.local_model) < 0:
-            self.local_model.addItem(settings.local_model, settings.local_model)
-        self.local_model.setCurrentIndex(self.local_model.findData(settings.local_model))
-        field_row(strategy, "本地主模型", self.local_model)
-        self.backend = QComboBox()
-        for title, value in (("自动分配", "auto"), ("NVIDIA CUDA", "cuda"), ("CPU（可能较慢）", "cpu")):
-            self.backend.addItem(title, value)
-        self.backend.setCurrentIndex(self.backend.findData(settings.local_backend))
-        field_row(strategy, "本地计算后端", self.backend)
-        self.model_dir = self._path(strategy, "模型根目录", settings.model_dir, directory=True)
-        self.backup_model = self._path(strategy, "已安装备用模型 GGUF", settings.backup_model_path)
-        self.backup_projector = self._path(strategy, "备用视觉组件 GGUF", settings.backup_projector_path)
-        form_hint(strategy, "备用模型和视觉组件必须配套且已安装；运行中不会自动下载。选择本地档位后请检查下方主模型路径。")
-        self.detect = QPushButton("重新检测设备")
-        self.detect.clicked.connect(self.probe)
-        strategy.addRow(self.detect)
-        self.device_status = QLabel("设备适配待验证；重新检测仅预估资源，不代表实测响应速度。")
-        self.device_status.setWordWrap(True)
-        strategy.addRow(self.device_status)
-        self._create_online(layout)
-        privacy = form_group(layout, "在线资料发送范围")
-        form_hint(privacy, "在线模型会接收对话文字、必要历史、工具结果及本轮明确附加的图片；费用由服务商直接结算。")
-        self.cloud_memory = QCheckBox("允许云端检索长期记忆")
-        self.cloud_memory.setChecked(settings.cloud_memory)
-        privacy.addRow(self.cloud_memory)
-        form_hint(privacy, "默认关闭。开启后可能按容量分批发送整个本地记忆库的候选内容，并非仅发送命中摘录；记忆文件仍保存在本机。")
-        self.cloud_observation = QCheckBox("允许后台自动观察向在线模型发送截图")
-        self.cloud_observation.setChecked(settings.cloud_observation)
-        privacy.addRow(self.cloud_observation)
-        form_hint(privacy, "默认关闭，与记忆检索和在线回退分别授权；录音保持本地识别，不随 API 开启而上传。")
+        create_setup_form(self, settings)
+        # 后台返回的错误和自定义模型名只按文字显示，不能被解释为链接或富文本。
+        for label in (self.validation_status, self.device_status, self.device_details):
+            label.setTextFormat(Qt.TextFormat.PlainText)
         self.set_profile(settings.profile)
+        self.presets.activated.connect(self._preset_changed)
+        self.policy.currentIndexChanged.connect(self._policy_changed)
+        self._policy_changed()
         self.key.textChanged.connect(self._key_changed)
         for field in (self.provider, self.region, self.endpoint, self.model, self.mode):
             field.textChanged.connect(self._profile_changed)
@@ -95,83 +49,75 @@ class AIPage(QWidget):
             box.toggled.connect(self._profile_changed)
         LOG.debug("模型策略与在线设置表单已就绪")
 
-    def _create_online(self, layout):
-        online = form_group(layout, "在线 API · 自备 Key")
-        from .ai.provider_catalog import preset_profiles
-
-        self.presets = QComboBox()
-        self.presets.addItem("选择服务商预设（未经过本机验证）", None)
-        for profile in preset_profiles():
-            self.presets.addItem(f"{profile.provider} / {profile.region} / {profile.model}", profile)
-        self.presets.currentIndexChanged.connect(self._preset_changed)
-        field_row(online, "服务商预设", self.presets)
-        for name, title in (("provider", "服务商"), ("region", "地区"), ("endpoint", "HTTPS API 地址"),
-                            ("model", "模型 ID"), ("mode", "工作模式")):
-            field = QLineEdit()
-            field.setMaxLength(2048)
-            setattr(self, name, field)
-            field_row(online, title, field)
-        self.context_tokens = QSpinBox()
-        self.context_tokens.setRange(1024, 2_000_000)
-        field_row(online, "上下文预算 token", self.context_tokens)
-        self.capabilities = {}
-        for name, title in (("text", "文字"), ("image", "图片"), ("tools", "工具"),
-                            ("stream", "流式"), ("cancel", "取消"), ("json", "结构化输出")):
-            box = QCheckBox("声明支持：" + title)
-            self.capabilities[name] = box
-            online.addRow(box)
-        self.key = QLineEdit()
-        self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setMaxLength(4096)
-        self.key.setPlaceholderText("留空保留已保存 Key；输入新 Key 将轮换凭据")
-        field_row(online, "API Key（仅内存草稿）", self.key)
-        form_hint(online, "自备 Key，由服务商直接计费。验证只发送合成文字、图片和无副作用工具用例，可能产生少量调用费用。官方声明不等于本项目验证。")
-        self.validate_button = QPushButton("验证配置（可能产生少量费用）")
-        self.validate_button.clicked.connect(self.start_validation)
-        self.cancel_button = QPushButton("取消验证")
-        self.cancel_button.clicked.connect(self.cancel_validation)
-        self.cancel_button.setEnabled(False)
-        online.addRow(self.validate_button, self.cancel_button)
-        self.validation_status = QLabel()
-        self.validation_status.setWordWrap(True)
-        online.addRow(self.validation_status)
-
-    def _path(self, form, title, value, directory=False):
-        row = QHBoxLayout()
-        field = QLineEdit(value)
-        field.setMaxLength(2048)
-        field.setAccessibleName(title)
-        row.addWidget(field)
-        button = QPushButton("选择")
-        def choose():
-            path = (QFileDialog.getExistingDirectory(self, title, field.text()) if directory else
-                    QFileDialog.getOpenFileName(self, title, field.text(), "GGUF (*.gguf)")[0])
-            if path:
-                field.setText(path)
-        button.clicked.connect(choose)
-        row.addWidget(button)
-        form.addRow(title, row)
-        return field
-
     def set_profile(self, profile):
         self.cancel_validation()
         self._profile = profile
-        if not self.key.text():
-            self._credential_ref = profile.credential_ref
-        for name in ("provider", "region", "endpoint", "model", "mode"):
-            getattr(self, name).setText(getattr(profile, name))
-        self.context_tokens.setValue(profile.context_tokens)
-        for name, box in self.capabilities.items():
-            box.setChecked(name in profile.capabilities)
+        # 整批回填只刷新一次，避免中间字段组合清除验证或分配错误的凭据引用。
+        fields = [getattr(self, name) for name in ("provider", "region", "endpoint", "model", "mode")]
+        with ExitStack() as stack:
+            for field in (*fields, self.context_tokens, *self.capabilities.values()):
+                stack.enter_context(QSignalBlocker(field))
+            for name in ("provider", "region", "endpoint", "model", "mode"):
+                getattr(self, name).setText(getattr(profile, name))
+            self.context_tokens.setValue(profile.context_tokens)
+            for name, box in self.capabilities.items():
+                box.setChecked(name in profile.capabilities)
         if not self.key.text():
             self._credential_ref = self._saved_reference()
-        self._update_validation_status()
+        self._profile_changed()
+        if self.key.text():
+            # 完整预设一次确定地址，不受手动首次逐字输入地址的宽限影响。
+            self._key_endpoint = profile.endpoint
 
-    def _preset_changed(self):
-        profile = self.presets.currentData()
-        if profile is not None:
-            # 新端点不能复用旧服务商的凭据引用与验证证据。
-            self.set_profile(profile)
+    @staticmethod
+    def _same_configuration(first, second):
+        return (all(getattr(first, name) == getattr(second, name) for name in
+                    ("provider", "region", "endpoint", "model", "mode", "context_tokens"))
+                and set(first.capabilities) == set(second.capabilities))
+
+    def _preset_changed(self, index):
+        profile = self.presets.itemData(index)
+        if profile is None:
+            self.advanced.toggle.setChecked(True)
+            self.endpoint.setFocus()
+            return
+        current = self.profile()
+        if self._same_configuration(current, profile):
+            return  # 同一预设再次点选，不清空密钥、验证证据或正在进行的测试。
+        self.set_profile(profile)
+        LOG.info("在线服务预设已更新")
+
+    def _policy_changed(self, *_):
+        policy = self.policy.currentData()
+        self.local_group.setVisible(policy != "online_first")
+        self.online_group.setVisible(policy != "local_only")
+        self.privacy_group.setVisible(policy != "local_only")
+        hints = {
+            "local_only": "对话在本机运行，无在线对话费用；需要已安装的本机模型。",
+            "local_first": "先使用本机模型，资源不足时尝试已通过测试的在线服务；在线请求会发送资料并由服务商计费。",
+            "online_first": "优先使用在线服务，资源不足时尝试已安装并验证的本机模型；在线请求会发送资料并由服务商计费。",
+        }
+        self.policy_hint.setText(hints[policy])
+        if policy == "local_only":
+            self.cancel_validation()
+        self.changed.emit()
+
+    def _refresh_online_summary(self):
+        profile = self.profile()
+        matched = next((index for index in range(1, self.presets.count())
+                        if self._same_configuration(profile, self.presets.itemData(index))), 0)
+        with QSignalBlocker(self.presets):
+            self.presets.setCurrentIndex(matched)
+        service = SERVICE_NAMES.get(profile.provider, "自定义服务")
+        self.online_model.setText(f"当前模型：{service} · {profile.model}" if profile.model
+                                  else "选择服务商后会自动填写模型；也可在高级设置中自定义。")
+        link = KEY_LINKS.get(profile.provider)
+        # 链接只能来自仓库固定白名单，不能使用端点或其他可编辑文本拼成 HTML。
+        help_text = (f'<a style="color: {COLORS["accent"]}" href="{link}">获取 API 密钥（官方）</a>。' if link
+                     else "请从所用服务的官方控制台获取 API 密钥。")
+        if profile.provider == "bailian":
+            help_text += "密钥需与所选地区一致。"
+        self.key_help.setText(help_text + "保存后存入本机系统凭据管理器。")
 
     def profile(self):
         values = {name: getattr(self, name).text().strip() for name in
@@ -189,6 +135,8 @@ class AIPage(QWidget):
     def _key_changed(self):
         from .ai.credentials import new_ref
 
+        # 填写密钥时绑定已有地址；地址尚空时允许用户继续逐字填写首个地址。
+        self._key_endpoint = self.endpoint.text().strip() if self.key.text() else ""
         try:
             self._credential_ref = new_ref(self.endpoint.text()) if self.key.text() else self._saved_reference()
         except ValueError:
@@ -200,11 +148,19 @@ class AIPage(QWidget):
                 if self.endpoint.text().strip() == self._saved_profile.endpoint else "")
 
     def _profile_changed(self, *_):
-        if self.key.text() and self.endpoint.text().strip() != getattr(self, "_key_endpoint", ""):
-            self._key_endpoint = self.endpoint.text().strip()
-            from .ai.credentials import new_ref
+        from .ai.credentials import new_ref, ref_matches_endpoint
+
+        endpoint = self.endpoint.text().strip()
+        cleared = bool(self.key.text() and self._key_endpoint and endpoint != self._key_endpoint)
+        if cleared:
+            # 手动改地址与选择其他服务遵守同一边界，旧密钥不能改换引用后继续发送。
+            with QSignalBlocker(self.key):
+                self.key.clear()
+            self._key_endpoint = ""
+            LOG.info("在线服务地址已更改，已清除原密钥草稿")
+        if self.key.text() and not ref_matches_endpoint(self._credential_ref, endpoint):
             try:
-                self._credential_ref = new_ref(self._key_endpoint)
+                self._credential_ref = new_ref(endpoint)
             except ValueError:
                 self._credential_ref = ""
         elif not self.key.text():
@@ -212,16 +168,33 @@ class AIPage(QWidget):
             self._credential_ref = self._saved_reference()
         self.cancel_validation()
         self._update_validation_status()
+        self._refresh_online_summary()
+        if cleared:
+            self.validation_status.setText("服务地址已更改，请重新填写对应服务的 API 密钥。\n"
+                                           + self.validation_status.text())
         self.changed.emit()
 
     def _update_validation_status(self):
-        self.validation_status.setText("当前配置已有匹配的验证证据。" if self.profile().is_verified("text")
-                                       else "当前配置待验证；能力声明不代表完整桌宠可用。")
+        profile = self.profile()
+        names = {"text": "文字聊天", "image": "看图", "tools": "使用工具", "stream": "逐步显示回复",
+                 "cancel": "取消请求", "json": "JSON 结构化输出"}
+        passed = [title for name, title in names.items() if name in profile.capabilities and profile.is_verified(name)]
+        pending = [title for name, title in names.items() if name in profile.capabilities and not profile.is_verified(name)]
+        lines = []
+        if passed:
+            lines.append("已通过：" + "、".join(passed))
+        if pending:
+            lines.append("未验证：" + "、".join(pending))
+        lines.append("测试通过只说明对应能力可用，不能保证所有桌宠操作都能正确完成。")
+        self.validation_status.setText("\n".join(lines))
 
     def credential_changed(self):
         return bool(self.key.text())
 
     def credential_draft(self):
+        if self.key.text():
+            # 保存快照从此绑定实际地址，后续改地址必须重新输入密钥。
+            self._key_endpoint = self.endpoint.text().strip()
         return (self.profile(), self.key.text()) if self.key.text() else None
 
     def credentials_saved(self, snapshot):
@@ -253,21 +226,23 @@ class AIPage(QWidget):
         try:
             profile = self.profile().validate()
             if not profile.endpoint or not profile.model:
-                raise ValueError("请填写 API 地址和模型 ID。")
+                raise ValueError("请先选择服务商，或在高级设置中填写 API 地址和模型名称。")
         except ValueError as exc:
             self.validation_status.setText(str(exc))
             return
+        if self.key.text():
+            self._key_endpoint = profile.endpoint
         self._validation = ValidateProfile(self.results, profile, self.key.text() or None, uuid4().hex)
         self.validate_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
-        self.validation_status.setText("正在验证合成用例，可取消；不读取屏幕、录音或记忆。")
+        self.validation_status.setText("正在测试连接和所选能力，可取消；使用示例资料，可能产生少量费用。")
         QThreadPool.globalInstance().start(self._validation)
 
     def cancel_validation(self):
         if self._validation is not None:
             self._validation.cancel()
             self._validation = None
-            self.validation_status.setText("验证已取消，保留配置和 Key 草稿。")
+            self.validation_status.setText("测试已取消，配置和密钥草稿仍保留；已产生的费用可能仍会结算。")
         if hasattr(self, "validate_button"):
             self.validate_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
@@ -283,6 +258,8 @@ class AIPage(QWidget):
             self.validation_status.setText(error)
         else:
             self._profile = profile
+            if self.key.text():
+                self._key_endpoint = profile.endpoint
             self._update_validation_status()
             self.changed.emit()
 
@@ -290,7 +267,7 @@ class AIPage(QWidget):
         from .config import MODELS
 
         self._generation += 1
-        self.device_status.setText("正在后台检测环境…")
+        self.device_status.setText("正在检测电脑配置，不会更改你的设置…")
         self.detect.setEnabled(False)
         QThreadPool.globalInstance().start(ProbeDevice(self.results, self._generation,
                                                      Path(self.model_dir.text().strip() or MODELS)))
@@ -300,12 +277,13 @@ class AIPage(QWidget):
             return
         self.detect.setEnabled(True)
         if error:
-            self.device_status.setText(error)
+            self.device_status.setText("无法确认电脑是否适合本机运行，请重新检测；尚未实测。")
+            self.device_details.setText(error)
             return
         from .ai.assessment import assess
         from .ai.catalog import MODELS
 
-        descriptions = []
+        descriptions, recommendations, statuses = [], [], []
         for index in range(self.local_model.count()):
             model_id = self.local_model.itemData(index)
             if model_id not in MODELS:
@@ -313,7 +291,21 @@ class AIPage(QWidget):
             result = assess(report, model_id, self.backend.currentData())
             self.local_model.model().item(index).setEnabled(result.selectable)
             descriptions.append(MODELS[model_id].name + "：" + "；".join(result.reasons))
-        self.device_status.setText("\n".join(descriptions))
+            statuses.append(result.status)
+            if MODELS[model_id].verification == "verified" and result.status in ("estimated", "slow"):
+                suffix = "（可能需要较长等待）" if result.status == "slow" else ""
+                recommendations.append(MODELS[model_id].name + suffix)
+        self.device_details.setText("\n".join(descriptions))
+        if recommendations:
+            message = "推荐：" + "、".join(recommendations) + "。资源估算可运行，回复速度未实测。"
+        elif "unknown" in statuses or not statuses:
+            message = "无法确认电脑是否适合本机运行，请重新检测；回复速度未实测。"
+        elif all(status in ("insufficient", "incompatible") for status in statuses):
+            message = "当前电脑资源或系统不满足本机模型要求，可查看高级设置中的原因；未实测。"
+        else:
+            message = "当前没有已验证适配的推荐方案，可查看高级设置中的原因；回复速度未实测。"
+        self.device_status.setText(message)
+        LOG.info("电脑配置检测完成，已展示建议；保留用户配置")
 
     def hideEvent(self, event):
         self.cancel_validation()

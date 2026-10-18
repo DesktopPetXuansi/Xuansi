@@ -99,13 +99,21 @@ def test_local_choice_updates_paired_paths_without_overwriting_initial_custom_pa
     app.processEvents()
 
 
-def test_endpoint_change_does_not_reuse_saved_credential(page):
-    page.set_profile(ModelProfile(endpoint="https://first.test/v1", credential_ref="saved"))
+def test_endpoint_change_does_not_reuse_saved_credential(page, monkeypatch):
+    tasks = []
+    monkeypatch.setattr("pet.ai_page.QThreadPool", SimpleNamespace(
+        globalInstance=lambda: SimpleNamespace(start=tasks.append)))
+    page.set_profile(ModelProfile(endpoint="https://first.test/v1", model="demo", credential_ref="saved"))
     page.endpoint.setText("https://second.test/v1")
     assert not page.profile().credential_ref
     page.key.setText("new")
     first_ref = page.profile().credential_ref
     page.endpoint.setText("https://third.test/v1")
+    assert not page.key.text() and not page.profile().credential_ref
+    assert "重新填写" in page.validation_status.text()
+    page.start_validation()
+    assert tasks[0].key is None and not tasks[0].profile.credential_ref
+    page.key.setText("third-service-key")
     assert page.profile().credential_ref and page.profile().credential_ref != first_ref
 
 
@@ -217,3 +225,70 @@ def test_default_device_probe_uses_actual_model_root(page, monkeypatch):
         globalInstance=lambda: SimpleNamespace(start=tasks.append)))
     page.probe()
     assert tasks[0].model_dir == MODELS
+
+
+def test_switching_service_drops_bound_key_but_reselecting_keeps_verified_draft(page):
+    """服务切换不能把旧密钥发给另一端点；重复选择也不能破坏当前证据。"""
+    from pet.ai.provider_catalog import preset_profiles
+
+    first, second = preset_profiles()[0], preset_profiles()[3]
+    page.set_profile(first)
+    page.key.setText("first-service-draft")
+    candidate = page.profile()
+    verified = replace(candidate, verified_at="today", verified_capabilities=("text",),
+                       verification_fingerprint=candidate.fingerprint())
+    page._validation = SimpleNamespace(request_id="current", profile=candidate)
+    page.validation_complete("current", verified, "")
+    first_index = next(i for i in range(page.presets.count()) if page.presets.itemData(i) == first)
+    page.presets.setCurrentIndex(first_index)
+    page.presets.activated.emit(first_index)
+    assert page.key.text() == "first-service-draft" and page.profile().is_verified("text")
+    second_index = next(i for i in range(page.presets.count()) if page.presets.itemData(i) == second)
+    page.presets.setCurrentIndex(second_index)
+    page.presets.activated.emit(second_index)
+    assert page.profile().endpoint == second.endpoint
+    assert not page.key.text() and not page.profile().credential_ref
+    assert not page.profile().is_verified("text")
+
+
+@pytest.mark.parametrize("bind", ["test", "save"])
+def test_initial_key_survives_typing_first_endpoint_then_binds_at_use(page, monkeypatch, bind):
+    """先填密钥再逐字填首次地址不丢草稿，发起测试或保存后不能跨端点复用。"""
+    page.key.setText("first-key-draft")
+    endpoint = "https://first.test/v1"
+    for length in range(1, len(endpoint) + 1):
+        page.endpoint.setText(endpoint[:length])
+        assert page.key.text() == "first-key-draft"
+    page.model.setText("first-model")
+    if bind == "test":
+        tasks = []
+        monkeypatch.setattr("pet.ai_page.QThreadPool", SimpleNamespace(
+            globalInstance=lambda: SimpleNamespace(start=tasks.append)))
+        page.start_validation()
+        assert tasks[0].key == "first-key-draft" and tasks[0].profile.endpoint == endpoint
+    else:
+        snapshot = page.credential_draft()
+        assert snapshot[0].endpoint == endpoint and snapshot[1] == "first-key-draft"
+    page.endpoint.setText("https://second.test/v1")
+    assert not page.key.text() and not page.profile().credential_ref
+    assert "重新填写" in page.validation_status.text()
+
+
+def test_same_endpoint_parameter_changes_keep_bound_key(page):
+    page.endpoint.setText("https://first.test/v1")
+    page.key.setText("first-key-draft")
+    reference = page.profile().credential_ref
+    page.model.setText("other-model")
+    page.capabilities["image"].setChecked(True)
+    page.context_tokens.setValue(32768)
+    assert page.key.text() == "first-key-draft" and page.profile().credential_ref == reference
+
+
+def test_first_service_selection_keeps_unbound_key_then_protects_it(page):
+    """首次选择完整预设是明确的地址选择，保留草稿后立即绑定此服务。"""
+    page.key.setText("first-key-draft")
+    page.presets.setCurrentIndex(1)
+    page.presets.activated.emit(1)
+    assert page.key.text() == "first-key-draft" and page.profile().credential_ref
+    page.endpoint.setText("https://different.test/v1")
+    assert not page.key.text() and not page.profile().credential_ref

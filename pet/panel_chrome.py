@@ -99,7 +99,7 @@ def create_header(panel):
 
     panel.speech_button = QPushButton("朗读开启")
     panel.speech_button.setCheckable(True)
-    panel.speech_button.setToolTip("切换本次运行的朗读；保存设置或重启后恢复默认偏好，不改变麦克风。")
+    panel.speech_button.setToolTip("临时开启或关闭回复朗读，不影响麦克风。保存设置或重启后，恢复语音与行为中的默认偏好。")
     panel.speech_button.toggled.connect(panel.speech_requested)
     panel.look_button = QPushButton("看一眼屏幕")
     panel.look_button.clicked.connect(panel.look_requested)
@@ -107,13 +107,10 @@ def create_header(panel):
     panel.stop_button.setEnabled(False)
     panel.stop_button.setToolTip("停止本轮生成和播放，已开启的麦克风会继续聆听。")
     panel.stop_button.clicked.connect(panel.stop_requested)
-    panel.audio_avoidance_action = QAction("声音回避 · 关", panel)
+    panel.audio_avoidance_action = QAction("有其他声音时暂停朗读", panel)
     panel.audio_avoidance_action.setCheckable(True)
-    panel.audio_avoidance_action.toggled.connect(
-        lambda enabled: panel.audio_avoidance_action.setText("声音回避 · 开" if enabled else "声音回避 · 关")
-    )
     panel.audio_avoidance_action.setChecked(panel.settings.audio_avoidance)
-    panel.audio_avoidance_action.setToolTip("其他软件发声时暂停朗读；自动保存并立即生效。")
+    panel.audio_avoidance_action.setToolTip("勾选后，其他软件发声时停止朗读，只显示文字；安静后不补播旧回复。此开关自动保存并立即生效，不影响麦克风。")
     panel.audio_avoidance_button = QToolButton()
     panel.audio_avoidance_button.setObjectName("avoidance")
     panel.audio_avoidance_button.setDefaultAction(panel.audio_avoidance_action)
@@ -123,7 +120,10 @@ def create_header(panel):
     panel.live_transcript.setObjectName("hint")
     panel.live_transcript.setAccessibleName("实时语音转写")
     panel.live_transcript.hide()
-    panel.audio_status = QLabel("声音回避已开启")
+    panel.audio_status = QLabel(
+        "已开启：其他软件发声时暂停朗读" if panel.settings.audio_avoidance
+        else "已关闭：朗读可与其他软件同时播放"
+    )
     panel.audio_status.setObjectName("hint")
     panel.audio_status.setWordWrap(True)
     for label in (panel.live_transcript, panel.audio_status):
@@ -139,7 +139,7 @@ def create_footer(panel):
     row.setSpacing(12)
     panel.form.hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     panel.form.hint.setToolTip(
-        "设置包含人设、语音与行为、模型与快捷键。记忆需保存记忆，形象需应用形象。"
+        "保存设置会结束当前回复并关闭麦克风，朗读恢复默认偏好。记忆需单独保存，形象需单独应用。"
     )
     state = QVBoxLayout()
     state.setSpacing(2)
@@ -154,7 +154,7 @@ def create_footer(panel):
     state.addWidget(panel.footer)
     row.addLayout(state, 1)
     panel.save_button = QPushButton("保存设置")
-    panel.save_button.setToolTip("保存人设、语音与行为、模型与快捷键；结束当前回复并关闭麦克风。")
+    panel.save_button.setToolTip("保存人设、语音与行为、模型与快捷键；结束当前回复并关闭麦克风，朗读恢复默认偏好。")
     panel.save_button.clicked.connect(panel._save)
     row.addWidget(panel.save_button)
     panel.collapse_button = QPushButton("收起")

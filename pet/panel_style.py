@@ -76,5 +76,9 @@ QScrollArea { border: 0; }
 QProgressBar { background: $surface; border: 1px solid $border; border-radius: 5px;
     text-align: center; min-height: 18px; }
 QProgressBar::chunk { background: $accent; border-radius: 4px; }
+QToolButton#advancedSettings { color: $accent; background: transparent; border: 1px solid transparent;
+    border-radius: 6px; padding: 6px; min-height: 18px; }
+QToolButton#advancedSettings:hover { background: $hover; }
+QToolButton#advancedSettings:focus { border-color: $accent; background: $hover; }
 QToolTip { background: $surface; color: $text; border: 1px solid $border; padding: 6px; }
 """).substitute(COLORS, check_icon=(Path(__file__).resolve().parents[1] / "assets/ui/check.svg").as_posix())

@@ -369,7 +369,8 @@ class DesktopPet(QObject):
             self.runtime.audio_activity.set_enabled(settings.audio_avoidance)
             self.panel.audio_avoidance_action.setChecked(settings.audio_avoidance)
             self.ui.refresh()
-            self.panel.status.setText("声音回避已开启" if settings.audio_avoidance else "声音回避已关闭")
+            self.panel.status.setText("已开启：其他软件发声时暂停朗读" if settings.audio_avoidance
+                                      else "已关闭：朗读可与其他软件同时播放")
             return
         if appearance_only or (
             self.settings.avatar_image != settings.avatar_image

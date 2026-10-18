@@ -56,15 +56,15 @@ class PanelSettings:
 
     def refresh(self, *_):
         if self.saving:
-            self.hint.setText("正在保存配置…")
+            self.hint.setText("正在保存设置…")
             return
         try:
             changed = self.changed()
         except ValueError:
             changed = True
         self.hint.setText(
-            "有未保存的设置 · 收起时保存"
-            if changed else "配置已保存"
+            "有未保存的设置 · 收起时保存，并结束回复、关闭麦克风"
+            if changed else "设置已保存"
         )
 
     def request(self):
@@ -81,7 +81,7 @@ class PanelSettings:
         closing, self.closing = self.closing, False
         self.saving = False
         if error:
-            self.hint.setText("配置未保存：" + error)
+            self.hint.setText("设置未保存：" + error)
             self.panel.status.setText(error)
             LOG.warning("管理页配置保存未完成，保留草稿")
             return

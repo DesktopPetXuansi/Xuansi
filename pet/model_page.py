@@ -33,12 +33,33 @@ class ModelPage(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        hint = QLabel("调整回复与资源占用。保存会结束当前回复并关闭麦克风，下次回应使用新参数。")
+        hint = QLabel("先选运行方式，再按提示完成配置。保存会结束当前回复并关闭麦克风，需要时请重新开启连续对话。")
         hint.setWordWrap(True)
         hint.setObjectName("hint")
         layout.addWidget(hint)
         self.ai_page = AIPage(settings.ai)
         layout.addWidget(self.ai_page)
+        advanced = self.ai_page.advanced.content_layout
+        self._reply_parameters(advanced, settings)
+        self._resource_parameters(advanced, settings)
+        local = form_group(advanced, "本机模型文件")
+        self.model = self._file_row(local, "图文模型（GGUF）", settings.model_path)
+        self.projector = self._file_row(local, "看图组件（GGUF）", settings.projector_path)
+        self.ai_page.local_model.currentIndexChanged.connect(self._local_model_changed)
+        self.ai_page.model_dir.editingFinished.connect(self._local_model_changed)
+        form_hint(local, "模型和看图组件需配套。路径可直接编辑，悬停可查看完整路径。")
+        hotkeys = form_group(layout, "快捷键")
+        self.hotkey = QKeySequenceEdit(QKeySequence(settings.chat_hotkey))
+        self.hotkey.setMaximumSequenceLength(1)
+        field_row(hotkeys, "打开控制中心", self.hotkey)
+        form_hint(hotkeys, "点选后按下组合键，至少含两个修饰键（如 Ctrl、Alt）。再次按快捷键或 Esc 收起；有修改时会先保存并关闭麦克风。")
+        self.save_button = QPushButton("保存设置")
+        self.save_button.clicked.connect(self.save_requested)
+        layout.addWidget(self.save_button)
+        layout.addStretch()
+        LOG.debug("模型设置页已就绪，高级参数默认收起")
+
+    def _reply_parameters(self, layout, settings):
         reply = form_group(layout, "回复参数")
         self.temperature = QDoubleSpinBox()
         self.temperature.setRange(0, 2)
@@ -54,7 +75,10 @@ class ModelPage(QWidget):
         self.tokens.setRange(32, 1024)
         self.tokens.setValue(settings.max_tokens)
         field_row(reply, "回复 token 上限", self.tokens)
-        resources = form_group(layout, "资源占用")
+        form_hint(reply, "不了解这些参数时保留原值。token 是模型计量单位，不等于中文字数；提高上限可能增加等待或在线费用。")
+
+    def _resource_parameters(self, layout, settings):
+        resources = form_group(layout, "本机资源占用")
         self.context = QComboBox()
         for size in (4096, 8192, 16384):
             self.context.addItem(str(size), size)
@@ -73,25 +97,6 @@ class ModelPage(QWidget):
             resources,
             "增大上下文会增加显存占用；建议从默认 4096 上下文、4 个 CPU 线程开始。",
         )
-        local = form_group(layout, "本地模型")
-        self.model = self._file_row(local, "图文模型 GGUF", settings.model_path)
-        self.projector = self._file_row(local, "视觉组件 GGUF", settings.projector_path)
-        self.ai_page.local_model.currentIndexChanged.connect(self._local_model_changed)
-        self.ai_page.model_dir.editingFinished.connect(self._local_model_changed)
-        form_hint(local, "模型与视觉组件需配套。路径可直接编辑，悬停可查看完整路径。")
-        hotkeys = form_group(layout, "快捷键")
-        self.hotkey = QKeySequenceEdit(QKeySequence(settings.chat_hotkey))
-        self.hotkey.setMaximumSequenceLength(1)
-        field_row(hotkeys, "控制中心快捷键", self.hotkey)
-        form_hint(
-            hotkeys,
-            "点选后按下新组合，至少两个修饰键。再次按快捷键或 Esc 收起控制中心。\n收起时保存未保存的配置；安静后不补播声音回避期间的旧回复。"
-        )
-        self.save_button = QPushButton("保存设置")
-        self.save_button.clicked.connect(self.save_requested)
-        layout.addWidget(self.save_button)
-        layout.addStretch()
-        LOG.debug("模型设置页已就绪")
 
     def _file_row(self, form, label, value):
         row = QHBoxLayout()
