@@ -20,7 +20,7 @@ class ControlNavigation(QObject):
         self.header = QFrame(parent)
         self.header.setObjectName("browserTabStrip")
         layout = QHBoxLayout(self.header)
-        layout.setContentsMargins(8, 8, 8, 0)
+        layout.setContentsMargins(8, 4, 8, 0)
         self.bar = QTabBar()
         self.bar.setObjectName("controlTabs")
         self.bar.setAccessibleName("控制中心功能标签")

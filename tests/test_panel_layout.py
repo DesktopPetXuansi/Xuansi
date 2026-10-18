@@ -47,13 +47,13 @@ def assert_fully_inside(widget, container):
 
 
 def test_ready_window_reserves_space_for_conversation(panel):
-    settle_size(panel, 880, 760)
-    assert panel.navigation.stack.height() >= 560, "就绪状态页面区域应至少有 560 个逻辑像素"
-    assert panel.chat.height() >= 320, "默认窗口应能直接阅读至少 320 个逻辑像素的记录"
+    assert (panel.width(), panel.height()) == (720, 560), "默认窗口应适合日常桌面使用"
+    assert panel.navigation.stack.height() >= 420, "紧凑窗口应给内容页至少 420 个逻辑像素"
+    assert panel.chat.height() >= 230, "紧凑窗口应给对话记录至少 230 个逻辑像素"
 
 
 def test_conversation_history_grows_with_window(panel):
-    settle_size(panel, 880, 760)
+    settle_size(panel, 720, 560)
     initial_height = panel.chat.height()
     settle_size(panel, 1040, 800)
     assert panel.chat.height() > initial_height, "增高窗口应增加可阅读的对话记录空间"

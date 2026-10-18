@@ -29,7 +29,7 @@ def make_panel(monkeypatch, tmp_path):
         panel.logs.path = tmp_path / "usability.log"
         windows.append(panel)
         panel.open_section("model")
-        panel.resize(880, 760)
+        panel.resize(720, 560)
         app.processEvents()
         return panel
 

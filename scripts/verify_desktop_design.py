@@ -168,12 +168,12 @@ def inspect_pages(application, temporary, output):
     platform.activity_changed.connect(panel.footer.set_activity)
     pages = []
     try:
-        pages.append(capture(panel, "chat", (880, 760), output))
+        pages.append(capture(panel, "chat", (720, 560), output))
         panel.append("你", "今天有几件事要做，陪我一起慢慢完成吧。")
         panel.append("玄司", "好，我们先从手边的一件小事开始。")
-        assert panel.grab().save(str(output / "chat-example-880x760.png"))
+        assert panel.grab().save(str(output / "chat-example-720x560.png"))
         for key in ("persona", "memory", "preferences", "model", "appearance", "resources"):
-            pages.append(capture(panel, key, (880, 760), output))
+            pages.append(capture(panel, key, (720, 560), output))
             if key == "appearance":
                 assert appearance.preview.renderer._live2d_active and not appearance.preview.renderer._live2d_failed
                 assert appearance.preview.renderer.grabFramebuffer().save(str(output / "appearance-framebuffer.png"))
@@ -181,13 +181,14 @@ def inspect_pages(application, temporary, output):
         wait_until(lambda: platform.worker is None)
         platform.upload_dialog.source.setText("D:/AI/Models/xuansi/xuansi.model3.json")
         for key in ("upload", "logs"):
-            pages.append(capture(panel, key, (880, 760), output))
+            pages.append(capture(panel, key, (720, 560), output))
         for key in ("chat", "preferences", "resources", "upload"):
             pages.append(capture(panel, key, (560, 660), output))
         for key in ("chat", "preferences", "model"):
             pages.append(capture(panel, key, (520, 480), output))
+        pages.append(capture(panel, "chat", (880, 760), output))
         pages.append(capture(panel, "chat", (1040, 800), output))
-        assert pages[0]["chat_height"] >= 320 and pages[0]["content_rect"][3] >= 560
+        assert pages[0]["chat_height"] >= 230 and pages[0]["content_rect"][3] >= 420
         assert pages[-1]["chat_height"] > pages[0]["chat_height"]
         state_samples(panel, platform, output)
         return pages

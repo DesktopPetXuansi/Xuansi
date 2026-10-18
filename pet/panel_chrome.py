@@ -76,8 +76,8 @@ def create_header(panel):
     header = QFrame()
     header.setObjectName("panelHeader")
     row = QHBoxLayout(header)
-    row.setContentsMargins(20, 12, 20, 12)
-    row.setSpacing(12)
+    row.setContentsMargins(12, 8, 12, 8)
+    row.setSpacing(8)
     panel.title = ProductName(panel.settings.name)
     panel.title.setObjectName("productName")
     row.addWidget(panel.title)
@@ -135,8 +135,8 @@ def create_footer(panel):
     footer = QFrame()
     footer.setObjectName("panelFooter")
     row = QHBoxLayout(footer)
-    row.setContentsMargins(20, 8, 20, 8)
-    row.setSpacing(12)
+    row.setContentsMargins(12, 6, 12, 6)
+    row.setSpacing(8)
     panel.form.hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     panel.form.hint.setToolTip(
         "保存设置会结束当前回复并关闭麦克风，朗读恢复默认偏好。记忆需单独保存，形象需单独应用。"

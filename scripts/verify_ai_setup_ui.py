@@ -39,7 +39,7 @@ def main():
     samples = []
     try:
         panel.open_section('model')
-        for width, height in ((880, 760), (520, 480)):
+        for width, height in ((720, 560), (880, 760), (520, 480)):
             panel.resize(width, height)
             application.processEvents()
             ai = panel.model_page.ai_page

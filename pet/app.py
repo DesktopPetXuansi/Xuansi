@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from .avatar import Avatar
 from .companion_ui import CompanionUI
-from .config import Settings, load_settings
+from .config import DATA, Settings, load_settings
 from .desktop import cursor_position, desktop_state, point_is_own_window
 from .events import MouseEvent, ObservationGate
 from .idle_action import IdleActionTimer
@@ -45,7 +45,7 @@ class DesktopPet(QObject):
         self.idle_action = IdleActionTimer()
         self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
-        self.panel = Panel(self.settings)
+        self.panel = Panel(self.settings, window_state_path=DATA / 'panel-window.json')
         preference = ('首选在线 · ' + self.settings.ai.profile.model if self.settings.ai.policy == 'online_first'
                       else '首选本地 · ' + self.settings.ai.local_model)
         self.panel.footer.set_provider(preference + ' · 尚未连接')

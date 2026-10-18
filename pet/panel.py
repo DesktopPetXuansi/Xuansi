@@ -1,6 +1,7 @@
 """统一控制中心：浏览器式标签导航，复用表单并沿用配置保存事务。"""
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
@@ -16,6 +17,7 @@ from .panel_chrome import create_footer, create_header
 from .panel_content import populate_sections
 from .panel_settings import PanelSettings
 from .panel_style import STYLE
+from .panel_window import restore_size, save_size
 from .theme import configure_fonts
 
 LOG = logging.getLogger(__name__)
@@ -38,13 +40,14 @@ class Panel(QWidget):
     stop_requested = Signal()
     speech_requested = Signal(bool)
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, *, window_state_path: Path | None = None):
         super().__init__()
         configure_fonts(QApplication.instance())
         self.settings = settings
         self.setWindowTitle(f"{settings.name} · 控制中心")
-        self.resize(880, 760)
+        self.window_state_path = window_state_path
         self.setMinimumSize(520, 480)
+        restore_size(self, window_state_path)
         self.setStyleSheet(STYLE)
         self._opening_callbacks = {}
         layout = QVBoxLayout(self)
@@ -140,3 +143,9 @@ class Panel(QWidget):
     def closeEvent(self, event):
         event.ignore()
         self.form.close()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        # 配置保存完成、直接收起和退出统一走这里；忽略系统最小化的临时隐藏。
+        if not event.spontaneous():
+            save_size(self, self.window_state_path)

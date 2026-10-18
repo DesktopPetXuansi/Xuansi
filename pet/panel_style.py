@@ -31,7 +31,7 @@ QFrame#browserTabStrip { background: $tabs; border-bottom: 1px solid $border; }
 QTabBar#controlTabs { background: transparent; }
 QTabBar#controlTabs::tab { background: $tabs; color: $muted; border: 0;
     border-top-left-radius: 8px; border-top-right-radius: 8px;
-    padding: 10px 12px; margin-right: 3px; min-width: 48px; }
+    padding: 8px 10px; margin-right: 3px; min-width: 48px; }
 QTabBar#controlTabs::tab:hover { background: $hover; color: $text; }
 QTabBar#controlTabs::tab:selected { background: $background; color: $accent; font-weight: 600; }
 QTabBar#controlTabs::tab:focus { text-decoration: underline; }
