@@ -21,11 +21,14 @@ class PlatformClient:
         self.store = store or CredentialStore(self.base_url)
         self.pending_model_upload = None
 
-    async def request(self, method, path, payload=None, *, headers=None):
-        tokens = await asyncio.to_thread(self.store.read)
+    async def request(self, method, path, payload=None, *, headers=None, anonymous=False):
+        # 公共发现完全绕开凭据读取与令牌刷新，失效登录不影响查看公共形象。
+        tokens = None if anonymous else await asyncio.to_thread(self.store.read)
         async with httpx.AsyncClient(timeout=30) as client:
             async def send(current):
                 request_headers = httpx.Headers(headers or {})
+                if anonymous:
+                    request_headers.pop("Authorization", None)
                 if current:
                     request_headers["Authorization"] = f"Bearer {current['access_token']}"
                 return await client.request(method, self.base_url + "/api/v1" + path,

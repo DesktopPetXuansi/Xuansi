@@ -72,6 +72,10 @@ class PlatformTask(QThread):
 class PlatformDialog(QDialog):
     shutdown_done = Signal()
     activity_changed = Signal(str)
+    operation_completed = Signal(str, object)
+    operation_failed = Signal(str, str)
+    operation_finished = Signal(str)
+    busy_changed = Signal(bool)
 
     def __init__(self, owner, *, embedded=False):
         super().__init__(owner.panel)
@@ -80,6 +84,7 @@ class PlatformDialog(QDialog):
             self.setParent(owner.panel, Qt.WindowType.Widget)
         self.owner = owner
         self.worker = None
+        self.busy = False
         self.client = None
         self.upload_dialog = None
         self.pending_settings = None
@@ -110,6 +115,8 @@ class PlatformDialog(QDialog):
 
     def set_busy(self, busy):
         # 宿主显示跨页操作状态；不新增轮询，也不改变当前任务的取消/保存边界。
+        self.busy = busy
+        self.busy_changed.emit(busy)
         self.activity_changed.emit("官网资源 · 正在处理…" if busy else "")
         self.url.setEnabled(not busy)
         self.remote.setEnabled(not busy)
@@ -121,10 +128,8 @@ class PlatformDialog(QDialog):
             self.upload_dialog.set_busy(busy)
 
     def start(self, command, operation):
-        if self.shutting_down:
-            return
-        if self.worker is not None and self.worker.isRunning():
-            return
+        if self.shutting_down or self.worker is not None or self.pending_settings is not None or self.busy:
+            return False
         self.set_busy(True)
         self.request_url = self.url.text().strip()
         self.status.setText("正在处理…浏览器授权最多等待五分钟，可取消。")
@@ -134,6 +139,7 @@ class PlatformDialog(QDialog):
         self.worker.progress.connect(self.task_progress, Qt.ConnectionType.QueuedConnection)
         self.worker.finished.connect(self.task_finished)
         self.worker.start()
+        return True
 
     def task_failed(self, message):
         if self.worker and self.worker.command == "save":
@@ -142,6 +148,8 @@ class PlatformDialog(QDialog):
         self.status.setText(message)
         if self.upload_dialog and self.worker and self.worker.command.startswith("upload-"):
             self.upload_dialog.status.setText(message)
+        if self.worker:
+            self.operation_failed.emit(self.worker.command, message)
 
     def task_progress(self, message, percent):
         self.status.setText(message)
@@ -196,10 +204,12 @@ class PlatformDialog(QDialog):
         LOG.info("切换控制中心上传标签")
 
     def task_finished(self):
-        self.set_busy(self.pending_settings is not None or self.shutting_down)
+        command = self.worker.command if self.worker else ''
         if self.worker:
             self.worker.deleteLater()
             self.worker = None
+        self.set_busy(self.pending_settings is not None or self.shutting_down)
+        self.operation_finished.emit(command)
         if self.shutting_down:
             self.finish_shutdown()
 
@@ -325,6 +335,7 @@ class PlatformDialog(QDialog):
     def completed(self, command, result):
         if self.shutting_down:
             return
+        self.operation_completed.emit(command, result)
         if command.startswith("upload-") and self.upload_dialog:
             self.upload_dialog.completed(command, result)
             return

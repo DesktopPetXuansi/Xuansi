@@ -32,6 +32,33 @@ class MemoryStore:
         self.tokens = None
 
 
+@pytest.mark.parametrize("status", [200, 401])
+def test_anonymous_public_request_never_reads_or_refreshes_credentials(monkeypatch, status):
+    class ForbiddenStore:
+        def read(self):
+            raise AssertionError("公共浏览不得读取凭据")
+
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        assert request.url.path == "/api/v1/resources"
+        assert "Authorization" not in request.headers
+        return httpx.Response(status, json={"data": []})
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(
+        transport=httpx.MockTransport(handler), **kwargs))
+    operation = PlatformClient("http://localhost:3000", ForbiddenStore()).request(
+        "GET", "/resources?limit=100", headers={"Authorization": "Bearer must-not-leak"}, anonymous=True)
+    if status == 401:
+        with pytest.raises(httpx.HTTPStatusError):
+            asyncio.run(operation)
+    else:
+        assert asyncio.run(operation) == []
+    assert len(calls) == 1
+
+
 def test_refresh_rotation_and_revoke(monkeypatch):
     store = MemoryStore()
     calls = []
