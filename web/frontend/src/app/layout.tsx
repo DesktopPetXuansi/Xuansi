@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   },
   description:
     "玄司是运行在 Windows 桌面的 AI 伙伴。了解本地聊天、语音与屏幕观察，下载客户端，管理你的 Live2D 模型、动作和表情。",
+  // 复用现有图标，避免浏览器请求不存在的 favicon.ico。
+  icons: { icon: "/brand/icon.png" },
   openGraph: {
     title: "玄司 Xuansi",
     description: "把陪伴，留在你的桌面。",

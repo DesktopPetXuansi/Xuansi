@@ -36,22 +36,24 @@ export function ResourceList({ personal = false }: { personal?: boolean }) {
           ? "上传默认私有，保留作者、许可和版本信息。"
           : "浏览已发布的官方资源，按模型版本选择动作与表情。"}
       </Heading>
-      <div className="actions" style={{ marginBottom: 24 }}>
-        {personal && (
+      {personal && (
+        <div className="actions resource-create">
           <Link href="/dashboard/resources/new" className="button-link">
             新建资源 +
           </Link>
-        )}
-      </div>
+        </div>
+      )}
       <form
         className="filters"
         onSubmit={(event) => {
           event.preventDefault();
           setFilter({ search, kind, tag, cursor: "" });
+          console.debug("[资源筛选] 已提交筛选条件");
         }}
       >
         <Field label="搜索资源">
           <input
+            type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="名称或标签"
@@ -70,7 +72,6 @@ export function ResourceList({ personal = false }: { personal?: boolean }) {
             ))}
           </select>
         </Field>
-        <Button type="submit">筛选</Button>
         <Field label="标签">
           <input
             value={tag}
@@ -78,6 +79,8 @@ export function ResourceList({ personal = false }: { personal?: boolean }) {
             placeholder="按标签筛选"
           />
         </Field>
+        {/* 所有条件位于提交按钮之前，键盘和视觉顺序保持一致。 */}
+        <Button type="submit">筛选</Button>
       </form>
       {query.isPending ? (
         <Notice>正在加载资源…</Notice>
@@ -153,7 +156,7 @@ export function ResourceRow({
           </div>
         )}
         <div className="row-body">
-          <h3>{resource.name}</h3>
+          <h2 className="resource-title">{resource.name}</h2>
           <p>{resource.description || "作者尚未添加介绍。"}</p>
           <span className="badge">{kinds[resource.kind] ?? resource.kind}</span>
           <span className="badge">{statuses[resource.visibility]}</span>

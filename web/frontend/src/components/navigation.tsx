@@ -1,9 +1,73 @@
 "use client";
-import { api,ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowUpRight, Menu, UserRound, X } from "lucide-react";
+import { useRef, useState, type KeyboardEvent } from "react";
+
+const links = [
+  { href: "/features", label: "产品" },
+  { href: "/resources", label: "资源库" },
+  { href: "/docs", label: "文档" },
+  { href: "/download", label: "下载" },
+];
+
+function PrimaryNavigation({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+
+  function closeMenu(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Escape" || !open) return;
+    setOpen(false);
+    toggle.current?.focus();
+    console.debug("[主导航] Escape 关闭菜单并恢复焦点");
+  }
+
+  return (
+    <>
+      <button
+        ref={toggle}
+        type="button"
+        className="nav-toggle"
+        aria-label={open ? "收起主导航" : "展开主导航"}
+        aria-expanded={open}
+        aria-controls="primary-navigation"
+        onKeyDown={closeMenu}
+        onClick={() => {
+          setOpen(!open);
+          console.debug("[主导航]", open ? "收起" : "展开");
+        }}
+      >
+        {open ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
+      </button>
+      <nav
+        id="primary-navigation"
+        className="primary-navigation"
+        aria-label="主导航"
+        data-expanded={open}
+        onKeyDown={closeMenu}
+      >
+        {links.map(({ href, label }) => (
+          <Link
+            key={href}
+            href={href}
+            aria-current={
+              pathname === href || pathname.startsWith(`${href}/`)
+                ? "page"
+                : undefined
+            }
+            onClick={() => setOpen(false)}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+    </>
+  );
+}
 export function useMe() {
   return useQuery({
     queryKey: ["me"],
@@ -19,6 +83,7 @@ export function useMe() {
 }
 export function Navigation() {
   const me = useMe();
+  const pathname = usePathname();
   return (
     <header className="site-header">
       <div className="nav-inner">
@@ -28,17 +93,31 @@ export function Navigation() {
             玄司<span className="brand-en">XUANSI</span>
           </span>
         </Link>
-        <nav aria-label="主导航">
-          <Link href="/features">产品</Link>
-          <Link href="/resources">资源库</Link>
-          <Link href="/docs">文档</Link>
-          <Link href="/download">下载</Link>
-        </nav>
-        <Link className="nav-account" href={me.data ? "/dashboard" : "/login"}>
-          {me.data ? "工作台 ↗" : "登录 / 注册"}
-        </Link>
+        {/* 两个断点入口交替显示，让视觉顺序与键盘顺序始终一致。 */}
+        <AccountLink signedIn={Boolean(me.data)} mobile />
+        {/* 路由切换时重建菜单状态，不用 effect 同步用户操作。 */}
+        <PrimaryNavigation key={pathname} pathname={pathname} />
+        <AccountLink signedIn={Boolean(me.data)} />
       </div>
     </header>
+  );
+}
+function AccountLink({
+  signedIn,
+  mobile = false,
+}: {
+  signedIn: boolean;
+  mobile?: boolean;
+}) {
+  return (
+    <Link
+      className={`nav-account nav-account-${mobile ? "mobile" : "desktop"}`}
+      href={signedIn ? "/dashboard" : "/login"}
+    >
+      <UserRound size={15} aria-hidden />
+      {signedIn ? "工作台" : "登录 / 注册"}
+      <ArrowUpRight size={14} aria-hidden />
+    </Link>
   );
 }
 export function Footer() {
