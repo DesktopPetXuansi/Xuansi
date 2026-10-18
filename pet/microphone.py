@@ -15,7 +15,8 @@ LOG = logging.getLogger(__name__)
 
 
 class Microphone:
-    def __init__(self, on_segment: Callable[[np.ndarray], None], on_state: Callable[[str], None], on_update=None):
+    def __init__(self, on_segment: Callable[[np.ndarray], None], on_state: Callable[[str], None], on_update=None,
+                 *, model_root=None):
         self.on_segment = on_segment
         self.on_state = on_state
         self.on_update = on_update
@@ -23,11 +24,14 @@ class Microphone:
         self.muted = threading.Event()
         self.thread: threading.Thread | None = None
         self.frames: Queue[np.ndarray] = Queue(maxsize=20)
+        self.model_root = model_root
+        self.congested = threading.Event()
 
     def start(self, device=-1):
         if self.thread and self.thread.is_alive():
             return
         self.stop_event.clear()
+        self.congested.clear()
         self.thread = threading.Thread(target=self._run, args=(device,), daemon=True, name="pet-microphone")
         self.thread.start()
 
@@ -48,13 +52,16 @@ class Microphone:
             self.frames.put_nowait(data[:, 0].copy())
         except Full:
             # 丢弃拥塞音频，绝不在实时回调中等待识别或磁盘。
-            pass
+            self.congested.set()
 
     def _run(self, device):
         segmenter = Segmenter()
         failed = False
         try:
-            online = OnlineInput(self._online_update) if self.on_update else None
+            online = None
+            if self.on_update:
+                online = (OnlineInput(self._online_update, model_root=self.model_root) if self.model_root
+                          else OnlineInput(self._online_update))
             if self.stop_event.is_set():
                 return
             while not self.frames.empty():
@@ -70,6 +77,17 @@ class Microphone:
                 self.on_state("实时聆听中 · 说完即可回复" if online else "正在聆听，说完停顿即可")
                 LOG.info("麦克风已开启")
                 while not self.stop_event.is_set():
+                    if self.congested.is_set():
+                        # 不将缺失一段的录音拼成完整命令，工作线程负责可见反馈。
+                        self.congested.clear()
+                        while not self.frames.empty():
+                            self.frames.get_nowait()
+                        segmenter.reset()
+                        if online:
+                            online.reset()
+                        self.on_state('收音拥塞 · 已丢弃不完整话段，请重新说话')
+                        LOG.warning('收音队列拥塞，不完整话段已丢弃')
+                        continue
                     try:
                         samples = self.frames.get(timeout=0.1)
                     except Empty:

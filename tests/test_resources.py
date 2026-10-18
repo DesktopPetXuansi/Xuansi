@@ -31,6 +31,7 @@ def test_unavailable_or_fullscreen_desktop_releases_model(monkeypatch, state):
         monitor=SimpleNamespace(input_monitor_available=False),
         idle_action=IdleActionTimer(),
         _update_idle_action=lambda _state, _now: None,
+        _adjust_resource_pressure=lambda _available: None,
         voice=lambda enabled: actions.append(("voice", enabled)),
         runtime=SimpleNamespace(
             cancel=lambda release: actions.append(("release", release)),

@@ -78,7 +78,9 @@ class ToolContext:
                 names.append("select_tts_engine")
             names.append("finish_observation")
         else:
-            names.extend(("save_memory", "set_speech_enabled", "select_tts_engine"))
+            names.append('save_memory')
+            if 'tts' in self.settings.ai.voice_components:
+                names.extend(('set_speech_enabled', 'select_tts_engine'))
             if self.runtime.motion_actions:
                 names.append("play_motion")
         tools = []
@@ -92,7 +94,8 @@ class ToolContext:
                 "parameters": {"type": "object", "properties": properties,
                                "required": list(properties), "additionalProperties": False},
             }})
-        return tools
+        filter_tools = getattr(getattr(self.runtime, 'engine', None), 'filter_tools', None)
+        return filter_tools(self.settings, tools) if filter_tools is not None else tools
 
     def _arguments(self, call):
         allowed = {tool["function"]["name"] for tool in self.tools()}

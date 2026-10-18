@@ -56,3 +56,38 @@ def test_setup_propagates_errors_and_can_skip_shortcuts(tmp_path, failure):
     assert (install / "realtime.checked").exists() == (failure != "models")
     log = (install / "data/setup.log").read_text(encoding="utf-8-sig")
     assert ("Setup completed successfully." in log) == (failure is None)
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_setup_uses_plan_and_rejects_it_before_creating_environment(tmp_path, valid):
+    """完整执行 PowerShell 与真实计划入口，下载器替身不联网。"""
+    from pet.ai.install_plan import InstallPlan, save_plan
+
+    install = tmp_path / "plan install"
+    scripts = install / "scripts"
+    scripts.mkdir(parents=True)
+    shutil.copy2(ROOT / "setup.ps1", install / "setup.ps1")
+    shutil.copy2(ROOT / "scripts/preflight.py", scripts / "preflight.py")
+    (install / "requirements.lock.txt").write_text("", encoding="utf-8")
+    (install / "pet/ai").mkdir(parents=True)
+    shutil.copy2(ROOT / "pet/__init__.py", install / "pet/__init__.py")
+    for name in ("__init__.py", "assessment.py", "device.py", "catalog.py", "catalog.json", "install_plan.py"):
+        shutil.copy2(ROOT / "pet/ai" / name, install / "pet/ai" / name)
+    (scripts / "download_assets.py").write_text(
+        "import sys\nfrom pathlib import Path\n"
+        "assert sys.argv[1] == '--plan'\nPath('selected.checked').touch()\n", encoding="utf-8"
+    )
+    (scripts / "download_realtime.py").write_text("raise AssertionError('plan resources already handled')\n",
+                                                encoding="utf-8")
+    plan_path = tmp_path / "plan.json"
+    save_plan(InstallPlan(app_dir=str(install), model_dir=str(tmp_path / "models"), backend="cpu"), plan_path)
+    if not valid:
+        plan_path.write_text('{"api_key":"not-permitted"}', encoding="utf-8")
+    result = subprocess.run([
+        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(install / "setup.ps1"),
+        "-PythonPath", sys._base_executable, "-InstallPlanPath", str(plan_path), "-SkipShortcuts",
+    ], capture_output=True, timeout=90)
+    assert (result.returncode == 0) is valid, result.stdout + result.stderr
+    assert (install / ".venv").exists() is valid
+    assert (install / "selected.checked").exists() is valid
+    assert (install / "data/settings.json").exists() is valid

@@ -4,6 +4,8 @@ import json
 import logging
 import time
 
+from .ai.memory_provider import LegacyMemorySession, MemorySession
+
 LOG = logging.getLogger(__name__)
 PROMPT = (
     '你是长期记忆检索器。根据本轮问题及参考历史理解哪些候选资料真正有助于回答。'
@@ -26,35 +28,17 @@ def _messages(query, history, candidates, limit):
 
 
 async def _input_tokens(client, messages):
-    """让服务端使用实际聊天模板计数，而不是以字数猜测上下文。"""
-    response = await client.post('/v1/chat/completions/input_tokens', json={
-        'model': 'local-pet', 'messages': messages,
-        'chat_template_kwargs': {'enable_thinking': False},
-    })
-    response.raise_for_status()
-    try:
-        count = response.json()['input_tokens']
-        if type(count) is not int or count < 0:
-            raise ValueError('无效 token 数')
-        return count
-    except (KeyError, TypeError, ValueError) as exc:
-        raise RuntimeError('无法确认记忆检索的上下文容量，请重试。') from exc
+    """准确计数或保守预算由提供方决定，不向云端发送本地私有请求。"""
+    estimate = await client.count(messages)
+    if type(estimate.tokens) is not int or estimate.tokens < 0:
+        raise RuntimeError('无法确认记忆检索的上下文容量，请重试。')
+    return estimate.tokens
 
 
 async def _select(client, messages, candidates, output_tokens, limit):
     """相关性由模型决定；验证只阻止杜撰、越界或截断结果进入正文。"""
-    response = await client.post('/v1/chat/completions', json={
-        'model': 'local-pet', 'messages': messages, 'max_tokens': output_tokens,
-        'temperature': 0.0, 'top_p': 1.0, 'stream': False,
-        'response_format': {'type': 'json_object'},
-        'chat_template_kwargs': {'enable_thinking': False},
-    })
-    response.raise_for_status()
     try:
-        choice = response.json()['choices'][0]
-        if choice.get('finish_reason') != 'stop':
-            raise ValueError('检索结果未完整结束')
-        result = json.loads(choice['message']['content'])
+        result = json.loads(await client.generate(messages, output_tokens))
         if not isinstance(result, dict) or set(result) != {'selections'}:
             raise ValueError('无效检索字段')
         selected = result['selections']
@@ -174,10 +158,11 @@ async def _fit_context(client, settings, query, history, fragments, limit, prefe
     return kept[dropped:], output_tokens
 
 
-async def retrieve_memory(client, settings, query, notes, history=(), limit=700):
+async def retrieve_memory(client, settings, query, notes, history=(), limit=700, *, provider=None):
     """扫描所有记忆后由模型筛选原文，拒绝无进展重试和语义规则兜底。"""
     if not notes or limit <= 0:
         return ''
+    client = MemorySession(provider, settings) if provider is not None else LegacyMemorySession(client)
     started = time.monotonic()
     fragments = []
     # 分片仅由容量决定；少量重叠避免相邻切点把完整事项切断。

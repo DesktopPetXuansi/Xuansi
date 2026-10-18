@@ -46,6 +46,12 @@ $runtime = Join-Path $payload 'runtime'
 New-Item -ItemType Directory -Path $runtime -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $buildRoot 'python/tools') -Destination (Join-Path $runtime 'python') -Recurse
 Copy-Item -LiteralPath (Join-Path $buildRoot 'compiler/tools/License.txt') -Destination (Join-Path $runtime 'INNO-LICENSE.txt')
+# 安装前验证复用锁定 HTTP 提供方，临时 Python 不在安装前执行 pip。
+$bundlePython = Join-Path $projectRoot '.venv/Scripts/python.exe'
+if (-not (Test-Path -LiteralPath $bundlePython)) { throw 'The locked build environment is required.' }
+& $bundlePython -X utf8 (Join-Path $payload 'scripts/build_preflight_bundle.py') `
+    --output (Join-Path $runtime 'preflight') --lock (Join-Path $payload 'requirements.lock.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Preflight dependency bundle could not be verified.' }
 # 记录安装包对应的源码，用户数据、开发环境与模型权重从未进入暂存树。
 @{ version = $version; commit = $revision; python = '3.13.15'; installer = 'Inno Setup 7.1.0' } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $payload 'release.json') -Encoding UTF8

@@ -32,8 +32,8 @@ class PartialTurn:
 
 
 class OnlineInput:
-    def __init__(self, emit):
-        root = MODELS / "streaming-paraformer"
+    def __init__(self, emit, *, model_root=None):
+        root = (model_root or MODELS) / "streaming-paraformer"
         if not all((root / name).is_file() for name in ("tokens.txt", "encoder.int8.onnx", "decoder.int8.onnx")):
             raise RuntimeError("实时识别模型未安装，请运行 scripts/download_realtime.py。")
         self.recognizer = sherpa_onnx.OnlineRecognizer.from_paraformer(

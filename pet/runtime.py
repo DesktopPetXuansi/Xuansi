@@ -12,12 +12,12 @@ from pathlib import Path
 import sounddevice as sd
 from PySide6.QtCore import QObject, Signal
 
+from .ai.assembly import create_inference_router
 from .audio_activity import AudioActivity
 from .audio_models import AudioModels
-from .config import Settings, save_settings
+from .config import MODELS, Settings, save_settings
 from .conversation import converse
 from .desktop import observation_current
-from .inference import LocalEngine
 from .live_dialogue import LiveDialogue
 from .memory import MemoryStore, durable_io
 from .microphone import Microphone
@@ -46,6 +46,7 @@ class Runtime(QObject):
     # 用 TTS 播放响度驱动口型；麦克风输入不会触发此信号。
     mouth_level = Signal(float)
     motion_requested = Signal(int, str, str)
+    provider_changed = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -54,7 +55,7 @@ class Runtime(QObject):
         self.speech_override: bool | None = None
         self.motion_actions: tuple[str, ...] = ()
         self.microphone_epoch = 0
-        self.engine = LocalEngine()
+        self.engine = create_inference_router(on_event=self.provider_changed.emit)
         self.audio = AudioModels()
         self.audio_activity = AudioActivity()
         self.memory = MemoryStore()
@@ -101,6 +102,7 @@ class Runtime(QObject):
                 )
 
     async def _conversation(self, epoch, settings, text, kind, position, samples, observation=None):
+        await asyncio.to_thread(self.audio.configure_root, Path(settings.ai.model_dir) if settings.ai.model_dir else MODELS)
         await converse(self, epoch, settings, text, kind, position, samples, observation)
 
     async def _speak(self, epoch, settings, answer, observation, kind="chat", *, selected_engine=None):
@@ -122,6 +124,8 @@ class Runtime(QObject):
         )
 
     def should_speak(self, settings, kind="chat"):
+        if 'tts' not in settings.ai.voice_components:
+            return False
         if self.speech_override is False:
             return False
         if kind == "observation":
@@ -194,6 +198,7 @@ class Runtime(QObject):
         return self.schedule(self._configure_microphone(epoch, enabled, device, realtime, settings))
 
     async def _prepare_voice(self, settings):
+        await asyncio.to_thread(self.audio.configure_root, Path(settings.ai.model_dir) if settings.ai.model_dir else MODELS)
         # 开麦时预热；预热合成只进内存，不调用播放接口，也不写入对话历史。
         await self.engine.warmup(settings)
         if self.should_speak(settings):
@@ -219,6 +224,14 @@ class Runtime(QObject):
             if not enabled:
                 self.microphone_state.emit(epoch, "麦克风已关闭")
                 return
+            if settings is not None:
+                required = 'realtime' if realtime else 'asr'
+                if required not in settings.ai.voice_components:
+                    self.listening = False
+                    self.microphone_state.emit(epoch, '所选语音识别组件未安装，请在安装向导中添加后再开启。')
+                    return
+                await asyncio.to_thread(self.audio.configure_root,
+                                        Path(settings.ai.model_dir) if settings.ai.model_dir else MODELS)
             self.microphone_state.emit(epoch, "正在准备本地语音…")
             try:
                 if realtime:
@@ -242,6 +255,7 @@ class Runtime(QObject):
                         lambda samples: self.segment.emit(epoch, samples),
                         lambda text: self.microphone_state.emit(epoch, text),
                         on_update=lambda update: self.voice_update.emit(epoch, update),
+                        model_root=Path(settings.ai.model_dir) if settings and settings.ai.model_dir else None,
                     )
                     self.microphone.start(device)
                     return
@@ -278,19 +292,20 @@ class Runtime(QObject):
                 self.finished.emit(epoch)
                 LOG.info("本轮回复已停止 listening=%s", self.listening)
 
-    def persist(self, settings: Settings, validate_models=True, platform_changes=None):
+    def persist(self, settings: Settings, validate_models=True, platform_changes=None, credential_change=None):
         def validate_files():
             settings.validate()
             from .appearance import image_path
 
             if settings.avatar_image and not image_path(settings.avatar_image).is_file():
                 raise ValueError("形象副本已丢失，请重新选择图片。")
-            if validate_models and not all(
+            if validate_models and settings.ai.policy != 'online_first' and not all(
                 Path(p).is_file() for p in (settings.model_path, settings.projector_path)
             ):
                 raise ValueError("模型文件不存在，请在配置中选择配套的本地 GGUF 文件。")
 
         async def write():
+            created_ref = ''
             try:
                 async with self.storage_control:
                     await asyncio.to_thread(validate_files)
@@ -299,7 +314,24 @@ class Runtime(QObject):
                         "platform_url", "platform_model_version", "platform_expression_version", "avatar_image")}
                     latest.update(platform_changes or {})
                     merged = replace(settings, **latest)
-                    await durable_io(save_settings, merged)
+                    if credential_change is not None:
+                        profile, key = credential_change
+                        if profile != settings.ai.profile or not key.strip() or not profile.credential_ref:
+                            raise ValueError('密钥草稿与当前在线配置不一致，请重新验证。')
+                        if profile.credential_ref == self.current_settings.ai.profile.credential_ref:
+                            raise ValueError('密钥修改需使用新的凭据引用，请重新验证。')
+                        from .ai.credentials import CredentialStore
+
+                        await durable_io(CredentialStore().write, profile.credential_ref, key)
+                        created_ref = profile.credential_ref
+                    try:
+                        await durable_io(save_settings, merged)
+                    except BaseException:
+                        # 新引用先写后提交配置；配置失败只回收本次新引用，旧Key仍可用。
+                        if created_ref:
+                            await durable_io(CredentialStore().delete, created_ref)
+                            created_ref = ''
+                        raise
                     self.current_settings = merged
                 self.settings_saved.emit(merged, "")
             except Exception as exc:

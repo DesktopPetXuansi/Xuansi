@@ -1,9 +1,11 @@
 """下载公开权重与推理引擎：限速、断点续传、SHA256 校验后再启用。"""
 
+import argparse
 import binascii
 import hashlib
 import json
 import logging
+import sys
 import tarfile
 import time
 import urllib.request
@@ -12,7 +14,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS = Path("D:/AI/Models/desktop-pet")
+sys.path.insert(0, str(ROOT))
+
+from pet.ai.install_plan import default_model_dir
+
+MODELS = Path(default_model_dir())
 RUNTIME = ROOT / "runtime"
 LOG = logging.getLogger("download")
 HF = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/"
@@ -112,11 +118,17 @@ def fetch(asset: tuple[str, Path, str]):
     raise RuntimeError(f"下载失败：{path.name}，保留续传文件")
 
 
-def extract():
-    destination = RUNTIME / "llama"
-    destination.mkdir(parents=True, exist_ok=True)
-    for name in ("llama.zip", "cudart.zip"):
-        with zipfile.ZipFile(RUNTIME / name) as archive:
+def extract(assets=None, models=MODELS, runtime=RUNTIME, manifest_path=None):
+    """只解压本次选择的资源，不要求其他模型或语音包存在。"""
+    destination = runtime / "llama"
+    selected = ASSETS if assets is None else assets
+    for _, path, _ in selected:
+        if path.suffix != ".zip":
+            continue
+        backend = "cuda" if path.name in ("llama.zip", "cudart.zip") else "cpu"
+        destination = runtime / "llama" / backend
+        destination.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(path) as archive:
             for entry in archive.infolist():
                 target = (destination / entry.filename).resolve()
                 if not target.is_relative_to(destination.resolve()):
@@ -129,21 +141,54 @@ def extract():
                     if checksum == entry.CRC:
                         continue
                 archive.extract(entry, destination)
-    for name in ("sensevoice.tar.bz2", "kokoro.tar.bz2", "melo.tar.bz2"):
-        with tarfile.open(MODELS / name) as archive:
-            archive.extractall(MODELS, filter="data")
+    for _, path, _ in selected:
+        if not path.name.endswith(".tar.bz2"):
+            continue
+        with tarfile.open(path) as archive:
+            archive.extractall(models, filter="data")
     manifest = [
         {"url": url, "filename": path.name, "sha256": checksum, "bytes": path.stat().st_size}
-        for url, path, checksum in ASSETS
+        for url, path, checksum in selected
     ]
-    (ROOT / "assets-manifest.json").write_text(
+    (manifest_path or ROOT / "assets-manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     LOG.info("解压和清单完成")
 
 
-if __name__ == "__main__":
+def deploy_plan(plan):
+    """固定目录推导路径，使用有界并发及既有续传和完整摘要校验。"""
+    from pet.ai.install_plan import default_model_dir, resources_for
+
+    app = Path(plan.app_dir) if plan.app_dir else ROOT
+    models = Path(plan.model_dir or default_model_dir())
+    runtime = app / "runtime"
+    assets = [(item.url, (runtime if item.location == "runtime" else models) / item.path, item.sha256)
+              for item in resources_for(plan)]
+    if not assets:
+        LOG.info("本次未选择本地模型或语音资源，跳过下载")
+        return
+    app.mkdir(parents=True, exist_ok=True)
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        list(executor.map(fetch, assets))
+    extract(assets, models, runtime, app / "assets-manifest.json")
+
+
+def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plan", type=Path)
+    args = parser.parse_args()
+    if args.plan:
+        sys.path.insert(0, str(ROOT))
+        from pet.ai.install_plan import load_plan
+
+        deploy_plan(load_plan(args.plan))
+        return
     with ThreadPoolExecutor(max_workers=3) as executor:
         list(executor.map(fetch, ASSETS))
     extract()
+
+
+if __name__ == "__main__":
+    main()

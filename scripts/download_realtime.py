@@ -1,7 +1,10 @@
 """只增量下载实时识别权重；固定上游版本、校验摘要，不上传任何音频。"""
 
+import argparse
 import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from download_assets import MODELS, fetch
 
@@ -21,5 +24,17 @@ ASSETS = [
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plan", type=Path)
+    args = parser.parse_args()
+    if args.plan:
+        # 独立入口仍遵守统一计划的组件选择。
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from pet.ai.install_plan import default_model_dir, load_plan, resources_for
+
+        plan = load_plan(args.plan)
+        models = Path(plan.model_dir or default_model_dir())
+        ASSETS = [(item.url, models / item.path, item.sha256) for item in resources_for(plan)
+                  if item.kind == "realtime"]
     with ThreadPoolExecutor(max_workers=2) as executor:
         list(executor.map(fetch, ASSETS))

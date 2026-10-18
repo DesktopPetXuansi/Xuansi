@@ -2,12 +2,15 @@
 
 import json
 import logging
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
+
+from .ai.install_plan import default_model_dir
+from .ai.settings import AISettings
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-MODELS = Path("D:/AI/Models/desktop-pet")
+MODELS = Path(default_model_dir())
 LOG = logging.getLogger(__name__)
 
 
@@ -42,13 +45,15 @@ class Settings:
     context_size: int = 4096
     cpu_threads: int = 4
     chat_hotkey: str = "Ctrl+Alt+Space"
+    ai: AISettings = field(default_factory=AISettings)
 
     def validate(self):
         defaults = Settings()
-        for field in fields(self):
-            value, original = getattr(self, field.name), getattr(defaults, field.name)
+        for descriptor in fields(self):
+            value, original = getattr(self, descriptor.name), getattr(defaults, descriptor.name)
             if type(value) is not type(original):
-                raise ValueError(f"设置类型错误：{field.name}")
+                raise ValueError(f"设置类型错误：{descriptor.name}")
+        self.ai.validate()
         if not 10 <= self.interval <= 300 or self.pet_size not in (64, 96, 128, 160, 224, 288):
             raise ValueError("观察间隔为 10–300 秒，高度可选 64、96、128、160、224 或 288")
         if self.capture_scope not in ("screen", "nearby"):
@@ -94,6 +99,8 @@ def load_settings(path: Path = DATA / "settings.json"):
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         allowed = {field.name for field in fields(Settings)}
+        if isinstance(raw, dict) and 'ai' in raw:
+            raw['ai'] = AISettings.from_dict(raw['ai'])
         return Settings(**{key: value for key, value in raw.items() if key in allowed}).validate()
     except FileNotFoundError:
         return Settings()

@@ -137,7 +137,11 @@ async def run_dialogue(runtime, epoch, settings, text, images, kind, position, o
         _provided_images(history, settings, images, kind, text)
     _trim_history(history)
     # 冷加载有自身100秒保护，之后整条工具链共享90秒预算。
-    await runtime.engine.start(settings)
+    begin_turn = getattr(runtime.engine, 'begin_turn', None)
+    if begin_turn is not None:
+        await begin_turn(settings, required=('image',) if images else (), observation=kind == 'observation')
+    else:
+        await runtime.engine.start(settings)
     calls_used, cache = 0, {}
     try:
         async with asyncio.timeout(TURN_SECONDS):
@@ -150,6 +154,9 @@ async def run_dialogue(runtime, epoch, settings, text, images, kind, position, o
                                                       tool_choice=choice)
                 if not context.current():
                     return DialogueResult(None, context.selected_tts)
+                mark_committed = getattr(runtime.engine, 'mark_committed', None)
+                if mark_committed is not None:
+                    mark_committed()
                 history.append(reply.message())
                 if reply.content:
                     # 只依据协议发布原文；工具前的说明也保留，不按任何词句删除。
@@ -163,7 +170,7 @@ async def run_dialogue(runtime, epoch, settings, text, images, kind, position, o
                     raise RuntimeError("模型重复使用了同一工具标识，本轮未执行。")
                 if not reply.tool_calls:
                     if not reply.content.strip():
-                        raise RuntimeError("本地模型没有生成回复，请重新发送这句话。")
+                        raise RuntimeError("当前模型没有生成回复，请重新发送这句话。")
                     return DialogueResult(reply.content, context.selected_tts)
                 conflict = (any(call.name == "finish_observation" for call in reply.tool_calls)
                             and len(reply.tool_calls) != 1)

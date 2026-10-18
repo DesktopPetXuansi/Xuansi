@@ -1,7 +1,7 @@
 """原生聊天协议类型及完整性验证；正文始终保留模型原文。"""
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
@@ -45,6 +45,7 @@ class AssistantMessage(TypedDict):
     role: Literal['assistant']
     content: str
     tool_calls: NotRequired[list[NativeToolCall]]
+    provider_metadata: NotRequired[dict[str, JsonValue]]
 
 
 class ToolMessage(TypedDict):
@@ -83,11 +84,15 @@ class AssistantReply:
     content: str
     tool_calls: tuple[ToolCall, ...] = ()
     finish_reason: str = 'stop'
+    metadata: dict[str, JsonValue] = field(default_factory=dict)
 
     def message(self) -> AssistantMessage:
         message: AssistantMessage = {'role': 'assistant', 'content': self.content}
         if self.tool_calls:
             message['tool_calls'] = [call.message() for call in self.tool_calls]
+        if self.metadata:
+            # 原生签名与思考上下文属于对应提供方；由适配器确认作用域再发送。
+            message['provider_metadata'] = self.metadata
         return message
 
 

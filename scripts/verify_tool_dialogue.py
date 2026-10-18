@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tool_fixture import Case, cases_for, picture
 
 from pet import model_tools
+from pet.ai.assembly import create_inference_router
 from pet.config import Settings
 from pet.inference import LocalEngine
 from pet.memory import MemoryStore
@@ -169,6 +170,9 @@ class Verification:
 
     def install(self):
         async def complete(*args, **kwargs):
+            # 检索的内部JSON生成单独记日志，不混入对话工具闭环的请求计数。
+            if kwargs.get('json_mode'):
+                return await self.original_complete(*args, **kwargs)
             self.active["completion_requests"] += 1
             reply = await self.original_complete(*args, **kwargs)
             self.active["model_responses"].append(safe_record(reply.message()))
@@ -232,7 +236,10 @@ async def verify(arguments, report):
                           "max_tokens": settings.max_tokens, "context_size": settings.context_size,
                           "gpu_layers": settings.gpu_layers, "model_path": settings.model_path,
                           "projector_path": settings.projector_path}
-    engine = LocalEngine()
+    report['engine_boundary'] = 'provider-router' if arguments.router else 'local-direct'
+    report['selection_events'] = []
+    engine = (create_inference_router(on_event=lambda event: report['selection_events'].append(asdict(event)))
+              if arguments.router else LocalEngine())
     with tempfile.TemporaryDirectory(prefix="native-tool-verification-") as folder:
         runner = Verification(engine, settings, report, arguments.output, Path(folder))
         try:
@@ -271,6 +278,7 @@ def main(argv=None):
     parser.add_argument("--suite", choices=("smoke", "full", "speech", "holdout", "memory", "observation"), default="smoke")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gpu-layers", type=int, default=99)
+    parser.add_argument('--router', action='store_true', help='通过生产提供方选择器执行本地合成验收')
     parser.add_argument("--model-path", type=Path, help="只覆盖本次验收模型，不修改应用默认设置")
     parser.add_argument("--projector-path", type=Path, help="与本次实验模型匹配的视觉投影")
     arguments = parser.parse_args(argv)

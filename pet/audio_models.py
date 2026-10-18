@@ -4,6 +4,7 @@ import logging
 import re
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 import sherpa_onnx
@@ -24,13 +25,23 @@ def select_tts_engine(text: str, requested: str):
 
 class AudioModels:
     def __init__(self):
+        self.root = MODELS
         self.recognizer = None
         self.tts = None
         self.tts_engine = ""
         self.lock = threading.Lock()
 
+    def configure_root(self, root: Path):
+        with self.lock:
+            if self.root == root:
+                return
+            self.recognizer = self.tts = None
+            self.tts_engine = ''
+            self.root = root
+        LOG.info('语音资源目录已切换，旧会话已释放')
+
     def _load_asr(self):
-        root = MODELS / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
+        root = self.root / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
         models = list(root.glob("*int8.onnx")) or list(root.glob("*.onnx"))
         if not models:
             raise RuntimeError("语音识别模型尚未安装完成。")
@@ -68,7 +79,7 @@ class AudioModels:
                 self._load_asr()
 
     def _load_fast_tts(self):
-        root = MODELS / "vits-melo-tts-zh_en"
+        root = self.root / "vits-melo-tts-zh_en"
         config = sherpa_onnx.OfflineTtsConfig(
             model=sherpa_onnx.OfflineTtsModelConfig(
                 vits=sherpa_onnx.OfflineTtsVitsModelConfig(
@@ -87,7 +98,7 @@ class AudioModels:
         LOG.info("Melo 本地中英语音就绪")
 
     def _load_tts(self):
-        root = MODELS / "kokoro-int8-multi-lang-v1_1"
+        root = self.root / "kokoro-int8-multi-lang-v1_1"
         models = list(root.glob("*int8.onnx")) or list(root.glob("*.onnx"))
         if not models:
             raise RuntimeError("语音合成模型尚未安装完成。")

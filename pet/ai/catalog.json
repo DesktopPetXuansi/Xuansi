@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "engine_revision": "56381e407c0ccfb3a6f71e668a27a901001d22ce",
+  "models": [
+    {
+      "id": "qwen3.5-9b",
+      "name": "Qwen3.5-9B Q4_K_M",
+      "resources": [
+        "9b-weights",
+        "9b-projector"
+      ],
+      "model_path": "qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf",
+      "projector_path": "qwen3.5-9b/mmproj-F16.gguf",
+      "verification": "verified"
+    },
+    {
+      "id": "qwen3.5-4b",
+      "name": "Qwen3.5-4B Q4_K_M（实验：语义验收未通过）",
+      "resources": [
+        "4b-weights",
+        "4b-projector"
+      ],
+      "model_path": "qwen3.5-4b/Qwen3.5-4B-Q4_K_M.gguf",
+      "projector_path": "qwen3.5-4b/mmproj-F16.gguf",
+      "verification": "failed"
+    }
+  ],
+  "resources": [
+    {
+      "id": "9b-weights",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf",
+      "path": "qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf",
+      "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+      "bytes": 5680522464,
+      "kind": "model",
+      "location": "models",
+      "archive": ""
+    },
+    {
+      "id": "9b-projector",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/mmproj-F16.gguf",
+      "path": "qwen3.5-9b/mmproj-F16.gguf",
+      "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f",
+      "bytes": 918166080,
+      "kind": "projector",
+      "location": "models",
+      "archive": ""
+    },
+    {
+      "id": "llama-cuda",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/llama-b10930-bin-win-cuda-12.4-x64.zip",
+      "path": "llama.zip",
+      "sha256": "7d07deb817f7f380d1da119c76967d7ead0a4dbb02456c0edfda82a99122fed6",
+      "bytes": 254065226,
+      "kind": "engine",
+      "location": "runtime",
+      "archive": "zip"
+    },
+    {
+      "id": "cudart",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/cudart-llama-bin-win-cuda-12.4-x64.zip",
+      "path": "cudart.zip",
+      "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+      "bytes": 391443627,
+      "kind": "engine",
+      "location": "runtime",
+      "archive": "zip"
+    },
+    {
+      "id": "sensevoice",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
+      "path": "sensevoice.tar.bz2",
+      "sha256": "7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63",
+      "bytes": 165783878,
+      "kind": "asr",
+      "location": "models",
+      "archive": "tar"
+    },
+    {
+      "id": "kokoro",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+      "path": "kokoro.tar.bz2",
+      "sha256": "a1e94694776049035c4f2c6529f003aaece993c76aae9a78995831c3c4dcafc6",
+      "bytes": 147031220,
+      "kind": "tts",
+      "location": "models",
+      "archive": "tar"
+    },
+    {
+      "id": "melo",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2",
+      "path": "melo.tar.bz2",
+      "sha256": "e58351ed7149f290a54534538badd4077cdbe6fddc964b24d0bee870415d1514",
+      "bytes": 167006755,
+      "kind": "tts",
+      "location": "models",
+      "archive": "tar"
+    },
+    {
+      "id": "4b-weights",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+      "path": "qwen3.5-4b/Qwen3.5-4B-Q4_K_M.gguf",
+      "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "bytes": 2740937888,
+      "kind": "model"
+    },
+    {
+      "id": "4b-projector",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/mmproj-F16.gguf",
+      "path": "qwen3.5-4b/mmproj-F16.gguf",
+      "sha256": "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
+      "bytes": 672423616,
+      "kind": "projector"
+    },
+    {
+      "id": "llama-cpu",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/llama-b10930-bin-win-cpu-x64.zip",
+      "path": "llama-cpu.zip",
+      "sha256": "a0c1bf04e7b7b4b6c7f280b6bef08ecaa170f2ba611830b2332bce9ddf352dab",
+      "bytes": 18429489,
+      "kind": "engine",
+      "location": "runtime",
+      "archive": "zip"
+    },
+    {
+      "id": "realtime-encoder",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/encoder.int8.onnx",
+      "path": "streaming-paraformer/encoder.int8.onnx",
+      "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a",
+      "bytes": 165462184,
+      "kind": "realtime"
+    },
+    {
+      "id": "realtime-decoder",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/decoder.int8.onnx",
+      "path": "streaming-paraformer/decoder.int8.onnx",
+      "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f",
+      "bytes": 71664561,
+      "kind": "realtime"
+    },
+    {
+      "id": "realtime-tokens",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/tokens.txt",
+      "path": "streaming-paraformer/tokens.txt",
+      "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6",
+      "bytes": 75756,
+      "kind": "realtime"
+    }
+  ],
+  "cuda_windows_driver": {
+    "minimum_minor_compatibility": "528.33",
+    "toolkit_driver": "551.61",
+    "source": "https://docs.nvidia.com/cuda/archive/12.4.0/cuda-toolkit-release-notes/index.html"
+  }
+}

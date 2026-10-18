@@ -182,6 +182,7 @@ def resource_desktop(pet, monkeypatch, state):
     monkeypatch.setattr("pet.app.psutil.virtual_memory", lambda: SimpleNamespace(available=8 * 2**30))
     pet.runtime.engine = SimpleNamespace(loaded=False)
     pet._update_idle_action = lambda *_: None
+    pet._adjust_resource_pressure = lambda _available: None
     pet.avatar.show = pet.avatar.hide = lambda: None
     return desktop
 
