@@ -125,7 +125,9 @@ def test_resource_progress_stays_visible_across_tabs_and_resource_refresh(panel)
 def test_navigation_preserves_all_nine_pages_in_order(panel):
     expected = ("chat", "persona", "memory", "preferences", "model", "appearance", "resources", "upload", "logs")
     bar = panel.navigation.bar
-    assert tuple(bar.tabData(index) for index in range(bar.count())) == expected
+    primary = tuple(key for key in expected if key not in ("resources", "upload"))
+    assert tuple(bar.tabData(index) for index in range(bar.count())) == primary
+    assert tuple(panel.sections) == expected
     for key in expected:
         panel.open_section(key)
         QApplication.instance().processEvents()

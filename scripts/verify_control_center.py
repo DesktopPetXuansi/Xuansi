@@ -16,7 +16,8 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QTabBar, QToolButton
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pet.appearance_dialog import AppearanceDialog
+from pet.appearance_flow import AppearanceFlow
+from pet.appearance_hub import AppearanceHub
 from pet.config import ROOT, Settings, load_settings, save_settings
 from pet.live2d_session import configure_opengl_sharing
 from pet.panel import Panel
@@ -62,9 +63,10 @@ def inspect(application, temporary, output):
     panel.logs.path = temporary / "native-ui.log"
     panel.logs.path.write_text("2026-10-15 INFO control-center 原生界面验收\n", encoding="utf-8")
     owner = SimpleNamespace(panel=panel, settings=settings, runtime=Runtime())
-    appearance = AppearanceDialog(panel, embedded=True)
+    appearance = AppearanceHub(panel)
     platform = PlatformDialog(owner, embedded=True)
-    panel.mount_section("appearance", appearance, on_open=lambda: appearance.present(owner.settings.avatar_image))
+    flow = AppearanceFlow(owner, appearance, platform, on_applied=lambda: None)
+    panel.mount_section("appearance", appearance, on_open=flow.present)
     panel.mount_section("resources", platform,
                         on_open=lambda: platform.refresh_local() if platform.worker is None else None)
     panel.upload_requested.connect(platform.open_upload)
@@ -87,9 +89,9 @@ def inspect(application, temporary, output):
         report["chat_sends_once"] = messages == [("同一个控制中心", False)]
         panel.append("玄司", "对话、设置、形象和资源集中在这个控制中心。")
         bar = panel.navigation.bar
-        keys = tuple(panel.sections)
+        keys = tuple(bar.tabData(index) for index in range(bar.count()))
         report["horizontal_chrome_style_tabs"] = (
-            isinstance(bar, QTabBar) and bar.count() == 9 and not bar.tabsClosable()
+            isinstance(bar, QTabBar) and bar.count() == 7 and len(panel.sections) == 9 and not bar.tabsClosable()
             and bar.shape() in (QTabBar.Shape.RoundedNorth, QTabBar.Shape.TriangularNorth)
             and len({bar.tabRect(index).center().y() for index in range(bar.count())}) == 1
         )
@@ -164,7 +166,7 @@ def inspect(application, temporary, output):
             assert sum(page.active for page in panel.sections.values()) == 1
             visited.append(key)
             QTest.keyClick(navigation.bar, Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
-        report["narrow_keyboard_accesses_all_nine"] = visited == list(keys)
+        report["narrow_keyboard_accesses_primary_tabs"] = visited == list(keys)
         report["narrow_switch_keeps_draft"] = panel.persona.name.text() == "跨标签保留草稿"
         panel.open_section("upload")
         QTest.qWait(50)
@@ -175,6 +177,7 @@ def inspect(application, temporary, output):
         report["escape_hides_center"] = not panel.isVisible()
         return report
     finally:
+        flow.close()
         platform.shutdown()
         wait_until(lambda: platform.worker is None)
         panel.hide()

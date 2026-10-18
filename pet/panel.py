@@ -23,7 +23,7 @@ from .theme import configure_fonts
 LOG = logging.getLogger(__name__)
 SECTIONS = (
     ("chat", "对话"), ("persona", "人设与提示词"), ("memory", "长期记忆"),
-    ("preferences", "语音与行为"), ("model", "模型与快捷键"), ("appearance", "桌宠形象"),
+    ("preferences", "语音与行为"), ("model", "模型与快捷键"), ("appearance", "更换形象"),
     ("resources", "官网资源"), ("upload", "上传本地 Live2D"), ("logs", "运行日志"),
 )
 
@@ -64,7 +64,7 @@ class Panel(QWidget):
         layout.addWidget(create_footer(self))
         self.escape = QShortcut(QKeySequence("Esc"), self)
         self.escape.activated.connect(self.close)
-        LOG.info("控制中心布局已就绪，保留九标签及原有保存事务")
+        LOG.info("控制中心布局已就绪，七个主标签与九个固定页面沿用原保存事务")
 
     def mount_section(self, key, widget, on_open=None):
         self._opening_callbacks[key] = on_open
@@ -85,7 +85,7 @@ class Panel(QWidget):
     def collapse_section(self, key):
         # 内嵌表单的返回/关闭只离开当前标签，退出时不能重新显示主窗口。
         if self.navigation.current_key == key and key != "chat":
-            self.navigation.select("chat")
+            self.navigation.select('appearance' if key in ('resources', 'upload') else 'chat')
 
     def open_configuration(self):
         self.open_section("model")

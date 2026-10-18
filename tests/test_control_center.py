@@ -28,7 +28,8 @@ def panel(monkeypatch, tmp_path):
 def test_horizontal_tabs_switch_content_inside_one_control_window(panel):
     assert panel.findChildren(QTabBar) == [panel.navigation.bar]
     assert not panel.findChildren(QMenuBar), "控制中心不再依赖多层菜单"
-    assert panel.navigation.bar.count() == len(panel.sections) == 9
+    assert panel.navigation.bar.count() == 7
+    assert len(panel.sections) == 9, "资源与上传仍保留为更换形象的次级页面"
     for key in ("chat", "persona", "memory", "preferences", "model", "logs"):
         panel.open_section(key)
         assert panel.navigation.current_key == key
@@ -88,10 +89,11 @@ def test_header_without_dropdown_keeps_tabs_accessible_in_a_narrow_window(panel)
     panel.open_section("chat")
     bar.setFocus()
     visited = []
-    for _ in panel.sections:
+    primary = [bar.tabData(index) for index in range(bar.count())]
+    for _ in primary:
         visited.append(panel.navigation.current_key)
         QTest.keyClick(bar, Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
-    assert visited == list(panel.sections)
+    assert visited == primary
     assert panel.navigation.current_key == "chat"
 
 
@@ -127,5 +129,5 @@ def test_leaving_an_embedded_tab_never_reopens_a_hidden_center(panel):
     panel.open_section("upload")
     panel.hide()
     panel.collapse_section("upload")
-    assert panel.navigation.current_key == "chat"
+    assert panel.navigation.current_key == "appearance"
     assert not panel.isVisible()

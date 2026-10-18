@@ -130,7 +130,8 @@ def test_embedded_upload_hide_preserves_task_receipt_and_shutdown_waits(monkeypa
     receipt = {"resourceId": "retained-resource"}
     upload.client = SimpleNamespace(base_url=platform.url.text(), pending_model_upload=receipt)
     cancelled = []
-    worker = SimpleNamespace(isRunning=lambda: True, cancel=lambda: cancelled.append(True), deleteLater=lambda: None)
+    worker = SimpleNamespace(command="upload-model", isRunning=lambda: True,
+                             cancel=lambda: cancelled.append(True), deleteLater=lambda: None)
     platform.worker = worker
     upload.set_busy(True)
     panel.show()

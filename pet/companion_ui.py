@@ -6,7 +6,8 @@ from dataclasses import replace
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
-from .appearance_dialog import AppearanceDialog
+from .appearance_flow import AppearanceFlow
+from .appearance_hub import AppearanceHub
 from .config import ROOT
 from .hotkey import GlobalHotkey
 from .platform_dialog import PlatformDialog
@@ -32,11 +33,11 @@ class CompanionUI:
         owner.panel.audio_avoidance_action.triggered.connect(self.toggle_avoidance)
         owner.runtime.settings_saved.connect(self.saved)
         owner.runtime.speech_changed.connect(self.refresh)
-        self.appearance = AppearanceDialog(owner.panel, embedded=True)
-        self.appearance.apply_requested.connect(self.save_appearance)
-        owner.panel.mount_section("appearance", self.appearance,
-                                  on_open=lambda: self.appearance.present(owner.settings.avatar_image))
+        self.appearance = AppearanceHub(owner.panel)
         self.platform = PlatformDialog(owner, embedded=True)
+        self.appearance_flow = AppearanceFlow(owner, self.appearance, self.platform,
+                                              on_applied=self.refresh_icon, is_saving=lambda: self.saving)
+        owner.panel.mount_section('appearance', self.appearance, on_open=self.appearance_flow.present)
         self.platform.activity_changed.connect(owner.panel.footer.set_activity)
         owner.panel.mount_section("resources", self.platform, on_open=self.resources_opened)
         owner.panel.upload_requested.connect(self.platform.open_upload)
@@ -115,6 +116,7 @@ class CompanionUI:
             self.owner.panel.form.complete(str(exc))
             return
         self.saving = True
+        self.appearance_flow.refresh_busy()
         self.appearance_only = appearance_only
         self.hotkey_staged = not (appearance_only or avoidance_only)
         self.owner.panel.saving(True)
@@ -137,6 +139,7 @@ class CompanionUI:
         if self.closed:
             return
         self.saving = False
+        self.appearance_flow.refresh_busy()
         self.owner.panel.saving(False)
         self.owner.panel.audio_avoidance_action.setEnabled(True)
         if self.hotkey_staged:
@@ -175,6 +178,7 @@ class CompanionUI:
         self.closed = True
         self.hotkey.close()
         self.owner.panel.logs.hide()
+        self.appearance_flow.close()
         self.appearance.close()
         self.platform.shutdown()
         self.tray.hide()

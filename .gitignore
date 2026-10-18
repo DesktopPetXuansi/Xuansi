@@ -1,6 +1,7 @@
 .venv/
 upstream-nekoai/
 runtime/
+.runtime/
 data/
 __pycache__/
 .pytest_cache/

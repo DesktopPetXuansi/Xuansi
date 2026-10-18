@@ -55,6 +55,7 @@ def test_appearance_save_refreshes_even_same_image_without_resetting_voice(ident
     ui = SimpleNamespace(
         owner=owner, saving=True, closed=False, appearance_only=True, hotkey_staged=False,
         appearance=SimpleNamespace(saved=completed.append),
+        appearance_flow=SimpleNamespace(refresh_busy=lambda: None),
         refresh_icon=lambda: icons.append(owner.settings.avatar_image),
     )
     owner.ui = ui
