@@ -287,3 +287,13 @@
 ## [2026-10-18T10:54:37.125Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-18T14:48:57.410Z] ingest
+- **Pages:** 形象更换与保存约定.md
+- **Summary:** Created new page "形象更换与保存约定"
+
+## [2026-10-18T14:48:57.975Z] ingest
+- **Pages:** 控制中心单页与生命周期约定.md
+- **Summary:** Updated "控制中心单页与生命周期约定" with new content
+## [2026-10-18T14:50:06.883Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)

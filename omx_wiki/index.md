@@ -1,9 +1,10 @@
 # Wiki Index
 
-> 9 pages | Last updated: 2026-10-18T10:53:57.486Z
+> 10 pages | Last updated: 2026-10-18T14:48:57.981Z
 
 ## architecture
 
+- [形象更换与保存约定](形象更换与保存约定.md) — # 形象更换与保存约定
 - [控制中心单页与生命周期约定](控制中心单页与生命周期约定.md) — # 控制中心单页与生命周期约定
 
 ## convention
