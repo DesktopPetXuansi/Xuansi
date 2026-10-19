@@ -127,6 +127,22 @@ button {
   border-bottom-color: var(--green);
   font-weight: 600;
 }
+.primary-navigation a.nav-download,
+.primary-navigation a.nav-download[aria-current="page"] {
+  padding: 9px 16px;
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  background: var(--green);
+  color: white;
+  font-weight: 600;
+}
+.primary-navigation a.nav-download:hover {
+  background: var(--green-hover);
+}
+.primary-navigation a.nav-download[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .nav-toggle {
   display: none;
   background: transparent;
@@ -175,12 +191,19 @@ button {
 .site-footer small {
   color: var(--muted);
 }
+.footer-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
+}
 .site-footer nav {
   display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+  flex-direction: column;
   font-size: 12px;
-  align-content: start;
+}
+.site-footer nav h2 {
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 .site-footer nav a {
   display: inline-flex;
@@ -564,6 +587,9 @@ code {
     gap: 24px;
   }
   .primary-navigation {
+    gap: 16px;
+  }
+  .footer-groups {
     gap: 24px;
   }
   .workspace {
@@ -662,7 +688,10 @@ code {
     justify-content: flex-start;
   }
   .site-footer nav {
-    gap: 4px 20px;
+    gap: 0;
+  }
+  .footer-groups {
+    gap: 16px;
   }
   .panel {
     padding: 20px;

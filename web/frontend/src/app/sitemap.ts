@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { helpTopics } from "@/features/help/content";
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = process.env.SITE_URL ?? "http://localhost:3000";
   return [
@@ -12,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/terms",
     "/licenses",
     "/changelog",
+    ...helpTopics.map((topic) => `/docs/${topic.slug}`),
   ].map((path) => ({
     url: base + path,
     changeFrequency: "weekly",

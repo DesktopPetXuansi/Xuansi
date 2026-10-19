@@ -10,10 +10,9 @@ import { useRef, useState, type KeyboardEvent } from "react";
 
 const links = [
   { href: "/", label: "首页" },
-  { href: "/features", label: "产品" },
-  { href: "/resources", label: "资源库" },
-  { href: "/docs", label: "文档" },
-  { href: "/download", label: "下载" },
+  { href: "/resources", label: "挑选形象" },
+  { href: "/docs", label: "使用帮助" },
+  { href: "/download", label: "下载客户端" },
 ];
 
 function PrimaryNavigation({ pathname }: { pathname: string }) {
@@ -55,8 +54,11 @@ function PrimaryNavigation({ pathname }: { pathname: string }) {
           <Link
             key={href}
             href={href}
+            className={href === "/download" ? "nav-download" : undefined}
             aria-current={
-              pathname === href || (href !== "/" && pathname.startsWith(`${href}/`))
+              pathname === href ||
+              (href !== "/" && pathname.startsWith(`${href}/`)) ||
+              (href === "/docs" && pathname === "/faq")
                 ? "page"
                 : undefined
             }
@@ -103,7 +105,14 @@ function AccountLink({
       href={user ? "/dashboard" : "/login"}
     >
       <UserRound size={15} aria-hidden />
-      {user ? <><span className="nav-nickname">{user.displayName || "朋友"}</span><span>我的桌宠</span></> : "登录 / 注册"}
+      {user ? (
+        <>
+          <span className="nav-nickname">{user.displayName || "朋友"}</span>
+          <span>我的桌宠</span>
+        </>
+      ) : (
+        "登录 / 注册"
+      )}
       <ArrowUpRight size={14} aria-hidden />
     </Link>
   );
@@ -116,21 +125,41 @@ export function Footer() {
           玄司 <span className="brand-en">XUANSI</span>
         </Link>
         <p>一个在你桌面上，认真陪伴的伙伴。</p>
-        <small>本地推理 · 你的设备 · 你的选择</small>
+        <small>形象、聊天方式与分享，由你选择。</small>
       </div>
-      <nav aria-label="页脚导航">
-        <Link href="/faq">常见问题</Link>
-        <Link href="/privacy">隐私说明</Link>
-        <Link href="/terms">使用条款</Link>
-        <Link href="/licenses">授权与致谢</Link>
-        <a
-          href="https://github.com/DesktopPetXuansi/Xuansi"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub ↗
-        </a>
-      </nav>
+      {/* 低频入口按用途分组，问答归入帮助，项目资料不占主导航。 */}
+      <div className="footer-groups">
+        <nav aria-label="开始使用">
+          <h2>开始使用</h2>
+          <Link href="/download">下载客户端</Link>
+          <Link href="/docs">使用帮助</Link>
+          <Link href="/docs/appearance">如何换形象</Link>
+        </nav>
+        <nav aria-label="项目与反馈">
+          <h2>项目与反馈</h2>
+          <Link href="/changelog">更新记录</Link>
+          <a
+            href="https://github.com/DesktopPetXuansi/Xuansi/issues"
+            target="_blank"
+            rel="noreferrer"
+          >
+            问题反馈 ↗
+          </a>
+          <a
+            href="https://github.com/DesktopPetXuansi/Xuansi"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub 源码 ↗
+          </a>
+        </nav>
+        <nav aria-label="条款与许可">
+          <h2>条款与许可</h2>
+          <Link href="/privacy">隐私说明</Link>
+          <Link href="/terms">使用条款</Link>
+          <Link href="/licenses">授权与致谢</Link>
+        </nav>
+      </div>
     </footer>
   );
 }

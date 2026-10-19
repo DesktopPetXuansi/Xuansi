@@ -1,4 +1,5 @@
 import { HomeSections } from "@/features/home-sections";
+import { clientRelease } from "@/lib/client-release";
 import { ArrowUpRight, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -6,14 +7,17 @@ import "./home.css";
 
 const principles = [
   {
-    title: "运行在你的设备",
-    description: "本地模型推理，保留自己的数据边界。",
+    title: "文字、语音都能聊",
+    description: "先开始文字聊天，再按需配置语音。",
   },
   {
     title: "按你的节奏陪伴",
-    description: "聊天、语音、观察与休眠，由你开启。",
+    description: "看屏幕、朗读和休眠，由你决定。",
   },
-  { title: "让形象属于你", description: "管理模型、动作、表情与透明动图。" },
+  {
+    title: "换成喜欢的形象",
+    description: "使用自带角色，也能导入图片、动图或 Live2D。",
+  },
 ];
 
 // 首页保持服务端渲染，复用真实品牌素材，不添加持续动画和额外请求。
@@ -22,32 +26,32 @@ export default function Home() {
     <>
       <section className="hero" aria-labelledby="home-title">
         <div className="hero-copy">
-          <p className="eyebrow">MEET XUANSI / 遇见玄司</p>
+          <p className="eyebrow">玄司 · AI 桌面伙伴</p>
           <h1 id="home-title">
             把陪伴，
             <br />
             留在你的<em>桌面。</em>
           </h1>
           <p className="hero-description">
-            <span>她会听你说话，也会看看你正在忙什么。</span>
-            <span>一个住在电脑里的 AI 伙伴，让日常多一点回应。</span>
-            <span>推理在本地运行，陪伴由你决定。</span>
+            <span>一个住在 Windows 桌面上的 AI 伙伴。</span>
+            <span>聊聊今天的事，换个喜欢的形象，忙起来就让她安静待着。</span>
+            <span>选择在线服务或本机模型后，就能开始聊天。</span>
           </p>
           <div className="actions hero-actions">
             <Link className="button-link" href="/download">
               <Download size={17} aria-hidden />
               下载 Windows 客户端
             </Link>
-            <Link href="/features" className="quiet-link">
-              认识玄司 <ArrowUpRight size={16} aria-hidden />
+            <Link href="/resources" className="quiet-link">
+              挑选桌宠形象 <ArrowUpRight size={16} aria-hidden />
             </Link>
           </div>
           <p className="hero-note">
-            <span className="hero-version">v0.6.0</span>
-            <span>Windows 11 x64 · NVIDIA / CUDA 12.4</span>
+            <span className="hero-version">v{clientRelease.version}</span>
+            <span>Windows 10 1809 及以上 · 64 位</span>
           </p>
           <p className="hero-requirements">
-            首次安装需要联网，安装路径需要 D 盘。
+            首次安装需联网。在线聊天需自备服务商 API 密钥，费用由服务商收取。
           </p>
         </div>
         <figure className="hero-art">

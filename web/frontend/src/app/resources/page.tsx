@@ -1,4 +1,4 @@
-export const metadata = { title: "官方资源库" };
+export const metadata = { title: "挑选桌宠形象" };
 import { ResourceList } from "@/features/resources";
 export default function Page() {
   return (

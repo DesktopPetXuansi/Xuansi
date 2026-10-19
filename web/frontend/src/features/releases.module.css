@@ -1,0 +1,124 @@
+/* 下载动作与设备说明分开，窄屏仍按首次使用的顺序阅读。 */
+.downloadLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+.package h2 {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+.package > a {
+  margin-top: 12px;
+}
+.downloadHint {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 20px 0;
+}
+.packageLinks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.requirements {
+  padding-top: 16px;
+}
+.requirements h2 {
+  font-size: 22px;
+}
+.requirements ul {
+  padding-left: 20px;
+  color: var(--muted);
+}
+.requirements li {
+  margin: 12px 0;
+}
+.details {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  font-size: 14px;
+}
+.details summary {
+  cursor: pointer;
+  color: var(--green);
+  padding: 8px 0;
+}
+.details p {
+  margin-top: 12px;
+  color: var(--muted);
+}
+.details code {
+  overflow-wrap: anywhere;
+}
+.chatSection {
+  margin-top: 48px;
+  padding-block: 32px;
+  border-block: 1px solid var(--line);
+}
+.chatSection > h2 {
+  font-size: 26px;
+}
+.chatChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px;
+  margin: 24px 0 12px;
+}
+.chatChoices h3 {
+  font-size: 18px;
+}
+.chatChoices p {
+  color: var(--muted);
+}
+.upgrade {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 32px;
+  margin-top: 32px;
+}
+.upgrade > div {
+  max-width: 50em;
+}
+.upgrade > a {
+  flex-shrink: 0;
+}
+.upgrade h2 {
+  font-size: 22px;
+}
+.upgrade p {
+  color: var(--muted);
+}
+.history {
+  margin-top: 48px;
+}
+.notes {
+  white-space: pre-wrap;
+}
+.artifact {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .downloadLayout,
+  .chatChoices {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .requirements {
+    padding-top: 0;
+  }
+  .package h2 {
+    font-size: 28px;
+  }
+  .upgrade {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .chatSection {
+    margin-top: 32px;
+  }
+}

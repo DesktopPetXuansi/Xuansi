@@ -1,5 +1,5 @@
-export const metadata = { title: "使用文档" };
-import { ContentPage } from "@/features/content";
+export const metadata = { title: "使用帮助" };
+import { HelpCenter } from "@/features/help";
 export default function Page() {
-  return <ContentPage slug="docs" />;
+  return <HelpCenter />;
 }

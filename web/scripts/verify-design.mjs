@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium, expect } = createRequire(path.join(root, 'frontend/package.json'))('@playwright/test');
 const origin = process.env.WEB_URL ?? 'http://localhost:3000';
-const output = path.join(root, '.runtime/screenshots/design-2026-10-16');
+const output = path.join(root, '../data/verification/public-site-2026-10-19/design');
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch(process.env.CHROME_PATH
   ? { executablePath: process.env.CHROME_PATH, headless: true }
@@ -43,16 +43,16 @@ try {
   await page.keyboard.press('Enter');
   await expect(menu).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '产品', exact: true })).toBeFocused();
+  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '首页', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(menu).toBeFocused();
   await expect(menu).toHaveAttribute('aria-expanded', 'false');
   await menu.click();
-  await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '文档', exact: true }).click();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '使用帮助', exact: true }).click();
   await expect(page).toHaveURL(`${origin}/docs`);
   await expect(page.getByRole('button', { name: '展开主导航' })).toHaveAttribute('aria-expanded', 'false');
   await page.getByRole('button', { name: '展开主导航' }).click();
-  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '文档', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '使用帮助', exact: true })).toHaveAttribute('aria-current', 'page');
   // 账号链接没有菜单关闭处理器，独立验证跨路由重建能收起展开状态。
   await page.getByRole('link', { name: '登录 / 注册', exact: true }).click();
   await expect(page).toHaveURL(`${origin}/login`);
@@ -62,7 +62,7 @@ try {
   // 下列路由使用真实本地服务，只做浏览和截图。
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ['/', '/features', '/resources', '/download', '/login', '/docs']) {
+    for (const route of ['/', '/features', '/resources', '/download', '/login', '/docs', '/docs/getting-started', '/docs/appearance', '/docs/chat', '/docs/account', '/docs/troubleshooting', '/faq', '/privacy', '/terms', '/licenses', '/changelog']) {
       const response = await page.goto(`${origin}${route}`, { waitUntil: 'networkidle' });
       assert.equal(response?.status(), 200, `页面状态异常：${route}/${width}`);
       await expect(page.locator('h1')).toHaveCount(1);
@@ -78,7 +78,7 @@ try {
     }
   }
   await page.getByRole('link', { name: '玄司首页', exact: true }).click();
-  await page.getByRole('link', { name: '探索资源库' }).click();
+  await page.locator('main').getByRole('link', { name: '挑选形象', exact: true }).click();
   await expect(page).toHaveURL(`${origin}/resources`);
   await page.getByRole('link', { name: '玄司首页', exact: true }).click();
   await expect(page.locator('.hero')).toBeVisible();
@@ -113,9 +113,10 @@ try {
     await route.fulfill({ json: { data: [], meta: { nextCursor: query.get('cursor') ? undefined : 'design-next' } } });
   });
   await page.goto(`${origin}/resources`, { waitUntil: 'networkidle' });
-  await expect(page.getByRole('status').filter({ hasText: '暂时没有符合条件的资源' })).toBeVisible();
-  await page.getByLabel('搜索资源').fill('玄司');
-  await page.getByLabel('资源类型').selectOption('MODEL');
+  await expect(page.getByRole('status').filter({ hasText: '这里还没有已发布的资源' })).toBeVisible();
+  await page.getByLabel('搜索名称').fill('玄司');
+  await page.getByLabel('想找哪一种').selectOption('MODEL');
+  await page.getByText('按标签进一步筛选', { exact: true }).click();
   await page.getByLabel('标签', { exact: true }).fill('本地');
   await page.getByLabel('标签', { exact: true }).press('Enter');
   await expect.poll(() => queries.at(-1)).toEqual({ search: '玄司', kind: 'MODEL', tag: '本地', cursor: '' });
@@ -124,9 +125,9 @@ try {
   assert.equal(queries.at(-1).search, '玄司');
   assert.equal(queries.at(-1).kind, 'MODEL');
   assert.equal(queries.at(-1).tag, '本地');
-  await page.getByRole('button', { name: '返回首页' }).click();
+  await page.getByRole('button', { name: '返回第一页' }).click();
   // 首批结果可能仍在 Query 缓存中；用用户可见的翻页状态验证返回。
-  await expect(page.getByRole('button', { name: '返回首页' })).toBeHidden();
+  await expect(page.getByRole('button', { name: '返回第一页' })).toBeHidden();
   await expect(page.getByRole('button', { name: '下一页' })).toBeVisible();
   report.interactions.push('资源筛选：空态、Enter、搜索/类型/标签、翻页保留条件、回到首批');
 
@@ -145,7 +146,7 @@ try {
     await workspacePage.setViewportSize({ width, height: 1000 });
     await workspacePage.goto(`${origin}/dashboard/resources`, { waitUntil: 'networkidle' });
     await expect(workspacePage.getByRole('heading', { name: '我的资源', exact: true })).toBeVisible();
-    const input = await workspacePage.getByLabel('搜索资源').boundingBox();
+    const input = await workspacePage.getByLabel('搜索名称').boundingBox();
     assert.ok(input && input.width >= 120, `工作台筛选字段过窄：${width}`);
     assert.equal(await workspacePage.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `工作台溢出：${width}`);
     await workspacePage.screenshot({ path: path.join(output, `after-workspace-${width}.png`), fullPage: true });

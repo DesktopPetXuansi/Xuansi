@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const origin = process.env.WEB_URL ?? 'http://localhost:3100';
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname));
-const output = path.join(root, 'data/verification/page-footer-2026-10-19');
+const output = process.env.VERIFICATION_DIR ?? path.join(root, 'data/verification/page-footer-2026-10-19');
 await mkdir(output, { recursive: true });
 const { chromium, expect } = await import(pathToFileURL(path.join(root, 'web/frontend/node_modules/@playwright/test/index.mjs')).href);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
