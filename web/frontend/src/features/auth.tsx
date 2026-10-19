@@ -2,6 +2,9 @@
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { replaceSession } from "./identity/session";
 import { authHref, returnPath } from "./identity/return-path";
+import { AuthLinks } from "./identity/auth-links";
+import { PasswordField } from "./identity/password-field";
+import styles from "./identity/auth.module.css";
 import { api } from "@/lib/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,11 +26,18 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 const labels: Record<string, string> = {
-  login: "欢迎回来。",
-  register: "认识你的新伙伴。",
+  login: "欢迎回来",
+  register: "创建账号",
   "forgot-password": "找回密码",
   "reset-password": "设置新密码",
   "verify-email": "验证邮箱",
+};
+const descriptions: Record<string, string> = {
+  login: "登录后，接着使用你的收藏与形象历史。",
+  register: "管理喜欢的形象，保存自己的收藏。",
+  "forgot-password": "输入注册邮箱，获取重置密码的链接。",
+  "reset-password": "设置新的登录密码，完成后重新登录。",
+  "verify-email": "输入注册邮箱，重新获取验证邮件。",
 };
 export function AuthPage({ mode }: { mode: string }) {
   const query = useSearchParams();
@@ -38,6 +48,8 @@ export function AuthPage({ mode }: { mode: string }) {
   const [error, setError] = useState<unknown>();
   const [success, setSuccess] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const confirmation = mode === "verify-email" && !!query.get("token");
+  const complete = !!success && (mode === "register" || mode === "reset-password" || confirmation);
   // 单一表单类型保留稳定字段，按页面用途执行边界校验。
   const formSchema = schema.superRefine((values, context) => {
     if (mode !== "reset-password" && !z.email().safeParse(values.email).success)
@@ -129,18 +141,19 @@ export function AuthPage({ mode }: { mode: string }) {
   }
   return (
     <div className="container">
-      <div className="narrow">
+      <div className={styles.page}>
         <Heading
           eyebrow="YOUR ACCOUNT / 你的账号"
-          title={labels[mode] ?? "账号"}
+          title={mode === "register" && complete ? "验证你的邮箱" : labels[mode] ?? "账号"}
         >
-          登录后查看收藏、下载记录，以及你选择同步的形象历史。聊天与记忆继续保存在本地。
+          {mode === "register" && complete ? "完成邮件验证后，就可以登录了。"
+            : confirmation ? "确认邮箱后，即可上传与分享作品。" : descriptions[mode]}
         </Heading>
-        <div className="panel">
+        <div className={`panel ${styles.card}`}>
           {config.isPending && <Notice>正在加载账号配置…</Notice>}
           {config.error && <Notice error={config.error} />}
-          {mode === "verify-email" && query.get("token") ? (
-            <Button disabled={verifying || !!success} onClick={confirm}>
+          {!complete && (confirmation ? (
+            <Button className={styles.submit} disabled={verifying} onClick={confirm}>
               {verifying ? "正在验证…" : "确认验证邮箱"}
             </Button>
           ) : (
@@ -149,43 +162,38 @@ export function AuthPage({ mode }: { mode: string }) {
                 <Field label="邮箱">
                   <input
                     type="email"
-                    autoComplete="email"
+                    id="auth-email"
+                    placeholder="请输入邮箱地址"
+                    autoComplete={mode === "login" ? "username" : "email"}
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? "auth-email-error" : undefined}
                     {...register("email")}
                   />
                   {errors.email && (
-                    <small className="form-error">{errors.email.message}</small>
+                    <small id="auth-email-error" className="form-error" role="alert">{errors.email.message}</small>
                   )}
                 </Field>
               )}
               {mode === "register" && (
                 <Field label="昵称">
-                  <input autoComplete="nickname" {...register("displayName")} />
+                  <input autoComplete="nickname" placeholder="怎么称呼你" {...register("displayName")} />
                 </Field>
               )}
               {["login", "register", "reset-password"].includes(mode) && (
-                <Field
-                  label="密码"
+                <PasswordField
+                  registration={register("password")}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  recoveryHref={mode === "login" ? authHref("/forgot-password", destination) : undefined}
+                  error={errors.password?.message}
                   hint={
                     mode === "login"
                       ? undefined
                       : config.data && passwordHint(config.data.password)
                   }
-                >
-                  <input
-                    type="password"
-                    autoComplete={
-                      mode === "login" ? "current-password" : "new-password"
-                    }
-                    {...register("password")}
-                  />
-                  {errors.password && (
-                    <small className="form-error">
-                      {errors.password.message}
-                    </small>
-                  )}
-                </Field>
+                />
               )}
-              <Button disabled={isSubmitting || !config.data} type="submit">
+              {error !== undefined && <Notice error={error} />}
+              <Button className={styles.submit} disabled={isSubmitting || !config.data} type="submit">
                 {isSubmitting
                   ? "正在处理…"
                   : mode === "login"
@@ -197,22 +205,15 @@ export function AuthPage({ mode }: { mode: string }) {
                         : "发送邮件"}
               </Button>
             </form>
-          )}
-          {error !== undefined && <Notice error={error} />}{" "}
+          ))}
+          {confirmation && error !== undefined && <Notice error={error} />}
           {success && <Notice>{success}</Notice>}
-          <LocalMailbox config={config.data} />
-          <div className="auth-links">
-            <Link href={authHref(mode === "login" ? "/register" : "/login", destination)}>
-              {mode === "login" ? "创建账号" : "返回登录"}
-            </Link>
-            <Link href="/forgot-password">忘记密码？</Link>
-            <Link href="/">返回首页</Link>
-            {mode !== "reset-password" && (
-              <Link href="/verify-email">重新发送验证邮件</Link>
-            )}
-          </div>
+          {(mode === "verify-email" || (!!success && ["register", "forgot-password"].includes(mode))) &&
+            <LocalMailbox config={config.data} />}
+          <AuthLinks mode={mode} destination={destination} complete={complete} />
         </div>
-        <p className="legal-note">
+        <p className={styles.backHome}><Link href="/" className="quiet-link">返回首页</Link></p>
+        <p className={styles.legal}>
           继续即表示你已阅读{" "}
           <Link href="/terms" className="quiet-link">
             使用条款

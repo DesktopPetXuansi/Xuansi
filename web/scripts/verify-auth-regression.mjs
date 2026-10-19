@@ -37,13 +37,14 @@ try {
     assert.equal(registrations, 0, '短密码被提交到服务端');
   }
   console.log('通过：注册提示和ASCII/中文/Emoji短密码校验一致');
-  const mailbox = page.getByRole('link', { name: '打开本地收件箱', exact: true });
-  await expect(mailbox).toHaveAttribute('href', 'http://127.0.0.1:8025/');
-  await expect(page.getByText('验证邮件会进入本地收件箱，不会发送到真实邮箱。', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '打开本地收件箱', exact: true })).toHaveCount(0);
   const password = randomBytes(6).toString('hex');
   await page.locator('[name=password]').fill(password);
   await page.getByRole('button', { name: '创建账号', exact: true }).click();
   await expect(page.getByText('账号已创建', { exact: false })).toBeVisible();
+  const mailbox = page.getByRole('link', { name: '打开本地收件箱', exact: true });
+  await expect(mailbox).toHaveAttribute('href', 'http://127.0.0.1:8025/');
+  await expect(page.getByText('验证邮件会进入本地收件箱，不会发送到真实邮箱。', { exact: true })).toBeVisible();
   assert.equal(registrations, 1);
   console.log('通过：12字符密码实际注册成功，页面明确显示本地收件入口');
 
@@ -81,7 +82,7 @@ try {
   console.log('通过：账号设置与注册复用相同密码规则');
   // 退出测试账号，避免后续登录失败断言受已有会话影响。
   await page.getByRole('button', { name: '退出登录', exact: true }).click();
-  await page.waitForURL('**/login');
+  await page.waitForURL(`${origin}/`);
 
   await page.goto(`${origin}/reset-password?token=regression-not-a-real-token`);
   await expect(page.getByText('12 至 128 个字符。', { exact: true })).toBeVisible();

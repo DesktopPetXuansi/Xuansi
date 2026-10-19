@@ -1,0 +1,136 @@
+/* 账号页沿用公共色值与控件，只在本模块调整任务顺序、对齐和点击区域。 */
+.page {
+  max-width: 440px;
+  margin: 0 auto;
+  padding-top: 48px;
+}
+.page :global(.page-heading) {
+  padding: 0 0 28px;
+  text-align: center;
+}
+.page h1 {
+  margin-bottom: 12px;
+  font-size: 32px;
+  letter-spacing: 0;
+}
+.page :global(.intro) {
+  margin-bottom: 0;
+  font-size: 15px;
+}
+.card {
+  padding: 28px;
+}
+.card :global(.field) {
+  margin: 0 0 20px;
+}
+.card input {
+  width: 100%;
+  font-size: 16px;
+  min-height: 48px;
+}
+.card :global(.form-error) {
+  color: var(--error);
+  font-size: 13px;
+}
+.fieldHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.passwordField .fieldHeading label {
+  font-weight: 600;
+}
+.recovery {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 400;
+}
+.recovery:hover,
+.switchAccount a:hover,
+.mailHelp a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.passwordControl {
+  position: relative;
+}
+.passwordControl input {
+  padding-right: 80px;
+}
+.visibility {
+  position: absolute;
+  inset: 2px 2px 2px auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.visibility:hover {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+}
+.switchAccount,
+.mailHelp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 20px 0 0;
+  font-size: 14px;
+  font-weight: 400;
+}
+.switchAccount {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.switchAccount a,
+.mailHelp a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--green);
+  font-weight: 600;
+}
+.backHome,
+.legal {
+  text-align: center;
+  color: var(--muted);
+}
+.backHome {
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.legal {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .page {
+    padding-top: 32px;
+  }
+  .card {
+    padding: 24px 20px;
+  }
+  .page h1 {
+    font-size: 28px;
+  }
+}

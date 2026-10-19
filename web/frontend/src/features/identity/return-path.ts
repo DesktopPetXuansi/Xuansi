@@ -14,6 +14,6 @@ export function returnPath(value: string | null) {
   }
 }
 
-export function authHref(path: "/login" | "/register", destination: string) {
+export function authHref(path: "/login" | "/register" | "/forgot-password" | "/verify-email", destination: string) {
   return `${path}?${new URLSearchParams({ returnTo: returnPath(destination) })}`;
 }
