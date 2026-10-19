@@ -10,6 +10,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
 from . import appearance, platform_resources
+from .appearance_cache import CACHE_FAILURE, cache_exists, cached_candidate
 from .appearance_import import AppearanceCandidate, import_appearance, installed_candidate
 from .platform_resources import installed_resources
 
@@ -91,7 +92,7 @@ class AppearanceSources(QObject):
         async def operation():
             return await asyncio.to_thread(installed_candidate, version_id,
                                            image_directory=self.image_directory, resource_root=self.resource_root)
-        self._start("installed", operation, "正在准备这个形象的预览…")
+        self._start("installed", operation, "正在准备这个形象…")
 
     def mine(self):
         async def operation():
@@ -147,16 +148,36 @@ class AppearanceSources(QObject):
             return
         async def operation():
             client = self.platform.api()
+            try:
+                platform_resources.identifier(resource["id"])
+            except (ValueError, KeyError, TypeError, AttributeError):
+                return SourceFailure("这个形象的资源标识无效，请刷新官网形象列表后重试。")
             versions = await client.request("GET", f"/resources/{resource['id']}/versions")
             # 官网按创建时间倒序返回，首个通过校验的版本即最新可用版本。
-            version = next((item for item in versions if item["validationStatus"] == "READY"), None)
+            version = next((item for item in versions if item["validationStatus"] == "READY"
+                            and item.get("compatibilityStatus") != "INCOMPATIBLE"), None)
             if version is None:
                 return SourceFailure("这个形象暂时没有可下载的版本，请选择其他形象或稍后再试。")
+            try:
+                platform_resources.identifier(version["id"])
+                if self._cancel_event and self._cancel_event.is_set():
+                    raise asyncio.CancelledError
+                cached = await asyncio.to_thread(cache_exists, version["id"], self.resource_root)
+                if cached:
+                    manifest = await client.request(
+                        "GET", f"/resources/{resource['id']}/versions/{version['id']}/manifest")
+                    candidate = await asyncio.to_thread(
+                        cached_candidate, manifest, resource, version["id"],
+                        image_directory=self.image_directory, resource_root=self.resource_root)
+                    return replace(candidate, name=resource.get("name") or candidate.name)
+            except (ValueError, KeyError, OSError, TypeError, AttributeError):
+                LOG.warning("官网形象缓存检查失败，保留文件并拒绝使用")
+                return SourceFailure(CACHE_FAILURE)
             await client.install(resource["id"], version["id"], root=self.resource_root)
             candidate = await asyncio.to_thread(installed_candidate, version["id"],
                                                 image_directory=self.image_directory, resource_root=self.resource_root)
             return replace(candidate, name=resource.get("name") or candidate.name)
-        self._start("download", operation, "正在下载并准备形象预览…")
+        self._start("download", operation, "正在准备形象，未下载时会自动下载…")
 
     def _completed(self, command, result):
         if not self._closed and command == self._command:

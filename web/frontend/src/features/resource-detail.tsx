@@ -63,7 +63,7 @@ export function ResourceDetail({ id }: { id: string }) {
           <h2>下载到电脑</h2>
           <p>
             {item.visibility === "PUBLIC"
-              ? "公开资源无需登录即可下载。下载后还需要在客户端导入并预览。"
+              ? "公开资源无需登录即可下载。下载后还需要在客户端本地导入，再点击“使用这个形象”。"
               : "私有资源仅对有权限且已验证邮箱的账号开放下载。"}
           </p>
           <VersionList id={id} />

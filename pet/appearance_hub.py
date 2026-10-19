@@ -1,4 +1,4 @@
-"""统一形象选择页：候选只预览，明确点击使用后才交给保存协调器。"""
+"""统一形象选择页：使用是主操作，独立预览可选且不会自行修改桌宠。"""
 
 import logging
 
@@ -27,6 +27,7 @@ class AppearanceHub(QWidget):
     more_requested = Signal()
     cancel_requested = Signal()
     choice_requested = Signal(object)
+    choice_use_requested = Signal(object)
     use_requested = Signal(object)
 
     def __init__(self, parent):
@@ -34,6 +35,7 @@ class AppearanceHub(QWidget):
         self.control_panel = parent
         self.current = self.candidate = AppearanceCandidate('DEFAULT', '默认玄司')
         self.ready = self.busy = self.dirty = False
+        self._needs_preview = False
         self.preview = AppearancePreview(self, size=144)
         build_layout(self)
         self.stack.currentChanged.connect(self.refresh_buttons)
@@ -48,7 +50,7 @@ class AppearanceHub(QWidget):
         self.folder_picker.setOption(QFileDialog.Option.ShowDirsOnly)
         self.folder_picker.fileSelected.connect(self.import_requested)
         self.refresh_buttons()
-        LOG.info('形象页已就绪，按选择、预览、使用组织操作')
+        LOG.info('形象页已就绪，支持直接使用与可选预览')
 
     def browse(self):
         if not self.busy:
@@ -70,11 +72,17 @@ class AppearanceHub(QWidget):
         elif not keep:
             self.show_candidate(candidate)
 
-    def show_candidate(self, candidate):
+    def show_candidate(self, candidate, *, preview=True):
         self.candidate = candidate
         self.dirty = candidate_key(candidate) != candidate_key(self.current)
         self.ready = False
-        self.candidate_label.setText('预览：' + candidate.name)
+        self._needs_preview = not preview
+        self.candidate_label.setText(('预览：' if preview else '所选：') + candidate.name)
+        if not preview:
+            # 直接使用由真实桌宠试载，不要求另开独立预览或保持控制中心可见。
+            self.status.setText('正在检查并使用所选形象…')
+            self.refresh_buttons()
+            return
         self.status.setText('正在准备预览，桌面上的形象保持原样…')
         if candidate.kind == 'MODEL':
             self.preview.set_model(candidate.prepared)
@@ -84,6 +92,8 @@ class AppearanceHub(QWidget):
         self.refresh_buttons()
 
     def preview_loaded(self, loaded, error):
+        if self._needs_preview:
+            return
         self.ready = loaded
         if not loaded:
             message = error or '预览失败，请重新选择形象。'
@@ -96,15 +106,14 @@ class AppearanceHub(QWidget):
 
     def show_choices(self, mode, choices):
         self.choices.clear()
-        self.choices_title.setText('在线形象 · 选择后下载预览' if mode == 'online' else '我的形象 · 选择后预览')
+        self.choices_title.setText('在线形象 · 未下载时会自动下载' if mode == 'online' else '我的形象 · 可以直接使用')
         for choice in choices:
             name = choice['name'] if isinstance(choice, dict) else choice.name
             self.choices.addItem(name)
             self.choices.item(self.choices.count() - 1).setData(Qt.ItemDataRole.UserRole, choice)
         self.login_button.setVisible(mode == 'online')
-        self.choice_button.setText('下载并预览' if mode == 'online' else '预览所选形象')
         self.stack.setCurrentIndex(1)
-        self.status.setText('选择喜欢的形象，再点击下方按钮。' if choices
+        self.status.setText('选中喜欢的形象，点击“使用这个形象”即可；也可以先预览。' if choices
                             else '暂时没有可用形象，可以从本地导入，或稍后重试在线挑选。')
         self.refresh_buttons()
 
@@ -112,6 +121,21 @@ class AppearanceHub(QWidget):
         item = self.choices.currentItem()
         if not self.busy and item is not None:
             self.choice_requested.emit(item.data(Qt.ItemDataRole.UserRole))
+
+    def use_choice_item(self):
+        item = self.choices.currentItem()
+        if not self.busy and item is not None:
+            LOG.info('用户请求一键使用所选形象')
+            self.choice_use_requested.emit(item.data(Qt.ItemDataRole.UserRole))
+
+    def show_preview(self):
+        if self.busy:
+            return
+        if self._needs_preview:
+            # 直接使用后才按需加载新候选，避免把旧预览画面标成新形象。
+            self.show_candidate(self.candidate)
+        else:
+            self.stack.setCurrentIndex(0)
 
     def use_candidate(self):
         if self.ready and self.dirty and not self.busy:
@@ -128,7 +152,11 @@ class AppearanceHub(QWidget):
                        self.default_button, self.share_button, self.more_button, self.login_button):
             widget.setEnabled(not self.busy)
         self.choices.setEnabled(not self.busy)
-        self.choice_button.setEnabled(not self.busy and self.choices.currentItem() is not None)
+        selected = not self.busy and self.choices.currentItem() is not None
+        self.choice_button.setEnabled(selected)
+        self.preview_choice_button.setEnabled(selected)
+        self.back_button.setEnabled(not self.busy)
+        self.apply_button.setVisible(self.stack.currentIndex() == 0)
         self.apply_button.setEnabled(self.ready and self.dirty and not self.busy and self.stack.currentIndex() == 0)
         self.motion_button.setEnabled(self.ready and not self.busy and 'blink' in self.preview.available_motions)
 

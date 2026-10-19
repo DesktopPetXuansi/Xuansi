@@ -191,7 +191,7 @@ def test_non_appearance_resources_cannot_be_used_as_avatars(transaction, kind):
     owner, operation, replies, busy = transaction
     operation.use(candidate(kind))
     assert not owner.runtime.calls and owner.avatar.mock_calls == []
-    assert replies[0][0] is None and "预览" in replies[0][1]
+    assert replies[0][0] is None and "形象" in replies[0][1]
     assert not busy
 
 

@@ -42,6 +42,8 @@ def wait(predicate, message, seconds=15):
     deadline = time.monotonic() + seconds
     while not predicate() and time.monotonic() < deadline:
         QTest.qWait(20)
+        # 验收以 QTest 泵事件代替 app.exec；显式让出 GIL 供 ZIP/文件后台线程推进。
+        time.sleep(.001)
     assert predicate(), message
 
 
@@ -78,22 +80,28 @@ class LocalClient:
         if path == '/resources?limit=100':
             assert anonymous, '公开形象列表不应读取账号凭据'
             return [{'id': VERSION, 'kind': 'IMAGE', 'name': '官网测试形象'}]
+        if path == f'/resources/{VERSION}/versions/{VERSION}/manifest':
+            return self.manifest()
         assert path == f'/resources/{VERSION}/versions'
         return [{'id': 'pending', 'validationStatus': 'PENDING'},
                 {'id': VERSION, 'validationStatus': 'READY'},
                 {'id': 'older', 'validationStatus': 'READY'}]
 
-    async def install(self, resource, version, *, root):
-        assert resource == version == VERSION, '必须选择首个 READY 版本'
-        self.downloaded.append(version)
+    def manifest(self):
+        """每次从同一隔离文件构造当前官网清单，缓存复用仍核对真实摘要。"""
         payload = self.source.read_bytes()
-        manifest = {
-            'schemaVersion': 1, 'resourceId': resource, 'resourceVersionId': version,
+        return {
+            'schemaVersion': 1, 'resourceId': VERSION, 'resourceVersionId': VERSION,
             'kind': 'IMAGE', 'name': '官网测试形象', 'version': '1', 'minimumClientVersion': '',
             'capabilities': {}, 'entrypoint': 'image.png', 'dependencies': [],
             'files': [{'path': 'image.png', 'bytes': len(payload),
                        'sha256': hashlib.sha256(payload).hexdigest()}],
         }
+
+    async def install(self, resource, version, *, root):
+        assert resource == version == VERSION, '必须选择首个 READY 版本'
+        self.downloaded.append(version)
+        payload, manifest = self.source.read_bytes(), self.manifest()
         package = self.source.parent / 'online.zip'
         with zipfile.ZipFile(package, 'w') as archive:
             archive.writestr('image.png', payload)
@@ -141,11 +149,30 @@ def inspect(directory, output, report):
         hub.apply_button.click()
         wait(lambda: not flow.applying.busy, '保存事务没有完成')
 
+    def select_mine(predicate):
+        hub.mine_button.click()
+        wait(lambda: not flow.sources.busy, '我的形象列表没有退场')
+        from PySide6.QtCore import Qt
+        rows = [index for index in range(hub.choices.count())
+                if predicate(hub.choices.item(index).data(Qt.ItemDataRole.UserRole))]
+        assert len(rows) == 1, '我的形象必须能唯一定位验收候选'
+        hub.choices.setCurrentRow(rows[0])
+
+    def direct_use():
+        assert hub.choice_button.isEnabled()
+        # 主操作不依赖独立预览，但真实桌宠必须完成试载及持久化事务。
+        with patch.object(hub.preview, 'set_image', wraps=hub.preview.set_image) as image_preview, \
+                patch.object(hub.preview, 'set_model', wraps=hub.preview.set_model) as model_preview:
+            hub.choice_button.click()
+            wait(lambda: not flow.sources.busy and not flow.applying.busy and not hub.busy,
+                 '一键使用没有完成：' + hub.status.text())
+            assert image_preview.call_count == model_preview.call_count == 0, '主操作不能强制启动独立预览'
+
     def layout(name, size):
         panel.resize(*size)
         QTest.qWait(150)
         section = panel.sections['appearance']
-        button = hub.apply_button
+        button = hub.choice_button if hub.stack.currentIndex() == 1 else hub.apply_button
         visible = QRect(button.mapTo(section.viewport(), QPoint()), button.size())
         report.setdefault('layout', {})[name] = {
             'viewport': section.viewport().rect().getRect(), 'apply': visible.getRect(),
@@ -188,10 +215,36 @@ def inspect(directory, output, report):
         hub.choices.setCurrentRow(0)
         layout('choices-720x560', (720, 560))
         layout('choices-520x480', (520, 480))
+        direct_use()
+        check('online_one_click_real_apply', platform.client.downloaded == [VERSION]
+              and hub.candidate.name == '官网测试形象' and not avatar.native_animation
+              and avatar.image_id == owner.settings.avatar_image == hub.current.image_id)
+        check('list_hides_preview_confirmation', hub.apply_button.isHidden())
+        direct_use()
+        check('same_version_reuses_complete_cache', platform.client.downloaded == [VERSION]
+              and any(path.endswith('/manifest') for _, path, _ in platform.client.requests))
+        select_mine(lambda choice: choice.kind == 'ANIMATION')
+        original = avatar.image_id
+        runtime.fail = True
+        direct_use()
+        check('direct_save_failure_preserves_avatar', avatar.image_id == owner.settings.avatar_image == original
+              and '保存失败' in hub.status.text())
+        runtime.fail = False
+        direct_use()
+        check('mine_one_click_real_apply', avatar.native_animation
+              and avatar.image_id == owner.settings.avatar_image == hub.current.image_id)
+        original = avatar.image_id
+        hub.online_button.click()
+        wait(lambda: not flow.sources.busy, '在线列表未完成')
+        hub.choices.setCurrentRow(0)
         hub.choice_button.click()
-        wait(lambda: not flow.sources.busy and hub.ready, '官网下载预览失败')
-        check('latest_ready_preview', platform.client.downloaded == [VERSION]
-              and hub.candidate.name == '官网测试形象' and avatar.native_animation)
+        hub.cancel_button.click()
+        wait(lambda: not flow.sources.busy, '取消在线使用没有退场')
+        check('cancel_direct_preserves_avatar', avatar.image_id == original
+              and owner.settings.avatar_image == original and not hub.busy)
+        hub.preview_choice_button.click()
+        wait(lambda: not flow.sources.busy and hub.ready, '可选预览没有就绪')
+        check('optional_online_preview_preserves_avatar', avatar.image_id == original and avatar.native_animation)
         original = avatar.image_id
         runtime.fail = True
         use()
@@ -219,6 +272,20 @@ def inspect(directory, output, report):
         check('local_model_applied', avatar._live2d_active
               and avatar._platform_model_version == candidate.version_id
               and owner.settings.platform_model_version == candidate.version_id)
+        select_mine(lambda choice: choice.kind == 'IMAGE' and choice.image_id == original)
+        direct_use()
+        check('mine_image_replaces_real_model', bool(avatar.image_id) and not avatar._live2d_active)
+        select_mine(lambda choice: choice.kind == 'MODEL' and choice.version_id == candidate.version_id)
+        # 隐藏控制中心不取消用户明确发起的使用；桌宠仍须真实完成试载。
+        hub.choice_button.click()
+        panel.hide()
+        wait(lambda: not flow.applying.busy and not hub.busy, '隐藏后真实模型使用未完成')
+        panel.show()
+        check('mine_model_direct_real_gl_while_hidden', avatar._live2d_active
+              and avatar._platform_model_version == candidate.version_id
+              and owner.settings.platform_model_version == candidate.version_id)
+        hub.show_preview()
+        wait(lambda: hub.ready, '按需模型预览未就绪')
         live_model = avatar._live2d_model
         panel.open_section('chat')
         check('preview_releases_only_itself', not hub.preview.renderer._live2d_active
@@ -243,11 +310,11 @@ def inspect(directory, output, report):
         check('restore_default_real_gl', avatar._live2d_active and not avatar.image_id
               and not avatar._platform_model_version and not owner.settings.platform_model_version)
         # 装配生产历史控制器，成功回执异步落盘；预览、保存失败和回滚均不得计入。
-        wait(lambda: len(history.appearances.read()['entries']) == 5, '成功形象历史未完整落盘')
-        check('history_records_only_five_successes', len(history.appearances.read()['entries']) == 5
+        wait(lambda: len(history.appearances.read()['entries']) == 9, '成功形象历史未完整落盘')
+        check('history_records_only_nine_successes', len(history.appearances.read()['entries']) == 9
               and not history.appearances.read()['sync']['enabled'])
         hub.history_button.click()
-        wait(lambda: history.appearance_dialog.records.count() == 5, '形象历史列表未读取临时文件')
+        wait(lambda: history.appearance_dialog.records.count() == 9, '形象历史列表未读取临时文件')
         assert history.appearance_dialog.grab().save(str(output / 'appearance-history.png'))
         check('history_dialog_real_window', history.appearance_dialog.isVisible())
         history.appearance_dialog.records.setCurrentRow(1)  # 刚才成功使用的本机 Live2D。
@@ -268,6 +335,18 @@ def inspect(directory, output, report):
         check('all_data_is_temporary', flow.sources.image_directory == directory / 'appearances'
               and flow.sources.resource_root == directory / 'resources'
               and history.appearances.path.parent == directory and history.models.path.parent == directory)
+        panel.open_section('appearance')
+        hub.online_button.click()
+        wait(lambda: not flow.sources.busy, '关闭前在线列表未完成')
+        hub.choices.setCurrentRow(0)
+        original = (owner.settings.avatar_image, owner.settings.platform_model_version)
+        hub.choice_button.click()
+        flow.close()
+        wait(lambda: platform.worker is None, '关闭后后台来源没有退场')
+        check('close_discards_late_direct_result', original == (
+            owner.settings.avatar_image, owner.settings.platform_model_version))
+        report['online'] = {'downloaded_versions': platform.client.downloaded,
+                            'requests': platform.client.requests}
         assert all(report['checks'].values()), '存在失败验收项，请检查 report.json'
     finally:
         history.close()
@@ -286,7 +365,8 @@ def inspect(directory, output, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'data/verification/appearance-flow')
+    parser.add_argument('--output', type=Path, default=ROOT / 'data/verification/appearance-direct-use-2026-10-19'
+                        / ('native-' + os.environ.get('QT_SCALE_FACTOR', '1')))
     output = parser.parse_args().output.absolute()
     output.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s %(message)s')
@@ -296,7 +376,7 @@ def main():
     report = {'checks': {}, 'qt': qVersion(), 'pyside': pyside_version,
               'scale_factor': os.environ.get('QT_SCALE_FACTOR', '1'),
               'real': ['Qt 控件', 'OpenGL/Cubism', '导入/安全安装', '后台线程',
-                                    '预览/桌宠切换', '临时 JSON 保存'],
+                       '在线与我的形象一键使用', '可选独立预览', '真实桌宠试载', '临时 JSON 保存'],
               'substitutes': ['官网 Client（禁止 HTTP/凭据）', 'Runtime（仅临时配置）']}
     try:
         with tempfile.TemporaryDirectory(prefix='xuansi-native-appearance-') as temporary, ExitStack() as patches:

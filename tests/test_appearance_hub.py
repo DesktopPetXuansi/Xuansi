@@ -91,17 +91,20 @@ def test_success_receipt_keeps_next_step_clear_and_motion_preview_independent(hu
     assert view.motion_button.isEnabled() and view.dirty
 
 
-def test_download_action_is_explicit_and_automatically_leads_to_preview(hub):
+def test_use_and_optional_preview_have_independent_explicit_actions(hub):
     view, _ = hub
-    selected = []
+    selected, used = [], []
     view.choice_requested.connect(selected.append)
+    view.choice_use_requested.connect(used.append)
     resource = {'id': 'public-id', 'name': '小猫', 'kind': 'MODEL'}
     view.show_choices('online', [resource])
     view.choices.setCurrentRow(0)
-    assert view.choice_button.text() == '下载并预览'
-    assert selected == []
+    assert view.choice_button.text() == '使用这个形象'
+    assert selected == used == []
     view.choice_button.click()
-    assert selected == [resource]
+    assert used == [resource] and not selected
+    view.preview_choice_button.click()
+    assert selected == [resource] and used == [resource]
 
 
 def test_busy_state_prevents_duplicate_apply_and_keeps_cancel_available(hub):

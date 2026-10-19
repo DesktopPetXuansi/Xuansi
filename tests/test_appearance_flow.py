@@ -41,6 +41,7 @@ class Preview(QWidget):
 
 class Runtime(QObject):
     platform_settings_saved = Signal(object, str)
+    settings_saved = Signal(object, str)
 
     def __init__(self, settings):
         super().__init__()
@@ -59,6 +60,8 @@ def wait_for_idle(platform):
     deadline = time.monotonic() + 5
     while platform.worker is not None and time.monotonic() < deadline:
         QTest.qWait(10)
+        # 测试手动泵送Qt事件时释放GIL，后台Python文件任务才能及时交付回执。
+        time.sleep(0.001)
     assert platform.worker is None, '真实后台线程应退出后才交付候选'
     QApplication.processEvents()
 
@@ -132,14 +135,15 @@ def test_failed_save_keeps_current_shape_and_candidate_can_retry(flow, tmp_path)
 
 def test_online_choice_downloads_latest_ready_then_previews_without_applying(flow, monkeypatch):
     coordinator, view, platform, owner = flow
-    resource = {'id': 'public-cat', 'name': '官网小猫', 'kind': 'IMAGE'}
+    resource_id, version_id = '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'
+    resource = {'id': resource_id, 'name': '官网小猫', 'kind': 'IMAGE'}
     requests, installs = [], []
 
     async def request(method, path, **options):
         requests.append((path, options))
         return [resource] if path.startswith('/resources?') else [
             {'id': 'pending', 'validationStatus': 'PENDING'},
-            {'id': 'newest', 'validationStatus': 'READY'},
+            {'id': version_id, 'validationStatus': 'READY'},
             {'id': 'older', 'validationStatus': 'READY'}]
 
     async def install(resource_id, version_id, **options):
@@ -152,9 +156,9 @@ def test_online_choice_downloads_latest_ready_then_previews_without_applying(flo
     wait_for_idle(platform)
     assert requests == [('/resources?limit=100', {'anonymous': True})] and not installs
     view.choices.setCurrentRow(0)
-    view.choice_button.click()
+    view.preview_choice_button.click()
     wait_for_idle(platform)
-    assert installs == [('public-cat', 'newest')]
+    assert installs == [(resource_id, version_id)]
     assert view.candidate.name == '官网小猫' and view.stack.currentIndex() == 0
     assert view.apply_button.isEnabled() and not owner.runtime.writes
     assert not coordinator.sources.busy

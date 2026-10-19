@@ -34,7 +34,7 @@ class AppearanceApply(QObject):
         if (candidate.kind not in {"DEFAULT", "IMAGE", "ANIMATION", "MODEL"}
                 or (candidate.kind in {"IMAGE", "ANIMATION"} and not candidate.image_id)
                 or (candidate.kind == "MODEL" and (not candidate.prepared or not candidate.version_id))):
-            self.finished.emit(None, "请先选择并预览一个可用的形象。")
+            self.finished.emit(None, "请选择一个可用的桌宠形象。")
             return
         self._candidate = candidate
         self._original = {name: getattr(self.owner.settings, name) for name in SELECTION_FIELDS}

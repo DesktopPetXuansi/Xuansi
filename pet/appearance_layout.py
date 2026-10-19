@@ -1,4 +1,4 @@
-"""形象页按选择、预览、使用组织；次要资源与分享操作保留在页内。"""
+"""形象列表以使用为主操作，预览、资源与分享作为次要入口。"""
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -81,15 +81,19 @@ def build_layout(view):
     view.choices.currentRowChanged.connect(view.refresh_buttons)
     choices_layout.addWidget(view.choices, 1)
     row = QHBoxLayout()
-    view.choice_button = button('预览所选形象', view.choose_item)
+    view.choice_button = button('使用这个形象', view.use_choice_item)
+    view.choice_button.setObjectName('primary')
+    view.choice_button.setToolTip('未下载的形象会自动下载，检查并使用成功后自动保存')
+    view.preview_choice_button = button('预览所选形象', view.choose_item)
+    view.preview_choice_button.setObjectName('quiet')
     view.login_button = button('登录官网', view.login_requested)
-    view.back_button = button('返回预览', lambda: view.stack.setCurrentIndex(0))
-    for widget in (view.choice_button, view.login_button, view.back_button):
+    view.back_button = button('返回预览', view.show_preview)
+    for widget in (view.choice_button, view.preview_choice_button, view.login_button, view.back_button):
         row.addWidget(widget)
     choices_layout.addLayout(row)
     view.stack.addWidget(choices_page)
     layout.addWidget(view.stack, 1)
-    view.status = QLabel('先选择一个形象，预览满意后点击“使用这个形象”，程序会自动保存。')
+    view.status = QLabel('在线挑选或在“我的形象”选中后可直接使用，也可以先预览；更换成功会自动保存。')
     view.status.setWordWrap(True)
     view.status.setTextFormat(Qt.TextFormat.PlainText)
     view.status.setObjectName('hint')
