@@ -6,6 +6,8 @@ export type Resource = components["schemas"]["Resource"];
 export type Version = components["schemas"]["ResourceVersion"];
 export type Upload = components["schemas"]["Upload"];
 export type Release = components["schemas"]["Release"];
+export type Feedback = components["schemas"]["Feedback"];
+export type FeedbackDiagnostics = components["schemas"]["FeedbackDiagnostics"];
 export interface Session {
   id: string;
   createdAt: string;

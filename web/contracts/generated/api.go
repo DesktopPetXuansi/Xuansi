@@ -108,6 +108,48 @@ func (e CreateResourceInputKind) Valid() bool {
 	}
 }
 
+// Defines values for FeedbackCategory.
+const (
+	BUG        FeedbackCategory = "BUG"
+	OTHER      FeedbackCategory = "OTHER"
+	SUGGESTION FeedbackCategory = "SUGGESTION"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackCategory enum.
+func (e FeedbackCategory) Valid() bool {
+	switch e {
+	case BUG:
+		return true
+	case OTHER:
+		return true
+	case SUGGESTION:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedbackStatus.
+const (
+	INPROGRESS FeedbackStatus = "IN_PROGRESS"
+	NEW        FeedbackStatus = "NEW"
+	RESOLVED   FeedbackStatus = "RESOLVED"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackStatus enum.
+func (e FeedbackStatus) Valid() bool {
+	switch e {
+	case INPROGRESS:
+		return true
+	case NEW:
+		return true
+	case RESOLVED:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HistoryEntryAppearanceKind.
 const (
 	HistoryEntryAppearanceKindANIMATION   HistoryEntryAppearanceKind = "ANIMATION"
@@ -648,6 +690,75 @@ type Error struct {
 	RequestId string `json:"requestId"`
 }
 
+// Feedback 仅网站管理员可读的完整反馈条目。
+type Feedback struct {
+	Category    FeedbackCategory     `json:"category"`
+	Contact     string               `json:"contact"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	Description string               `json:"description"`
+	Diagnostics *FeedbackDiagnostics `json:"diagnostics"`
+	Id          openapi_types.UUID   `json:"id"`
+	Status      FeedbackStatus       `json:"status"`
+	Title       string               `json:"title"`
+	UpdatedAt   time.Time            `json:"updatedAt"`
+}
+
+// FeedbackCategory defines model for FeedbackCategory.
+type FeedbackCategory string
+
+// FeedbackDiagnostics 仅用户主动附带的固定版本信息；每值先trim后最多80字符。
+type FeedbackDiagnostics struct {
+	AppVersion    *string `json:"appVersion,omitempty"`
+	Architecture  *string `json:"architecture,omitempty"`
+	PythonVersion *string `json:"pythonVersion,omitempty"`
+	QtVersion     *string `json:"qtVersion,omitempty"`
+	System        *string `json:"system,omitempty"`
+}
+
+// FeedbackInput defines model for FeedbackInput.
+type FeedbackInput struct {
+	Category    FeedbackCategory     `json:"category"`
+	Contact     *string              `json:"contact,omitempty"`
+	Description string               `json:"description"`
+	Diagnostics *FeedbackDiagnostics `json:"diagnostics,omitempty"`
+	Title       string               `json:"title"`
+}
+
+// FeedbackListResponse defines model for FeedbackListResponse.
+type FeedbackListResponse struct {
+	Data []Feedback `json:"data"`
+	Meta struct {
+		NextCursor *string `json:"nextCursor"`
+	} `json:"meta"`
+}
+
+// FeedbackReceipt 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。
+type FeedbackReceipt struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Status    FeedbackStatus     `json:"status"`
+}
+
+// FeedbackReceiptResponse defines model for FeedbackReceiptResponse.
+type FeedbackReceiptResponse struct {
+	// Data 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。
+	Data FeedbackReceipt `json:"data"`
+}
+
+// FeedbackResponse defines model for FeedbackResponse.
+type FeedbackResponse struct {
+	// Data 仅网站管理员可读的完整反馈条目。
+	Data Feedback `json:"data"`
+}
+
+// FeedbackStatus defines model for FeedbackStatus.
+type FeedbackStatus string
+
+// FeedbackStatusInput defines model for FeedbackStatusInput.
+type FeedbackStatusInput struct {
+	Status FeedbackStatus `json:"status"`
+}
+
 // Grant defines model for Grant.
 type Grant struct {
 	CreatedAt   time.Time          `json:"createdAt"`
@@ -1105,6 +1216,21 @@ type PostApiV1AdminClientReleasesIdPublicationsParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// GetApiV1AdminFeedbackParams defines parameters for GetApiV1AdminFeedback.
+type GetApiV1AdminFeedbackParams struct {
+	Status *FeedbackStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor 绑定status筛选的不透明base64url游标，按createdAt/id降序。
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// PatchApiV1AdminFeedbackIdParams defines parameters for PatchApiV1AdminFeedbackId.
+type PatchApiV1AdminFeedbackIdParams struct {
+	// XCSRFToken 精确Origin与双提交Cookie校验；反馈禁止资源Bearer。
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // GetApiV1AdminJobsParams defines parameters for GetApiV1AdminJobs.
 type GetApiV1AdminJobsParams struct {
 	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1248,6 +1374,15 @@ type GetApiV1ClientReleasesParams struct {
 	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
 	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
 	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// PostApiV1FeedbackParams defines parameters for PostApiV1Feedback.
+type PostApiV1FeedbackParams struct {
+	// XCSRFToken 精确Origin与双提交Cookie校验；反馈禁止资源Bearer。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// IdempotencyKey 标准小写非零UUID；同编号不同内容409。
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
 // PatchApiV1MeJSONBody defines parameters for PatchApiV1Me.
@@ -1556,6 +1691,9 @@ type PatchApiV1AdminClientReleasesIdJSONRequestBody PatchApiV1AdminClientRelease
 // PostApiV1AdminClientReleasesIdPublicationsJSONRequestBody defines body for PostApiV1AdminClientReleasesIdPublications for application/json ContentType.
 type PostApiV1AdminClientReleasesIdPublicationsJSONRequestBody = PostApiV1AdminClientReleasesIdPublicationsJSONBody
 
+// PatchApiV1AdminFeedbackIdJSONRequestBody defines body for PatchApiV1AdminFeedbackId for application/json ContentType.
+type PatchApiV1AdminFeedbackIdJSONRequestBody = FeedbackStatusInput
+
 // PatchApiV1AdminResourcesIdJSONRequestBody defines body for PatchApiV1AdminResourcesId for application/json ContentType.
 type PatchApiV1AdminResourcesIdJSONRequestBody PatchApiV1AdminResourcesIdJSONBody
 
@@ -1582,6 +1720,9 @@ type PostApiV1AuthPasswordResetsConfirmJSONRequestBody PostApiV1AuthPasswordRese
 
 // PostApiV1AuthRegisterJSONRequestBody defines body for PostApiV1AuthRegister for application/json ContentType.
 type PostApiV1AuthRegisterJSONRequestBody = RegisterInput
+
+// PostApiV1FeedbackJSONRequestBody defines body for PostApiV1Feedback for application/json ContentType.
+type PostApiV1FeedbackJSONRequestBody = FeedbackInput
 
 // PatchApiV1MeJSONRequestBody defines body for PatchApiV1Me for application/json ContentType.
 type PatchApiV1MeJSONRequestBody PatchApiV1MeJSONBody

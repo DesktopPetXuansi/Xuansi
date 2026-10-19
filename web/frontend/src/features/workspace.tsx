@@ -48,6 +48,7 @@ export function Workspace({
         ["/admin/users", "用户"],
         ["/admin/resources", "资源发布"],
         ["/admin/releases", "客户端版本"],
+        ["/admin/feedback", "反馈中心"],
         ["/admin/jobs", "后台任务"],
         ["/admin/audit", "审计日志"],
       ]

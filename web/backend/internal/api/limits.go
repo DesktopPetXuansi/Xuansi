@@ -19,7 +19,8 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 	var mu sync.Mutex
 	windows := map[string]rateWindow{}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !(strings.HasPrefix(r.URL.Path, "/api/v1/auth/") || r.URL.Path == "/oauth/token") || r.Method == "GET" {
+		feedback := r.Method == "POST" && r.URL.Path == "/api/v1/feedback"
+		if !feedback && (!(strings.HasPrefix(r.URL.Path, "/api/v1/auth/") || r.URL.Path == "/oauth/token") || r.Method == "GET") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -40,7 +41,11 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 		}
 		window.Count++
 		windows[key] = window
-		allowed := window.Count <= 20
+		maximum := 20
+		if feedback {
+			maximum = 5
+		}
+		allowed := window.Count <= maximum
 		mu.Unlock()
 		if !allowed {
 			w.Header().Set("Retry-After", "60")

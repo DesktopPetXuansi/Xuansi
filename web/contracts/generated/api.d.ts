@@ -872,6 +872,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 匿名提交私有反馈
+         * @description 请求最多32KiB，字符串trim后限长；每IP每分钟最多5次。只有数据库写入成功才返回收据。
+         */
+        post: operations["post__api_v1_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员反馈收件箱 */
+        get: operations["get__api_v1_admin_feedback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/feedback/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 管理员更新反馈状态 */
+        patch: operations["patch__api_v1_admin_feedback_id"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1352,6 +1406,63 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             deviceLabel: string;
+        };
+        /** @enum {string} */
+        FeedbackCategory: "BUG" | "SUGGESTION" | "OTHER";
+        /** @enum {string} */
+        FeedbackStatus: "NEW" | "IN_PROGRESS" | "RESOLVED";
+        /** @description 仅用户主动附带的固定版本信息；每值先trim后最多80字符。 */
+        FeedbackDiagnostics: {
+            appVersion?: string;
+            system?: string;
+            architecture?: string;
+            pythonVersion?: string;
+            qtVersion?: string;
+        };
+        FeedbackInput: {
+            category: components["schemas"]["FeedbackCategory"];
+            title: string;
+            description: string;
+            contact?: string;
+            diagnostics?: components["schemas"]["FeedbackDiagnostics"] | null;
+        };
+        /** @description 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。 */
+        FeedbackReceipt: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            status: components["schemas"]["FeedbackStatus"];
+        };
+        /** @description 仅网站管理员可读的完整反馈条目。 */
+        Feedback: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            status: components["schemas"]["FeedbackStatus"];
+            category: components["schemas"]["FeedbackCategory"];
+            title: string;
+            description: string;
+            contact: string;
+            diagnostics: components["schemas"]["FeedbackDiagnostics"] | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        FeedbackStatusInput: {
+            status: components["schemas"]["FeedbackStatus"];
+        };
+        FeedbackReceiptResponse: {
+            data: components["schemas"]["FeedbackReceipt"];
+        };
+        FeedbackResponse: {
+            data: components["schemas"]["Feedback"];
+        };
+        FeedbackListResponse: {
+            data: components["schemas"]["Feedback"][];
+            meta: {
+                nextCursor: string | null;
+            };
         };
     };
     responses: never;
@@ -3508,6 +3619,125 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post__api_v1_feedback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 精确Origin与双提交Cookie校验；反馈禁止资源Bearer。 */
+                "X-CSRF-Token": string;
+                /** @description 标准小写非零UUID；同编号不同内容409。 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackReceiptResponse"];
+                };
+            };
+            /** @description 请求成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackReceiptResponse"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get__api_v1_admin_feedback: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["FeedbackStatus"];
+                limit?: number;
+                /** @description 绑定status筛选的不透明base64url游标，按createdAt/id降序。 */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackListResponse"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch__api_v1_admin_feedback_id: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 精确Origin与双提交Cookie校验；反馈禁止资源Bearer。 */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackStatusInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResponse"];
+                };
             };
             /** @description 业务错误 */
             default: {

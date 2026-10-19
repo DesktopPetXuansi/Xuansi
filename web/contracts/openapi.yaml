@@ -4089,6 +4089,209 @@
           }
         }
       }
+    },
+    "/api/v1/feedback": {
+      "post": {
+        "operationId": "post__api_v1_feedback",
+        "summary": "匿名提交私有反馈",
+        "tags": [
+          "feedback"
+        ],
+        "responses": {
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackReceiptResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackReceiptResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确Origin与双提交Cookie校验；反馈禁止资源Bearer。"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "标准小写非零UUID；同编号不同内容409。"
+          }
+        ],
+        "description": "请求最多32KiB，字符串trim后限长；每IP每分钟最多5次。只有数据库写入成功才返回收据。"
+      }
+    },
+    "/api/v1/admin/feedback": {
+      "get": {
+        "operationId": "get__api_v1_admin_feedback",
+        "summary": "管理员反馈收件箱",
+        "tags": [
+          "feedback"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackListResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/FeedbackStatus"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "绑定status筛选的不透明base64url游标，按createdAt/id降序。"
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/feedback/{id}": {
+      "patch": {
+        "operationId": "patch__api_v1_admin_feedback_id",
+        "summary": "管理员更新反馈状态",
+        "tags": [
+          "feedback"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackStatusInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确Origin与双提交Cookie校验；反馈禁止资源Bearer。"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5851,6 +6054,231 @@
           "occurredAt",
           "deviceLabel"
         ]
+      },
+      "FeedbackCategory": {
+        "type": "string",
+        "enum": [
+          "BUG",
+          "SUGGESTION",
+          "OTHER"
+        ]
+      },
+      "FeedbackStatus": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "IN_PROGRESS",
+          "RESOLVED"
+        ]
+      },
+      "FeedbackDiagnostics": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "仅用户主动附带的固定版本信息；每值先trim后最多80字符。",
+        "properties": {
+          "appVersion": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "system": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "architecture": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "pythonVersion": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "qtVersion": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "FeedbackInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "title",
+          "description"
+        ],
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/FeedbackCategory"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1
+          },
+          "contact": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "diagnostics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeedbackDiagnostics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FeedbackReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          }
+        },
+        "description": "不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。"
+      },
+      "Feedback": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "status",
+          "category",
+          "title",
+          "description",
+          "contact",
+          "diagnostics",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "category": {
+            "$ref": "#/components/schemas/FeedbackCategory"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "contact": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "diagnostics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeedbackDiagnostics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "仅网站管理员可读的完整反馈条目。"
+      },
+      "FeedbackStatusInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          }
+        }
+      },
+      "FeedbackReceiptResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackReceipt"
+          }
+        }
+      },
+      "FeedbackResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Feedback"
+          }
+        }
+      },
+      "FeedbackListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Feedback"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "nextCursor"
+            ],
+            "properties": {
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
