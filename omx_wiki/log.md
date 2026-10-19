@@ -297,3 +297,14 @@
 ## [2026-10-18T14:50:06.883Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-19T02:07:01.773Z] ingest
+- **Pages:** 安装与发行验收-0-7-1-2026-10-19.md
+- **Summary:** Created new page "安装与发行验收 0.7.1 2026-10-19"
+
+## [2026-10-19T02:07:02.434Z] ingest
+- **Pages:** 形象更换与保存约定.md
+- **Summary:** Updated "形象更换与保存约定" with new content
+
+## [2026-10-19T02:07:32.863Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
