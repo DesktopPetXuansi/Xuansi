@@ -836,6 +836,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取本人历史；Bearer需history:read */
+        get: operations["listPersonalHistory"];
+        put?: never;
+        post?: never;
+        /** 清空本人历史；Bearer需history:write */
+        delete: operations["clearPersonalHistory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/history/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 同步成功使用的形象；Bearer需history:write */
+        put: operations["putPersonalHistoryItem"];
+        post?: never;
+        /** 删除本人单条历史；Bearer需history:write */
+        delete: operations["deletePersonalHistoryItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1282,6 +1318,40 @@ export interface components {
         };
         AuthConfigResponse: {
             data: components["schemas"]["AuthConfig"];
+        };
+        HistoryEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "APPEARANCE" | "DOWNLOAD";
+            /** @enum {string|null} */
+            appearanceKind: "DEFAULT" | "MODEL" | "IMAGE" | "ANIMATION" | null;
+            resourceId: string | null;
+            resourceVersionId: string | null;
+            name: string;
+            version: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+            deviceLabel: string;
+            available: boolean;
+        };
+        HistoryPage: {
+            data: components["schemas"]["HistoryEntry"][];
+            meta: {
+                nextCursor: string | null;
+            };
+        };
+        AppearanceHistoryInput: {
+            /** @enum {string} */
+            kind: "APPEARANCE";
+            /** @enum {string} */
+            appearanceKind: "DEFAULT" | "MODEL" | "IMAGE" | "ANIMATION";
+            resourceId: string | null;
+            resourceVersionId: string | null;
+            name: string;
+            /** Format: date-time */
+            occurredAt: string;
+            deviceLabel: string;
         };
     };
     responses: never;
@@ -3306,6 +3376,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthConfigResponse"];
+                };
+            };
+        };
+    };
+    listPersonalHistory: {
+        parameters: {
+            query?: {
+                kind?: "APPEARANCE" | "DOWNLOAD";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按时间和ID倒序的历史 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clearPersonalHistory: {
+        parameters: {
+            query?: {
+                kind?: "APPEARANCE" | "DOWNLOAD";
+            };
+            header?: {
+                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                "X-CSRF-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清空 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    putPersonalHistoryItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                "X-CSRF-Token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppearanceHistoryInput"];
+            };
+        };
+        responses: {
+            /** @description 已保存；同ID相同内容可重试 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 同ID不同内容 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deletePersonalHistoryItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                "X-CSRF-Token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

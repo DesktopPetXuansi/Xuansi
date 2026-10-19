@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"xuansi/web/backend/internal/history"
 	"xuansi/web/backend/internal/platform"
 )
 
@@ -94,8 +95,22 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=resource.zip")
 	w.Header().Set("Content-Length", formatBytes(v.PackageBytes))
-	if _, e = io.Copy(w, body); e != nil {
-		s.Log.Warn("下载中断", "versionId", v.ID)
+	// 正常 EOF 也可能来自截短的存储对象，必须核对已发布包的字节数。
+	sent, e := io.Copy(w, body)
+	if e != nil || sent != v.PackageBytes {
+		s.Log.Warn("下载未完整发送", "versionId", v.ID, "sentBytes", sent, "expectedBytes", v.PackageBytes)
+	} else if ticket.UserID != nil {
+		// 字节全部发送成功才记下载；同一票据重复访问仅保留首次完成记录。
+		label := "网页下载"
+		if ticket.GrantID != nil {
+			label = "玄司桌面端"
+		}
+		row := history.Entry{ID: ticket.ID, UserID: *ticket.UserID, Kind: "DOWNLOAD",
+			ResourceID: &res.ID, ResourceVersionID: &v.ID, Name: res.Name, Version: &v.Version,
+			OccurredAt: time.Now().UTC(), DeviceLabel: label, RequestHash: platform.Digest("download:" + ticket.ID)}
+		if e = history.Put(r.Context(), s.DB, row); e != nil {
+			s.Log.Warn("下载已完成但历史记录未保存", "historyId", ticket.ID)
+		}
 	}
 }
 func (s *Server) cover(w http.ResponseWriter, r *http.Request) {

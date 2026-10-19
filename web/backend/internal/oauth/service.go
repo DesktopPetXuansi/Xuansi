@@ -148,17 +148,17 @@ func (s *Service) Revoke(w http.ResponseWriter, r *http.Request) {
 	s.Provider.WriteRevocationResponse(r.Context(), w, e)
 }
 
-// 只接受明确的读授权或读写授权；旧只读请求不会自动提升。
+// 历史和上传分别显式申请；旧只读请求不会自动提升权限。
 func validScopes(raw string) bool {
 	scopes := strings.Fields(raw)
 	seen := map[string]bool{}
 	for _, scope := range scopes {
-		if seen[scope] || scope != "resources:read" && scope != "resources:write" {
+		if seen[scope] || scope != "resources:read" && scope != "resources:write" && scope != "history:read" && scope != "history:write" {
 			return false
 		}
 		seen[scope] = true
 	}
-	return seen["resources:read"]
+	return seen["resources:read"] && (!seen["history:write"] || seen["history:read"])
 }
 
 func (s *Service) Authenticate(ctx context.Context, token string) (string, string, []string, error) {

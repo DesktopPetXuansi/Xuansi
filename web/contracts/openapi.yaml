@@ -3851,6 +3851,244 @@
           }
         }
       }
+    },
+    "/api/v1/me/history": {
+      "get": {
+        "operationId": "listPersonalHistory",
+        "summary": "读取本人历史；Bearer需history:read",
+        "tags": [
+          "history"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APPEARANCE",
+                "DOWNLOAD"
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "按时间和ID倒序的历史",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "clearPersonalHistory",
+        "summary": "清空本人历史；Bearer需history:write",
+        "tags": [
+          "history"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APPEARANCE",
+                "DOWNLOAD"
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已清空"
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/history/{id}": {
+      "put": {
+        "operationId": "putPersonalHistoryItem",
+        "summary": "同步成功使用的形象；Bearer需history:write",
+        "tags": [
+          "history"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已保存；同ID相同内容可重试"
+          },
+          "409": {
+            "description": "同ID不同内容"
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppearanceHistoryInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePersonalHistoryItem",
+        "summary": "删除本人单条历史；Bearer需history:write",
+        "tags": [
+          "history"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已删除"
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5456,6 +5694,163 @@
             "$ref": "#/components/schemas/AuthConfig"
           }
         }
+      },
+      "HistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "APPEARANCE",
+              "DOWNLOAD"
+            ]
+          },
+          "appearanceKind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "DEFAULT",
+              "MODEL",
+              "IMAGE",
+              "ANIMATION",
+              null
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deviceLabel": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "appearanceKind",
+          "resourceId",
+          "resourceVersionId",
+          "name",
+          "version",
+          "occurredAt",
+          "deviceLabel",
+          "available"
+        ]
+      },
+      "HistoryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "nextCursor"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "AppearanceHistoryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "APPEARANCE"
+            ]
+          },
+          "appearanceKind": {
+            "type": "string",
+            "enum": [
+              "DEFAULT",
+              "MODEL",
+              "IMAGE",
+              "ANIMATION"
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deviceLabel": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "kind",
+          "appearanceKind",
+          "resourceId",
+          "resourceVersionId",
+          "name",
+          "occurredAt",
+          "deviceLabel"
+        ]
       }
     },
     "securitySchemes": {

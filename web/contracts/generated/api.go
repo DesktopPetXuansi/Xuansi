@@ -9,6 +9,45 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AppearanceHistoryInputAppearanceKind.
+const (
+	AppearanceHistoryInputAppearanceKindANIMATION AppearanceHistoryInputAppearanceKind = "ANIMATION"
+	AppearanceHistoryInputAppearanceKindDEFAULT   AppearanceHistoryInputAppearanceKind = "DEFAULT"
+	AppearanceHistoryInputAppearanceKindIMAGE     AppearanceHistoryInputAppearanceKind = "IMAGE"
+	AppearanceHistoryInputAppearanceKindMODEL     AppearanceHistoryInputAppearanceKind = "MODEL"
+)
+
+// Valid indicates whether the value is a known member of the AppearanceHistoryInputAppearanceKind enum.
+func (e AppearanceHistoryInputAppearanceKind) Valid() bool {
+	switch e {
+	case AppearanceHistoryInputAppearanceKindANIMATION:
+		return true
+	case AppearanceHistoryInputAppearanceKindDEFAULT:
+		return true
+	case AppearanceHistoryInputAppearanceKindIMAGE:
+		return true
+	case AppearanceHistoryInputAppearanceKindMODEL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AppearanceHistoryInputKind.
+const (
+	AppearanceHistoryInputKindAPPEARANCE AppearanceHistoryInputKind = "APPEARANCE"
+)
+
+// Valid indicates whether the value is a known member of the AppearanceHistoryInputKind enum.
+func (e AppearanceHistoryInputKind) Valid() bool {
+	switch e {
+	case AppearanceHistoryInputKindAPPEARANCE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AuthConfigEmailMode.
 const (
 	LOCALMAILBOX AuthConfigEmailMode = "LOCAL_MAILBOX"
@@ -63,6 +102,51 @@ func (e CreateResourceInputKind) Valid() bool {
 	case CreateResourceInputKindMODEL:
 		return true
 	case CreateResourceInputKindMOTION:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HistoryEntryAppearanceKind.
+const (
+	HistoryEntryAppearanceKindANIMATION   HistoryEntryAppearanceKind = "ANIMATION"
+	HistoryEntryAppearanceKindDEFAULT     HistoryEntryAppearanceKind = "DEFAULT"
+	HistoryEntryAppearanceKindIMAGE       HistoryEntryAppearanceKind = "IMAGE"
+	HistoryEntryAppearanceKindLessThannil HistoryEntryAppearanceKind = "<nil>"
+	HistoryEntryAppearanceKindMODEL       HistoryEntryAppearanceKind = "MODEL"
+)
+
+// Valid indicates whether the value is a known member of the HistoryEntryAppearanceKind enum.
+func (e HistoryEntryAppearanceKind) Valid() bool {
+	switch e {
+	case HistoryEntryAppearanceKindANIMATION:
+		return true
+	case HistoryEntryAppearanceKindDEFAULT:
+		return true
+	case HistoryEntryAppearanceKindIMAGE:
+		return true
+	case HistoryEntryAppearanceKindLessThannil:
+		return true
+	case HistoryEntryAppearanceKindMODEL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HistoryEntryKind.
+const (
+	HistoryEntryKindAPPEARANCE HistoryEntryKind = "APPEARANCE"
+	HistoryEntryKindDOWNLOAD   HistoryEntryKind = "DOWNLOAD"
+)
+
+// Valid indicates whether the value is a known member of the HistoryEntryKind enum.
+func (e HistoryEntryKind) Valid() bool {
+	switch e {
+	case HistoryEntryKindAPPEARANCE:
+		return true
+	case HistoryEntryKindDOWNLOAD:
 		return true
 	default:
 		return false
@@ -339,6 +423,42 @@ func (e PostApiV1AdminClientReleasesJSONBodyChannel) Valid() bool {
 	}
 }
 
+// Defines values for ClearPersonalHistoryParamsKind.
+const (
+	ClearPersonalHistoryParamsKindAPPEARANCE ClearPersonalHistoryParamsKind = "APPEARANCE"
+	ClearPersonalHistoryParamsKindDOWNLOAD   ClearPersonalHistoryParamsKind = "DOWNLOAD"
+)
+
+// Valid indicates whether the value is a known member of the ClearPersonalHistoryParamsKind enum.
+func (e ClearPersonalHistoryParamsKind) Valid() bool {
+	switch e {
+	case ClearPersonalHistoryParamsKindAPPEARANCE:
+		return true
+	case ClearPersonalHistoryParamsKindDOWNLOAD:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPersonalHistoryParamsKind.
+const (
+	ListPersonalHistoryParamsKindAPPEARANCE ListPersonalHistoryParamsKind = "APPEARANCE"
+	ListPersonalHistoryParamsKindDOWNLOAD   ListPersonalHistoryParamsKind = "DOWNLOAD"
+)
+
+// Valid indicates whether the value is a known member of the ListPersonalHistoryParamsKind enum.
+func (e ListPersonalHistoryParamsKind) Valid() bool {
+	switch e {
+	case ListPersonalHistoryParamsKindAPPEARANCE:
+		return true
+	case ListPersonalHistoryParamsKindDOWNLOAD:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostOauthAuthorizeFormdataBodyApprove.
 const (
 	True PostOauthAuthorizeFormdataBodyApprove = "true"
@@ -368,6 +488,23 @@ func (e PostOauthAuthorizeFormdataBodyConsent) Valid() bool {
 		return false
 	}
 }
+
+// AppearanceHistoryInput defines model for AppearanceHistoryInput.
+type AppearanceHistoryInput struct {
+	AppearanceKind    AppearanceHistoryInputAppearanceKind `json:"appearanceKind"`
+	DeviceLabel       string                               `json:"deviceLabel"`
+	Kind              AppearanceHistoryInputKind           `json:"kind"`
+	Name              string                               `json:"name"`
+	OccurredAt        time.Time                            `json:"occurredAt"`
+	ResourceId        *string                              `json:"resourceId"`
+	ResourceVersionId *string                              `json:"resourceVersionId"`
+}
+
+// AppearanceHistoryInputAppearanceKind defines model for AppearanceHistoryInput.AppearanceKind.
+type AppearanceHistoryInputAppearanceKind string
+
+// AppearanceHistoryInputKind defines model for AppearanceHistoryInput.Kind.
+type AppearanceHistoryInputKind string
 
 // Artifact defines model for Artifact.
 type Artifact struct {
@@ -535,6 +672,34 @@ type HealthResponse struct {
 	Meta *struct {
 		NextCursor *string `json:"nextCursor,omitempty"`
 	} `json:"meta,omitempty"`
+}
+
+// HistoryEntry defines model for HistoryEntry.
+type HistoryEntry struct {
+	AppearanceKind    *HistoryEntryAppearanceKind `json:"appearanceKind"`
+	Available         bool                        `json:"available"`
+	DeviceLabel       string                      `json:"deviceLabel"`
+	Id                openapi_types.UUID          `json:"id"`
+	Kind              HistoryEntryKind            `json:"kind"`
+	Name              string                      `json:"name"`
+	OccurredAt        time.Time                   `json:"occurredAt"`
+	ResourceId        *string                     `json:"resourceId"`
+	ResourceVersionId *string                     `json:"resourceVersionId"`
+	Version           *string                     `json:"version"`
+}
+
+// HistoryEntryAppearanceKind defines model for HistoryEntry.AppearanceKind.
+type HistoryEntryAppearanceKind string
+
+// HistoryEntryKind defines model for HistoryEntry.Kind.
+type HistoryEntryKind string
+
+// HistoryPage defines model for HistoryPage.
+type HistoryPage struct {
+	Data []HistoryEntry `json:"data"`
+	Meta struct {
+		NextCursor *string `json:"nextCursor"`
+	} `json:"meta"`
 }
 
 // Job defines model for Job.
@@ -1114,6 +1279,39 @@ type DeleteApiV1MeClientGrantsIdParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ClearPersonalHistoryParams defines parameters for ClearPersonalHistory.
+type ClearPersonalHistoryParams struct {
+	Kind *ClearPersonalHistoryParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
+// ClearPersonalHistoryParamsKind defines parameters for ClearPersonalHistory.
+type ClearPersonalHistoryParamsKind string
+
+// ListPersonalHistoryParams defines parameters for ListPersonalHistory.
+type ListPersonalHistoryParams struct {
+	Kind   *ListPersonalHistoryParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+	Limit  *int                           `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string                        `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListPersonalHistoryParamsKind defines parameters for ListPersonalHistory.
+type ListPersonalHistoryParamsKind string
+
+// DeletePersonalHistoryItemParams defines parameters for DeletePersonalHistoryItem.
+type DeletePersonalHistoryItemParams struct {
+	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
+// PutPersonalHistoryItemParams defines parameters for PutPersonalHistoryItem.
+type PutPersonalHistoryItemParams struct {
+	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
+}
+
 // GetApiV1MeLibraryParams defines parameters for GetApiV1MeLibrary.
 type GetApiV1MeLibraryParams struct {
 	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1387,6 +1585,9 @@ type PostApiV1AuthRegisterJSONRequestBody = RegisterInput
 
 // PatchApiV1MeJSONRequestBody defines body for PatchApiV1Me for application/json ContentType.
 type PatchApiV1MeJSONRequestBody PatchApiV1MeJSONBody
+
+// PutPersonalHistoryItemJSONRequestBody defines body for PutPersonalHistoryItem for application/json ContentType.
+type PutPersonalHistoryItemJSONRequestBody = AppearanceHistoryInput
 
 // PutApiV1MeLibraryIdJSONRequestBody defines body for PutApiV1MeLibraryId for application/json ContentType.
 type PutApiV1MeLibraryIdJSONRequestBody PutApiV1MeLibraryIdJSONBody

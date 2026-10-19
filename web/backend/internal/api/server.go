@@ -70,6 +70,7 @@ func (s *Server) Router() http.Handler {
 		r.Use(s.csrf)
 		s.accountRoutes(r)
 		s.resourceRoutes(r)
+		s.historyRoutes(r)
 		s.releaseRoutes(r)
 		s.adminRoutes(r)
 	})
@@ -141,6 +142,12 @@ func bearerAllowed(method, path string, scopes []string) bool {
 	}
 	p := strings.Split(strings.TrimPrefix(path, "/api/v1/"), "/")
 	id := func(value string) bool { _, e := uuid.Parse(value); return e == nil }
+	// 历史是独立授权，已有资源读取/上传令牌不能隐式读取或同步个人行为。
+	if path == "/api/v1/me/history" || len(p) == 3 && p[0] == "me" && p[1] == "history" && id(p[2]) {
+		read := slices.Contains(scopes, "history:read")
+		write := slices.Contains(scopes, "history:write")
+		return read && (method == "GET" && len(p) == 2 || write && (method == "DELETE" || method == "PUT" && len(p) == 3))
+	}
 	if method == "GET" {
 		if path == "/api/v1/me" || path == "/api/v1/me/library" || path == "/api/v1/me/resources" || path == "/api/v1/resources" || path == "/api/v1/client/releases" {
 			return true
