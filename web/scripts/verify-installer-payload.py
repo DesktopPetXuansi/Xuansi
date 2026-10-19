@@ -21,6 +21,15 @@ def verify(compiler: Path):
         payload = check / "payload"
         (payload / "pet").mkdir(parents=True)
         (payload / "web/frontend").mkdir(parents=True)
+        # 生产声明也包含安装前检测的 dontcopy 文件；编译样例须覆盖这些必需来源。
+        for relative in (
+            "runtime/python/python.exe", "runtime/preflight/httpx/__init__.py",
+            "pet/__init__.py", "pet/ai/__init__.py", "pet/tool_protocol.py",
+            "pet/text_stream.py", "pet/model_memory.py", "scripts/preflight.py",
+        ):
+            fixture = payload / relative
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_text("# 仅供编译验证，不执行\n", encoding="utf-8")
         shared = payload / "web/contracts/fixtures/model-references.json"
         shared.parent.mkdir(parents=True)
         shared.write_bytes((ROOT / "web/contracts/fixtures/model-references.json").read_bytes())
@@ -39,6 +48,7 @@ def verify(compiler: Path):
         output = result.stdout.decode("utf-8", errors="replace")
         if (result.returncode or "desktop-entry.py" not in output
                 or "model-references.json" not in output or "frontend-only.txt" in output):
+            LOG.error("Inno 编译失败：%s", result.stderr.decode("utf-8", errors="replace")[-1600:])
             raise RuntimeError("Inno 载荷验证失败：桌面入口/共享样例必须保留，官网程序必须排除")
         LOG.info("真实编译通过：保留桌面入口与共享样例，官网程序未进入安装载荷")
 
