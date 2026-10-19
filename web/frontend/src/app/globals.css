@@ -26,6 +26,11 @@
 }
 body {
   margin: 0;
+  /* 整页至少占满可见窗口；正文可伸展，长页面继续按自然高度滚动。 */
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
   color: var(--ink);
   font-family:
@@ -33,6 +38,14 @@ body {
   font-size: 15px;
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
+}
+#main {
+  flex: 1 0 auto;
+  min-width: 0;
+}
+.site-header,
+.site-footer {
+  flex-shrink: 0;
 }
 a {
   color: inherit;
@@ -145,6 +158,7 @@ button {
   display: none;
 }
 .site-footer {
+  width: 100%;
   max-width: var(--content-width);
   margin: 64px auto 0;
   padding: 32px var(--gutter) 40px;
