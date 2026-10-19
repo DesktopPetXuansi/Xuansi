@@ -1,8 +1,10 @@
 "use client";
 import { useMe } from "@/components/navigation";
-import { Notice } from "@/components/ui";
+import { Button, Heading, Notice } from "@/components/ui";
+import { LoginRequired } from "./identity/login-required";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 const groups = [
   { title: "我的桌宠", links: [["/dashboard", "我的桌宠"], ["/dashboard/history", "使用历史"], ["/dashboard/library", "收藏"]] },
   { title: "上传管理", links: [["/dashboard/resources", "我的作品"], ["/dashboard/uploads", "上传队列"]] },
@@ -17,6 +19,30 @@ export function Workspace({
 }) {
   const me = useMe();
   const path = usePathname();
+  // 登录检查先于个人导航和内容，访客、检查中及失败时均不渲染私人工作区。
+  if (me.isPending || me.error) {
+    return <div className="container"><div className="narrow">
+      {me.isPending ? <Notice>正在检查登录状态…</Notice> : <>
+        <Notice error={me.error} />
+        <Button className="secondary" onClick={() => {
+          console.debug("[个人空间] 重试登录状态检查");
+          void me.refetch();
+        }}>重试检查</Button>
+      </>}
+      <p><Link href="/" className="quiet-link">返回首页</Link></p>
+    </div></div>;
+  }
+  if (!me.data) {
+    return <Suspense fallback={<div className="container"><Notice>正在准备登录入口…</Notice></div>}>
+      <LoginRequired />
+    </Suspense>;
+  }
+  if (admin && me.data.role !== "ADMIN") {
+    return <div className="container"><div className="narrow">
+      <Heading title="你没有管理后台权限。">可以返回个人空间，继续管理自己的桌宠与收藏。</Heading>
+      <Link href="/dashboard" className="button-link">返回我的桌宠</Link>
+    </div></div>;
+  }
   const items = admin
     ? [
         ["/admin/users", "用户"],
@@ -39,25 +65,7 @@ export function Workspace({
           )}
           {admin && <Link href="/dashboard">返回我的桌宠</Link>}
         </aside>
-        <section>
-          {me.isPending ? (
-            <Notice>正在检查登录状态…</Notice>
-          ) : me.error ? (
-            <Notice error={me.error} />
-          ) : !me.data ? (
-            <Notice>
-              请先{" "}
-              <Link href={`/login?returnTo=${path}`} className="quiet-link">
-                登录
-              </Link>{" "}
-              后继续。
-            </Notice>
-          ) : admin && me.data.role !== "ADMIN" ? (
-            <Notice>你没有管理后台权限。</Notice>
-          ) : (
-            children
-          )}
-        </section>
+        <section>{children}</section>
       </div>
     </div>
   );

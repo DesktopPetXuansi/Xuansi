@@ -58,7 +58,8 @@ export function Account() {
     try {
       await api("/auth/logout", "POST", {});
       await replaceSession(cache, false);
-      router.push("/login");
+      console.debug("[账号] 已退出登录，返回公开首页");
+      router.replace("/");
     } catch (cause) {
       setError(cause);
     }

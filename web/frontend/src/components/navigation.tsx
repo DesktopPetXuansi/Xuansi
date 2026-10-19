@@ -9,6 +9,7 @@ import { ArrowUpRight, Menu, UserRound, X } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 
 const links = [
+  { href: "/", label: "首页" },
   { href: "/features", label: "产品" },
   { href: "/resources", label: "资源库" },
   { href: "/docs", label: "文档" },
@@ -55,7 +56,7 @@ function PrimaryNavigation({ pathname }: { pathname: string }) {
             key={href}
             href={href}
             aria-current={
-              pathname === href || pathname.startsWith(`${href}/`)
+              pathname === href || (href !== "/" && pathname.startsWith(`${href}/`))
                 ? "page"
                 : undefined
             }

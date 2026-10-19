@@ -99,7 +99,8 @@ async function nativeSync() {
 
 try {
   await page.goto(`${origin}/dashboard/history`);
-  await expect(page.getByText('后继续。', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: '登录后继续', exact: true })).toBeVisible();
+  await expect(page.getByLabel('个人空间导航', { exact: true })).toHaveCount(0);
   checked('未登录可访问公共内容，个人历史显示登录入口');
   const userA = await register('形象历史验收甲');
   const userB = await register('形象历史验收乙');

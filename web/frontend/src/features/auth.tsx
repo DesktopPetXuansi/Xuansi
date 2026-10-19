@@ -1,6 +1,7 @@
 "use client";
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { replaceSession } from "./identity/session";
+import { authHref, returnPath } from "./identity/return-path";
 import { api } from "@/lib/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +31,7 @@ const labels: Record<string, string> = {
 };
 export function AuthPage({ mode }: { mode: string }) {
   const query = useSearchParams();
+  const destination = returnPath(query.get("returnTo") ?? query.get("next"));
   const router = useRouter();
   const client = useQueryClient();
   const config = useAuthConfig();
@@ -84,10 +86,8 @@ export function AuthPage({ mode }: { mode: string }) {
           return;
         }
         await replaceSession(client, true);
-        const next = query.get("returnTo") ?? query.get("next");
-        router.push(
-          next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard",
-        );
+        console.debug("[账号] 登录成功，返回原站内页面");
+        router.replace(destination);
       } else if (mode === "reset-password") {
         await api("/auth/password-resets/confirm", "POST", {
           token: query.get("token"),
@@ -202,10 +202,11 @@ export function AuthPage({ mode }: { mode: string }) {
           {success && <Notice>{success}</Notice>}
           <LocalMailbox config={config.data} />
           <div className="auth-links">
-            <Link href={mode === "login" ? "/register" : "/login"}>
+            <Link href={authHref(mode === "login" ? "/register" : "/login", destination)}>
               {mode === "login" ? "创建账号" : "返回登录"}
             </Link>
             <Link href="/forgot-password">忘记密码？</Link>
+            <Link href="/">返回首页</Link>
             {mode !== "reset-password" && (
               <Link href="/verify-email">重新发送验证邮件</Link>
             )}
