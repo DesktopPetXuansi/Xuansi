@@ -24,7 +24,7 @@ try {
   await page.locator('.hero').getByRole('link', { name: '下载 Windows 客户端' }).click();
   await expect(page).toHaveURL(`${origin}/download`);
   const download = page.locator('main').getByRole('link', { name: '下载 Windows 安装包', exact: true });
-  await expect(download).toHaveAttribute('href', 'https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.7.1/Xuansi-0.7.1-windows-x64-setup.exe');
+  await expect(download).toHaveAttribute('href', 'https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.8.0/Xuansi-0.8.0-windows-x64-setup.exe');
   await expect(page.locator('main')).not.toContainText('0.5.6');
   await expect(page.locator('main')).toContainText('不要求 D 盘');
   await expect(page.locator('main')).toContainText('Windows 10 1809');
