@@ -1,6 +1,7 @@
 "use client";
 import { useMe } from "@/components/navigation";
 import { Button, Field, Heading, Notice } from "@/components/ui";
+import { replaceSession } from "./identity/session";
 import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -56,7 +57,7 @@ export function Account() {
   async function logout() {
     try {
       await api("/auth/logout", "POST", {});
-      cache.clear();
+      await replaceSession(cache, false);
       router.push("/login");
     } catch (cause) {
       setError(cause);

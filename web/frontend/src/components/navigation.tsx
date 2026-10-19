@@ -1,7 +1,7 @@
 "use client";
-import { api, ApiError } from "@/lib/api";
+import { useMe } from "@/features/identity/session";
+export { useMe } from "@/features/identity/session";
 import type { User } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -68,19 +68,6 @@ function PrimaryNavigation({ pathname }: { pathname: string }) {
     </>
   );
 }
-export function useMe() {
-  return useQuery({
-    queryKey: ["me"],
-    queryFn: async () => {
-      try {
-        return await api<User>("/me");
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return null;
-        throw error;
-      }
-    },
-  });
-}
 export function Navigation() {
   const me = useMe();
   const pathname = usePathname();
@@ -94,28 +81,28 @@ export function Navigation() {
           </span>
         </Link>
         {/* 两个断点入口交替显示，让视觉顺序与键盘顺序始终一致。 */}
-        <AccountLink signedIn={Boolean(me.data)} mobile />
+        <AccountLink user={me.data} mobile />
         {/* 路由切换时重建菜单状态，不用 effect 同步用户操作。 */}
         <PrimaryNavigation key={pathname} pathname={pathname} />
-        <AccountLink signedIn={Boolean(me.data)} />
+        <AccountLink user={me.data} />
       </div>
     </header>
   );
 }
 function AccountLink({
-  signedIn,
+  user,
   mobile = false,
 }: {
-  signedIn: boolean;
+  user?: User | null;
   mobile?: boolean;
 }) {
   return (
     <Link
       className={`nav-account nav-account-${mobile ? "mobile" : "desktop"}`}
-      href={signedIn ? "/dashboard" : "/login"}
+      href={user ? "/dashboard" : "/login"}
     >
       <UserRound size={15} aria-hidden />
-      {signedIn ? "工作台" : "登录 / 注册"}
+      {user ? <><span className="nav-nickname">{user.displayName || "朋友"}</span><span>我的桌宠</span></> : "登录 / 注册"}
       <ArrowUpRight size={14} aria-hidden />
     </Link>
   );

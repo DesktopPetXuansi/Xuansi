@@ -53,14 +53,14 @@ export async function api<T>(
   const envelope = z
     .object({
       data: z.unknown(),
-      meta: z.object({ nextCursor: z.string().optional() }).optional(),
+      meta: z.object({ nextCursor: z.string().nullable().optional() }).optional(),
     })
     .safeParse(payload);
   if (!envelope.success) throw new ApiError("服务返回了无法识别的数据。", 502);
   return (includeMeta ? envelope.data : envelope.data.data) as T;
 }
 export function apiPage<T>(path: string) {
-  return api<{ data: T[]; meta?: { nextCursor?: string } }>(
+  return api<{ data: T[]; meta?: { nextCursor?: string | null } }>(
     path,
     "GET",
     undefined,

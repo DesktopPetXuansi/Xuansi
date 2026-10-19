@@ -8,7 +8,7 @@ export function Sessions() {
   return (
     <>
       <Heading title="会话与客户端授权">
-        撤销不再使用的设备。客户端授权只允许读取资源。
+        查看网站会话和已授权的客户端。资源读取、模型上传和历史同步分别授权；撤销后客户端需重新获得许可。
       </Heading>
       <SessionList endpoint="/me/sessions" title="网站会话" />
       <SessionList endpoint="/me/client-grants" title="客户端授权" />

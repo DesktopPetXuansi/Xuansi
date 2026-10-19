@@ -1,5 +1,6 @@
 "use client";
 import { Button, Field, Heading, Notice } from "@/components/ui";
+import { replaceSession } from "./identity/session";
 import { api } from "@/lib/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,7 +83,7 @@ export function AuthPage({ mode }: { mode: string }) {
           );
           return;
         }
-        await client.invalidateQueries({ queryKey: ["me"] });
+        await replaceSession(client, true);
         const next = query.get("returnTo") ?? query.get("next");
         router.push(
           next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard",
@@ -133,7 +134,7 @@ export function AuthPage({ mode }: { mode: string }) {
           eyebrow="YOUR ACCOUNT / 你的账号"
           title={labels[mode] ?? "账号"}
         >
-          账号用于管理资源。桌面的聊天与记忆继续保存在本地。
+          登录后查看收藏、下载记录，以及你选择同步的形象历史。聊天与记忆继续保存在本地。
         </Heading>
         <div className="panel">
           {config.isPending && <Notice>正在加载账号配置…</Notice>}

@@ -11,11 +11,14 @@ export function Authorize() {
   // 权限说明直接来自此次申请；旧只读授权保持原有文案。
   const scopes = (params.get("scope") ?? "").trim().split(/\s+/);
   const upload = scopes.includes("resources:write");
+  const historyRead = scopes.includes("history:read");
+  const historyWrite = scopes.includes("history:write");
   const validScope =
     scopes.includes("resources:read") &&
+    (!historyWrite || historyRead) &&
     new Set(scopes).size === scopes.length &&
     scopes.every((scope) =>
-      ["resources:read", "resources:write"].includes(scope),
+      ["resources:read", "resources:write", "history:read", "history:write"].includes(scope),
     );
   const me = useMe();
   const [error, setError] = useState<unknown>();
@@ -62,16 +65,19 @@ export function Authorize() {
     <div className="container">
       <div className="narrow">
         <Heading
-          title={upload ? "允许客户端上传模型？" : "允许客户端读取资源？"}
+          title={historyWrite ? "允许客户端同步形象历史？" : historyRead ? "允许客户端读取历史？" : upload ? "允许客户端上传模型？" : "允许客户端读取资源？"}
         >
           请确认这是你刚刚在桌面客户端发起的操作。
         </Heading>
         <div className="panel">
           <h3>desktop-ai-pet</h3>
-          <p>
-            申请权限：读取你的资源库、资源清单与下载资源包。
-            {upload && "上传你选择的本地模型，设为当前版本并加入资源库。"}
-          </p>
+          <p>此次申请的权限：</p>
+          <ul className="consent-permissions">
+            <li>资源读取：查看收藏、资源清单与下载资源包。</li>
+            {upload && <li>模型上传：上传你选择的本地模型，设为当前版本并加入收藏。</li>}
+            {historyRead && <li>历史读取：读取账号中的形象使用记录和下载记录。</li>}
+            {historyWrite && <li>历史同步与删除：保存你此后成功使用的形象记录，并允许删除历史。不自动上传开启同步以前的本机记录。</li>}
+          </ul>
           <p className="muted">
             不会获取你的密码，不会上传聊天、截图、录音或本地记忆。你可以随时在会话与授权页面撤销。
           </p>
@@ -91,7 +97,7 @@ export function Authorize() {
           ) : (
             <div className="actions">
               <Button disabled={busy} onClick={allow}>
-                {busy ? "正在授权…" : upload ? "允许上传模型" : "允许读取资源"}
+                {busy ? "正在授权…" : historyWrite ? "允许同步形象历史" : historyRead ? "允许读取历史" : upload ? "允许上传模型" : "允许读取资源"}
               </Button>
               <Link href="/dashboard/sessions" className="quiet-link">
                 暂不授权

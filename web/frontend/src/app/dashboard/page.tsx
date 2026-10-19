@@ -1,4 +1,2 @@
-import { Overview } from "@/features/workspace";
-export default function Page() {
-  return <Overview />;
-}
+import { CompanionPage } from "@/features/companion/companion-page";
+export default function Page() { return <CompanionPage />; }

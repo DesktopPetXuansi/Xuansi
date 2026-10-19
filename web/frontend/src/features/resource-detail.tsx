@@ -60,14 +60,14 @@ export function ResourceDetail({ id }: { id: string }) {
           </p>
           {me.data ? (
             <Button disabled={add.isPending} onClick={() => add.mutate()}>
-              {add.isSuccess ? "已加入资源库" : "加入我的资源库"}
+              {add.isSuccess ? "已收藏" : "收藏这个资源"}
             </Button>
           ) : (
             <Link
               className="button-link"
               href={`/login?returnTo=/resources/${id}`}
             >
-              登录后加入资源库
+              登录后收藏
             </Link>
           )}
           {add.error && <Notice error={add.error} />}

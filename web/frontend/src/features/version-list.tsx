@@ -47,7 +47,7 @@ export function VersionList({
         <Notice>尚未上传版本。</Notice>
       )}
       {query.data?.map((version) => (
-        <article className="version-row" key={version.id}>
+        <article className="version-row" key={version.id} id={`version-${version.id}`}>
           <div className="actions">
             <h3 style={{ margin: 0 }}>{version.version}</h3>
             <span className="badge">{statuses[version.validationStatus]}</span>
