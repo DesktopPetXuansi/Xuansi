@@ -23,12 +23,13 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pet import appearance, character_frames, native_animation, platform_resources
+from pet import appearance, character_frames, config, native_animation, platform_resources
 from pet.appearance_flow import AppearanceFlow
 from pet.appearance_hub import AppearanceHub
 from pet.appearance_import import AppearanceCandidate
 from pet.avatar import Avatar
 from pet.config import ROOT, Settings, save_settings
+from pet.history_controller import PersonalHistory
 from pet.live2d_session import SESSION, configure_opengl_sharing
 from pet.panel import Panel
 from pet.platform_dialog import PlatformDialog
@@ -48,6 +49,7 @@ class Runtime(QObject):
     """真实保存函数写临时 JSON，异步回执保持与生产一致的顺序。"""
 
     platform_settings_saved = Signal(object, str)
+    settings_saved = Signal(object, str)
 
     def __init__(self, settings, directory):
         super().__init__()
@@ -114,6 +116,7 @@ def inspect(directory, output, report):
     platform.api = lambda: platform.client
     hub = AppearanceHub(panel)
     flow = AppearanceFlow(owner, hub, platform, on_applied=lambda: None)
+    history = PersonalHistory(owner, flow, platform)
     panel.mount_section('appearance', hub, on_open=flow.present)
     panel.mount_section('resources', platform)
 
@@ -239,10 +242,36 @@ def inspect(directory, output, report):
         use()
         check('restore_default_real_gl', avatar._live2d_active and not avatar.image_id
               and not avatar._platform_model_version and not owner.settings.platform_model_version)
+        # 装配生产历史控制器，成功回执异步落盘；预览、保存失败和回滚均不得计入。
+        wait(lambda: len(history.appearances.read()['entries']) == 5, '成功形象历史未完整落盘')
+        check('history_records_only_five_successes', len(history.appearances.read()['entries']) == 5
+              and not history.appearances.read()['sync']['enabled'])
+        hub.history_button.click()
+        wait(lambda: history.appearance_dialog.records.count() == 5, '形象历史列表未读取临时文件')
+        assert history.appearance_dialog.grab().save(str(output / 'appearance-history.png'))
+        check('history_dialog_real_window', history.appearance_dialog.isVisible())
+        history.appearance_dialog.records.setCurrentRow(1)  # 刚才成功使用的本机 Live2D。
+        history.appearance_dialog.select_button.click()
+        wait(lambda: hub.ready and hub.candidate.kind == 'MODEL', '历史形象未恢复到真实预览')
+        check('history_restore_only_previews', avatar._platform_model_version == ''
+              and owner.settings.platform_model_version == '')
+        snapshot = replace(owner.settings, model_path='history-draft.gguf')
+        runtime.settings_saved.emit(snapshot, '')
+        wait(lambda: len(history.models.read()['entries']) == 1, '模型配置历史未异步保存')
+        panel.model_page.history_requested.emit()
+        wait(lambda: history.model_dialog.records.count() == 1, '模型配置历史未显示')
+        assert history.model_dialog.grab().save(str(output / 'model-history.png'))
+        history.model_dialog.select_button.click()
+        wait(lambda: panel.model_page.model.text() == 'history-draft.gguf', '模型历史未填写草稿')
+        check('model_history_restore_only_draft', owner.settings.model_path != 'history-draft.gguf'
+              and runtime.settings.model_path != 'history-draft.gguf')
         check('all_data_is_temporary', flow.sources.image_directory == directory / 'appearances'
-              and flow.sources.resource_root == directory / 'resources')
+              and flow.sources.resource_root == directory / 'resources'
+              and history.appearances.path.parent == directory and history.models.path.parent == directory)
         assert all(report['checks'].values()), '存在失败验收项，请检查 report.json'
     finally:
+        history.close()
+        history.io.pool.waitForDone(4000)
         flow.close()
         platform.shutdown()
         wait(lambda: platform.worker is None, '退出时后台任务未结束')
@@ -272,6 +301,7 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='xuansi-native-appearance-') as temporary, ExitStack() as patches:
             directory = Path(temporary)
+            patches.enter_context(patch.object(config, 'DATA', directory))
             image_path = appearance.image_path
             def isolated_image_path(identifier='', explicit_directory=None):
                 return image_path(identifier, explicit_directory or directory / 'appearances')

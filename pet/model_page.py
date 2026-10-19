@@ -28,6 +28,7 @@ LOG = logging.getLogger(__name__)
 
 class ModelPage(QWidget):
     save_requested = Signal()
+    history_requested = Signal()
 
     def __init__(self, settings):
         super().__init__()
@@ -55,7 +56,12 @@ class ModelPage(QWidget):
         form_hint(hotkeys, "点选后按下组合键，至少含两个修饰键（如 Ctrl、Alt）。再次按快捷键或 Esc 收起；有修改时会先保存并关闭麦克风。")
         self.save_button = QPushButton("保存设置")
         self.save_button.clicked.connect(self.save_requested)
-        layout.addWidget(self.save_button)
+        actions = QHBoxLayout()
+        actions.addWidget(self.save_button)
+        self.history_button = QPushButton('配置历史')
+        self.history_button.clicked.connect(self.history_requested)
+        actions.addWidget(self.history_button)
+        layout.addLayout(actions)
         layout.addStretch()
         LOG.debug("模型设置页已就绪，高级参数默认收起")
 
@@ -152,6 +158,18 @@ class ModelPage(QWidget):
 
     def credential_changed(self):
         return self.ai_page.credential_changed()
+
+    def restore_configuration(self, configuration):
+        """只填写草稿，保留用户明确测试、保存后才切换的既有事务。"""
+        settings, model, projector, missing = configuration
+        self.ai_page.restore_configuration(settings)
+        self.model.setText(model)
+        self.projector.setText(projector)
+        if missing:
+            self.ai_page.validation_status.setText('此配置的本机密钥已失效，请重新填写并测试。')
+        else:
+            self.ai_page.validation_status.setText('已填入历史配置，请检查并测试后保存设置。')
+        LOG.info('模型历史已填入草稿，尚未保存或切换')
 
     def credential_draft(self):
         return self.ai_page.credential_draft()

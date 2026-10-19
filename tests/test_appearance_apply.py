@@ -48,6 +48,28 @@ def transaction(monkeypatch):
     app.processEvents()
 
 
+def test_history_receipt_only_after_saved_and_loaded(transaction):
+    owner, operation, _replies, _busy = transaction
+    used = []
+    operation.used.connect(used.append)
+    selected = candidate()
+    operation.use(selected)
+    assert used == []
+    owner.runtime.reply()
+    assert used == [selected]
+
+
+def test_history_receipt_omits_failed_load_and_rollback(transaction):
+    owner, operation, _replies, _busy = transaction
+    used = []
+    operation.used.connect(used.append)
+    owner.avatar.set_image.side_effect = RuntimeError('load failed')
+    operation.use(candidate())
+    owner.runtime.reply()
+    owner.runtime.reply()
+    assert used == []
+
+
 def candidate(kind="IMAGE"):
     prepared = ({"resourceVersionId": "new-model", "kind": "MODEL"}, "model.model3.json")
     return SimpleNamespace(kind=kind, name="测试形象", image_id="new.png" if kind != "DEFAULT" else "",

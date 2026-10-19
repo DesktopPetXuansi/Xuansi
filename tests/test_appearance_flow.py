@@ -3,6 +3,7 @@
 import asyncio
 import time
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -245,7 +246,8 @@ def test_login_from_online_chooser_can_be_cancelled_without_leaving_page(flow, m
         await asyncio.sleep(30)
 
     monkeypatch.setattr('pet.platform_dialog.authorize', authorize)
-    monkeypatch.setattr(platform, 'api', lambda: SimpleNamespace(base_url='http://127.0.0.1:1'))
+    monkeypatch.setattr(platform, 'api', lambda: SimpleNamespace(base_url='http://127.0.0.1:1',
+                        store=SimpleNamespace(read=lambda: None)))
     view.show_choices('online', [])
     view.login_button.click()
     assert view.cancel_button.isVisible() and '浏览器' in view.status.text()
@@ -253,3 +255,75 @@ def test_login_from_online_chooser_can_be_cancelled_without_leaving_page(flow, m
     wait_for_idle(platform)
     assert '取消' in view.status.text()
     assert view.stack.currentIndex() == 1
+
+
+@pytest.mark.parametrize('kind', ['MODEL', 'IMAGE', 'ANIMATION', 'DEFAULT'])
+@pytest.mark.parametrize('fails', [False, True])
+def test_legacy_resource_buttons_use_shared_saved_trial_receipt(flow, kind, fails):
+    coordinator, view, platform, owner = flow
+    used = []
+    coordinator.applying.used.connect(used.append)
+    if fails:
+        target = owner.avatar.select_platform_model if kind == 'MODEL' else owner.avatar.set_image
+        target.side_effect = RuntimeError('合成试载失败')
+    if kind == 'DEFAULT':
+        platform.restore_default()
+    else:
+        manifest = {'kind': kind, 'name': '资源形象', 'resourceVersionId': 'selected-version'}
+        platform.completed('apply', ((manifest, Path('test.model3.json')), None if kind == 'MODEL' else 'new.png'))
+    assert len(owner.runtime.writes) == 1 and not used
+    assert platform.pending_settings is None
+    owner.runtime.finish()
+    if fails:
+        assert coordinator.applying.busy and len(owner.runtime.writes) == 2
+        owner.runtime.finish()
+        assert not used and '未更换' in platform.status.text()
+    else:
+        assert [candidate.kind for candidate in used] == [kind]
+        assert view.current.kind == kind and '成功' in platform.status.text()
+    assert not coordinator.applying.busy
+
+
+def test_legacy_action_and_startup_restore_do_not_create_appearance_receipts(flow):
+    coordinator, _, platform, owner = flow
+    used = []
+    coordinator.applying.used.connect(used.append)
+    owner.avatar.apply_platform_action = Mock()
+    for kind, command in [('MOTION', 'apply'), ('EXPRESSION', 'apply'), ('MODEL', 'restore')]:
+        manifest = {'kind': kind, 'resourceVersionId': 'existing-version'}
+        prepared = (manifest, Path('existing.model3.json'))
+        platform.completed(command, (prepared, None))
+        assert platform.pending_settings is not None
+        owner.runtime.finish()
+    assert owner.avatar.apply_platform_action.call_count == 2
+    assert owner.avatar.select_platform_model.call_count == 1
+    assert used == []
+
+
+@pytest.mark.parametrize('outcome', ['success', 'save-failed', 'load-failed'])
+def test_legacy_worker_finishes_before_save_keeps_other_operations_blocked(flow, outcome):
+    coordinator, _, platform, owner = flow
+    used = []
+    coordinator.applying.used.connect(used.append)
+    if outcome == 'load-failed':
+        owner.avatar.set_image.side_effect = RuntimeError('合成试载失败')
+
+    async def prepare():
+        manifest = {'kind': 'IMAGE', 'name': '资源形象', 'resourceVersionId': 'selected-version'}
+        return (manifest, Path('image.png')), 'new.png'
+
+    assert platform.start('apply', prepare)
+    wait_for_idle(platform)
+    # completed 已发起异步保存，但下载准备线程 finished 不能提前解锁界面。
+    assert coordinator.applying.busy and platform.busy
+    assert not platform.url.isEnabled() and not platform.local.isEnabled()
+    assert not platform.start('login', prepare)
+    assert not platform.start('apply', prepare)
+    owner.runtime.finish('合成保存失败' if outcome == 'save-failed' else '')
+    if outcome == 'load-failed':
+        assert coordinator.applying.busy and platform.busy
+        assert not platform.start('login', prepare)
+        owner.runtime.finish()
+    assert not coordinator.applying.busy and not platform.busy
+    assert platform.url.isEnabled() and platform.local.isEnabled()
+    assert len(used) == (1 if outcome == 'success' else 0)

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 from .appearance_flow import AppearanceFlow
 from .appearance_hub import AppearanceHub
 from .config import ROOT
+from .history_controller import PersonalHistory
 from .hotkey import GlobalHotkey
 from .platform_dialog import PlatformDialog
 
@@ -37,6 +38,7 @@ class CompanionUI:
         self.platform = PlatformDialog(owner, embedded=True)
         self.appearance_flow = AppearanceFlow(owner, self.appearance, self.platform,
                                               on_applied=self.refresh_icon, is_saving=lambda: self.saving)
+        self.history = PersonalHistory(owner, self.appearance_flow, self.platform)
         owner.panel.mount_section('appearance', self.appearance, on_open=self.appearance_flow.present)
         self.platform.activity_changed.connect(owner.panel.footer.set_activity)
         owner.panel.mount_section("resources", self.platform, on_open=self.resources_opened)
@@ -179,6 +181,7 @@ class CompanionUI:
         self.hotkey.close()
         self.owner.panel.logs.hide()
         self.appearance_flow.close()
+        self.history.close()
         self.appearance.close()
         self.platform.shutdown()
         self.tray.hide()

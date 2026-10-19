@@ -221,6 +221,26 @@ class AIPage(QWidget):
                        backup_projector_path=self.backup_projector.text().strip(), profile=self.profile(),
                        cloud_memory=self.cloud_memory.isChecked(), cloud_observation=self.cloud_observation.isChecked())
 
+    def restore_configuration(self, settings):
+        """历史引用仅用于原服务；历史验证证据已清空，不能绕过重新验证。"""
+        self.cancel_validation()
+        self.key.clear()
+        self._saved_profile = settings.profile
+        self.set_profile(settings.profile)
+        for widget, value in ((self.policy, settings.policy), (self.local_model, settings.local_model),
+                              (self.backend, settings.local_backend)):
+            index = widget.findData(value)
+            if index < 0:
+                widget.addItem(value, value)
+                index = widget.count() - 1
+            widget.setCurrentIndex(index)
+        self.model_dir.setText(settings.model_dir)
+        self.backup_model.setText(settings.backup_model_path)
+        self.backup_projector.setText(settings.backup_projector_path)
+        self.cloud_memory.setChecked(settings.cloud_memory)
+        self.cloud_observation.setChecked(settings.cloud_observation)
+        self.changed.emit()
+
     def start_validation(self):
         self.cancel_validation()
         try:

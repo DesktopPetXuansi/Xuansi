@@ -22,6 +22,8 @@ class AppearanceFlow(QObject):
         self._restore_pending = self._restoring = ''
         self._authorizing, self._login_error = False, ''
         self._closed = False
+        platform.appearance_managed = True
+        platform.appearance_requested.connect(self.use_resource)
         view.import_requested.connect(self.sources.local)
         view.online_requested.connect(self.sources.discover)
         view.mine_requested.connect(self.sources.mine)
@@ -135,6 +137,7 @@ class AppearanceFlow(QObject):
         self.view.set_busy(busy, cancellable=active or self._authorizing and self.platform.worker is not None)
 
     def apply_busy(self, busy):
+        self.platform.appearance_busy = busy
         self.platform.set_busy(busy or self.platform.worker is not None
                                or self.platform.pending_settings is not None or self.platform.shutting_down)
         self.refresh_busy()
@@ -145,7 +148,17 @@ class AppearanceFlow(QObject):
         if not self._closed and self.view.ready and not self.sources.busy and not self.is_saving():
             self.applying.use(candidate)
 
+    def use_resource(self, candidate):
+        """旧资源页的明确应用按钮复用事务，只有真实桌宠试载成功才发使用回执。"""
+        if self._closed or self.applying.busy or self.sources.active or self.is_saving():
+            self.platform.status.setText('请先等待当前形象操作完成。')
+            return
+        self.view.show_candidate(candidate)
+        self.applying.use(candidate)
+        LOG.info('官网资源应用已转交统一形象事务 kind=%s', candidate.kind)
+
     def applied(self, settings, error):
+        self.platform.status.setText(error or '形象已成功更换并保存。')
         if error:
             self.view.status.setText(error)
         else:

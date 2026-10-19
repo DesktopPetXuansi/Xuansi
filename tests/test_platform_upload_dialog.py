@@ -27,13 +27,14 @@ def pump_until(application, condition):
 
 
 @pytest.mark.parametrize("fails", [False, True])
-def test_direct_upload_connects_once_and_keeps_qt_responsive(monkeypatch, fails):
+@pytest.mark.parametrize("history", [False, True])
+def test_direct_upload_connects_once_and_keeps_qt_responsive(monkeypatch, fails, history):
     application = QApplication.instance() or QApplication([])
     panel = QWidget()
     owner = SimpleNamespace(panel=panel, settings=Settings(), runtime=UploadRuntime())
     dialog = PlatformDialog(owner)
     ui_thread, calls, authorization_calls = threading.get_ident(), [], []
-    tokens = {}
+    tokens = {"scope": "resources:read history:read history:write"} if history else {}
 
     class Store:
         def read(self):
@@ -64,8 +65,9 @@ def test_direct_upload_connects_once_and_keeps_qt_responsive(monkeypatch, fails)
                 raise UploadError("模型引用文件不存在：texture.png")
             return {"resourceId": str(uuid4()), "resourceVersionId": str(uuid4()), "name": metadata["name"]}
 
-    async def authorize(_base, *, upload):
+    async def authorize(_base, *, upload, **options):
         assert upload and threading.get_ident() != ui_thread
+        assert options == ({"history": True} if history else {})
         authorization_calls.append(True)
         return {"access_token": "test-access", "refresh_token": "test-refresh", "scope": "resources:read resources:write"}
 

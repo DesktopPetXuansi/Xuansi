@@ -48,7 +48,8 @@ def build_layout(view):
     view.folder_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     view.online_button = button('在线挑选', view.online_requested)
     view.mine_button = button('我的形象', view.mine_requested)
-    for widget in (view.local_button, view.folder_button, view.online_button, view.mine_button):
+    view.history_button = button('使用历史', view.history_requested)
+    for widget in (view.local_button, view.folder_button, view.online_button, view.mine_button, view.history_button):
         sources.addWidget(widget)
     sources.addStretch()
     layout.addLayout(sources)

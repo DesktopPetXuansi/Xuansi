@@ -70,6 +70,7 @@ class PlatformTask(QThread):
 
 
 class PlatformDialog(QDialog):
+    appearance_requested = Signal(object)
     shutdown_done = Signal()
     activity_changed = Signal(str)
     operation_completed = Signal(str, object)
@@ -91,6 +92,8 @@ class PlatformDialog(QDialog):
         self.shutting_down = False
         self.shutdown_emitted = False
         self.resources = []
+        self.appearance_managed = False
+        self.appearance_busy = False
         self.request_url = owner.settings.platform_url
         owner.runtime.platform_settings_saved.connect(self.platform_saved)
         self.setWindowTitle("官网资源库 · 玄司")
@@ -115,6 +118,8 @@ class PlatformDialog(QDialog):
 
     def set_busy(self, busy):
         # 宿主显示跨页操作状态；不新增轮询，也不改变当前任务的取消/保存边界。
+        # 资源准备线程退场后，受托形象事务仍可能等待保存或回滚回执。
+        busy = busy or self.appearance_busy
         self.busy = busy
         self.busy_changed.emit(busy)
         self.activity_changed.emit("官网资源 · 正在处理…" if busy else "")
@@ -220,7 +225,15 @@ class PlatformDialog(QDialog):
     def login(self):
         async def operation():
             client = self.api()
-            tokens = await authorize(client.base_url)
+            previous = await asyncio.to_thread(client.store.read)
+            scopes = set(str((previous or {}).get("scope", "")).split())
+            # 重新连接保留已明确授予的权限，不能替换掉历史同步或上传授权。
+            options = {}
+            if "resources:write" in scopes:
+                options["upload"] = True
+            if {"history:read", "history:write"} <= scopes:
+                options["history"] = True
+            tokens = await authorize(client.base_url, **options)
             await asyncio.to_thread(client.store.save, tokens)
             return client.base_url
         self.start("login", operation)
@@ -289,6 +302,12 @@ class PlatformDialog(QDialog):
         self.start("restore", operation)
 
     def restore_default(self):
+        if self.appearance_managed:
+            from .appearance_import import AppearanceCandidate
+
+            if not self.busy:
+                self.appearance_requested.emit(AppearanceCandidate("DEFAULT", "默认玄司"))
+            return
         avatar = self.owner.avatar
         avatar._release_live2d()
         avatar._platform_model_version = ""
@@ -375,6 +394,14 @@ class PlatformDialog(QDialog):
                 prepared, expression = result
                 manifest, path = prepared
                 kind, version = manifest["kind"], manifest["resourceVersionId"]
+                if command == "apply" and self.appearance_managed and kind in {"MODEL", "IMAGE", "ANIMATION"}:
+                    from .appearance_import import AppearanceCandidate
+
+                    # 用户明确应用走同一保存、试载与回滚事务；启动恢复不生成使用记录。
+                    candidate = AppearanceCandidate(kind, manifest.get("name") or path.name,
+                                                    expression or "", prepared)
+                    self.appearance_requested.emit(candidate)
+                    return
                 settings = self.owner.settings
                 if kind == "MODEL":
                     self.owner.avatar.select_platform_model(version, prepared)

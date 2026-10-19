@@ -67,7 +67,10 @@ class ModelUploadDialog(QDialog):
             client = self.client if self.client and self.client.base_url == base_url else PlatformClient(base_url)
             tokens = await asyncio.to_thread(client.store.read)
             if not tokens or "resources:write" not in str(tokens.get("scope", "")).split():
-                tokens = await authorize(base_url, upload=True)
+                scopes = set(str((tokens or {}).get("scope", "")).split())
+                # 上传扩权保留已获历史授权；首次连接不暗中申请历史权限。
+                options = {"history": True} if {"history:read", "history:write"} <= scopes else {}
+                tokens = await authorize(base_url, upload=True, **options)
                 if "resources:write" not in str(tokens.get("scope", "")).split():
                     raise UploadError("官网尚未授予上传权限，请允许上传模型后重试")
                 await asyncio.to_thread(client.store.save, tokens)

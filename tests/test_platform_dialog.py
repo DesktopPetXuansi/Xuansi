@@ -20,6 +20,38 @@ class SettingsRuntime(QObject):
     platform_settings_saved = Signal(object, str)
 
 
+@pytest.mark.parametrize("scope,expected", [
+    ("resources:read", {}),
+    ("resources:read history:read", {}),
+    ("resources:read history:read history:write", {"history": True}),
+    ("resources:read resources:write history:read history:write", {"upload": True, "history": True}),
+])
+def test_connect_preserves_only_existing_granted_permissions(monkeypatch, scope, expected):
+    application = QApplication.instance() or QApplication([])
+    panel = QWidget()
+    owner = SimpleNamespace(panel=panel, settings=Settings(), runtime=SettingsRuntime())
+    dialog = PlatformDialog(owner)
+    saved = []
+    client = SimpleNamespace(base_url="http://localhost:3000", store=SimpleNamespace(
+        read=lambda: {"scope": scope}, save=saved.append))
+    monkeypatch.setattr(dialog, "api", lambda: client)
+    operations = []
+    monkeypatch.setattr(dialog, "start", lambda command, operation: operations.append(operation))
+
+    async def authorize(base_url, **options):
+        assert base_url == client.base_url and options == expected
+        return {"scope": scope, "access_token": "isolated-test"}
+
+    monkeypatch.setattr("pet.platform_dialog.authorize", authorize)
+    dialog.login()
+    assert asyncio.run(operations[0]()) == client.base_url
+    assert len(saved) == 1
+    dialog.shutdown()
+    dialog.deleteLater()
+    panel.deleteLater()
+    application.processEvents()
+
+
 def test_resource_dialog_refresh_runs_in_background(monkeypatch):
     application = QApplication.instance() or QApplication([])
     panel = QWidget()

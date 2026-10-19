@@ -20,6 +20,7 @@ class AppearanceHub(QWidget):
     import_requested = Signal(str)
     online_requested = Signal()
     mine_requested = Signal()
+    history_requested = Signal()
     login_requested = Signal()
     default_requested = Signal()
     share_requested = Signal()
@@ -123,7 +124,7 @@ class AppearanceHub(QWidget):
         self.refresh_buttons()
 
     def refresh_buttons(self, *_):
-        for widget in (self.local_button, self.folder_button, self.online_button, self.mine_button,
+        for widget in (self.local_button, self.folder_button, self.online_button, self.mine_button, self.history_button,
                        self.default_button, self.share_button, self.more_button, self.login_button):
             widget.setEnabled(not self.busy)
         self.choices.setEnabled(not self.busy)

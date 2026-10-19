@@ -12,6 +12,7 @@ class AppearanceApply(QObject):
     """由界面线程协调异步保存和真实桌宠试载，不接管其他配置。"""
 
     finished = Signal(object, str)
+    used = Signal(object)
     busy_changed = Signal(bool)
 
     def __init__(self, owner, parent=None):
@@ -89,6 +90,7 @@ class AppearanceApply(QObject):
             self._persist(self._original)
             return
         LOG.info("形象更换并保存成功 kind=%s", self._candidate.kind)
+        self.used.emit(self._candidate)
         self._finish(settings, "")
 
     def _finish(self, settings, error):
