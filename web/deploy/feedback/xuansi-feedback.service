@@ -1,0 +1,37 @@
+# 独立反馈进程；EnvironmentFile 由 root 持有且 chmod 600，不复制到安装包。
+[Unit]
+Description=Xuansi anonymous feedback and GitHub delivery
+After=network-online.target docker.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=xuansi-feedback
+Group=xuansi-feedback
+WorkingDirectory=/opt/xuansi/current
+EnvironmentFile=/opt/xuansi/shared/feedback.env
+Environment=GOMEMLIMIT=64MiB
+Environment=GOMAXPROCS=1
+ExecStartPre=/opt/xuansi/current/feedback -migrate-only
+ExecStart=/opt/xuansi/current/feedback
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryHigh=128M
+MemoryMax=160M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
