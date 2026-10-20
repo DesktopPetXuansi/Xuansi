@@ -11,7 +11,7 @@ from .platform_auth import website_url
 
 LOG = logging.getLogger(__name__)
 STATUS_MESSAGES = {
-    400: "请检查填写内容和长度后重试。", 403: "网站校验未通过，请检查官网连接后重试。",
+    400: "请检查填写内容和长度后重试。", 403: "反馈请求校验未通过，请稍后重试。",
     404: "当前网站尚未开通反馈接收，内容已保留，可先复制反馈内容。",
     409: "这条反馈的提交信息发生冲突，请修改内容后重试。",
     429: "提交过于频繁，请稍后重试。",
@@ -69,7 +69,7 @@ class FeedbackClient:
                 token = csrf.get("token")
                 if (not isinstance(token, str) or not token or len(token) > 512
                         or not token.isascii() or any(char.isspace() or ord(char) < 33 for char in token)):
-                    raise ValueError("网站返回的确认信息不完整，请检查官网连接。")
+                    raise ValueError("反馈服务返回的确认信息不完整，请稍后重试。")
                 data = response_data(await client.post(self.base_url + "/api/v1/feedback", json=payload, headers={
                     "Origin": self.base_url, "X-CSRF-Token": token, "Idempotency-Key": key,
                 }))
@@ -78,4 +78,4 @@ class FeedbackClient:
             return receipt
         except httpx.RequestError as exc:
             LOG.warning("反馈网络请求失败 type=%s", type(exc).__name__)
-            raise ValueError("暂时无法连接反馈服务，内容已保留，请检查官网连接或稍后重试。") from None
+            raise ValueError("暂时无法连接反馈服务，内容已保留，请检查网络或稍后重试。") from None
