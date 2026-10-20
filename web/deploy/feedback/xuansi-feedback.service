@@ -3,8 +3,8 @@
 Description=Xuansi anonymous feedback and GitHub delivery
 After=network-online.target docker.service
 Wants=network-online.target
-StartLimitIntervalSec=60
-StartLimitBurst=3
+# 数据库恢复较慢时继续按 RestartSec 重试，避免开机后停在启动频率限制状态。
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
