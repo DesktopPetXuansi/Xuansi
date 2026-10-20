@@ -97,6 +97,7 @@ def inspect(pet, origin, output):
 
     # 只改变本次内存设置，绝不保存或覆盖实际用户的官网连接。
     pet.settings = replace(pet.settings, platform_url=origin)
+    assert controller.destination() == origin, "合成验收只能提交到本机指定入口"
     receipts = []
     controller.submission_finished.connect(lambda receipt, error: receipts.append((receipt, error)))
     view.submit_button.click()
@@ -127,7 +128,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="xuansi-feedback-") as directory:
         temporary = Path(directory)
         settings = replace(Settings(), observe=False, speak_replies=False, audio_avoidance=False,
-                           platform_url="http://127.0.0.1:1", chat_hotkey="Ctrl+Alt+Shift+F23")
+                           platform_url="http://127.0.0.1:1", feedback_url="",
+                           chat_hotkey="Ctrl+Alt+Shift+F23")
         with (
             patch.object(app_module, "DATA", temporary),
             patch.object(runtime_module, "MemoryStore", lambda: MemoryStore(temporary / "memory.json")),
