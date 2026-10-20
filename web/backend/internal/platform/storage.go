@@ -89,8 +89,9 @@ func (r *contextReader) Read(b []byte) (int, error) {
 }
 
 type S3Storage struct {
-	Client *s3.Client
-	Bucket string
+	Client    *s3.Client
+	Bucket    string
+	Presigner *s3.PresignClient
 }
 
 func NewStorage(ctx context.Context, c Config) (ObjectStorage, error) {
@@ -101,7 +102,14 @@ func NewStorage(ctx context.Context, c Config) (ObjectStorage, error) {
 	if e != nil {
 		return nil, e
 	}
-	return S3Storage{s3.NewFromConfig(cfg, func(o *s3.Options) { o.BaseEndpoint = aws.String(c.S3Endpoint); o.UsePathStyle = true }), c.S3Bucket}, nil
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) { o.BaseEndpoint = aws.String(c.S3Endpoint); o.UsePathStyle = true })
+	// 由 SDK 在签名前选择公网端点；不能签名后替换 URL 的 Host 或路径。
+	presigner := s3.NewPresignClient(client, s3.WithPresignClientFromClientOptions(func(o *s3.Options) {
+		if c.S3PublicEndpoint != "" {
+			o.BaseEndpoint = aws.String(c.S3PublicEndpoint)
+		}
+	}))
+	return S3Storage{Client: client, Bucket: c.S3Bucket, Presigner: presigner}, nil
 }
 func (s S3Storage) Put(ctx context.Context, key string, r io.Reader, size int64, contentType string) error {
 	_, e := s.Client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), Body: r, ContentLength: aws.Int64(size), ContentType: aws.String(contentType)})
@@ -119,7 +127,7 @@ func (s S3Storage) Delete(ctx context.Context, key string) error {
 	return e
 }
 func (s S3Storage) PresignPut(ctx context.Context, key string, size int64) (string, error) {
-	p, e := s3.NewPresignClient(s.Client).PresignPutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), ContentLength: aws.Int64(size), ContentType: aws.String("application/octet-stream")}, s3.WithPresignExpires(15*time.Minute))
+	p, e := s.Presigner.PresignPutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), ContentLength: aws.Int64(size), ContentType: aws.String("application/octet-stream")}, s3.WithPresignExpires(15*time.Minute))
 	if e != nil {
 		return "", e
 	}

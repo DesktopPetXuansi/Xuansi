@@ -16,6 +16,7 @@ type Config struct {
 	Address, DatabaseURL, AppURL, StorageDriver, StoragePath          string
 	Environment, SMTPHost, SMTPPort, SMTPFrom, SMTPUser, SMTPPassword string
 	S3Endpoint, S3Region, S3Bucket, S3AccessKey, S3SecretKey          string
+	S3PublicEndpoint                                                  string
 	OAuthSecret                                                       string
 	FeedbackGitHubRepository                                          string
 	FeedbackGitHubToken                                               string `json:"-"`
@@ -32,6 +33,8 @@ func env(key, fallback string) string {
 }
 func LoadConfig() (Config, error) {
 	c := Config{Address: env("HTTP_ADDRESS", "127.0.0.1:8080"), DatabaseURL: os.Getenv("DATABASE_URL"), AppURL: env("APP_URL", "http://localhost:3000"), Environment: env("APP_ENV", "development"), StorageDriver: env("STORAGE_DRIVER", "local"), StoragePath: env("STORAGE_PATH", "./data/storage"), SMTPHost: env("SMTP_HOST", "localhost"), SMTPPort: env("SMTP_PORT", "1025"), SMTPFrom: env("SMTP_FROM", "noreply@localhost"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), S3Endpoint: os.Getenv("S3_ENDPOINT"), S3Region: env("S3_REGION", "auto"), S3Bucket: os.Getenv("S3_BUCKET"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), OAuthSecret: os.Getenv("OAUTH_SECRET"), MaxUploadBytes: 512 << 20, QuotaBytes: 2 << 30}
+	// 后台读写可走内网；浏览器的预签名上传单独使用公网 HTTPS 来源。
+	c.S3PublicEndpoint = os.Getenv("S3_PUBLIC_ENDPOINT")
 	c.FeedbackGitHubRepository = os.Getenv("FEEDBACK_GITHUB_REPOSITORY")
 	c.FeedbackGitHubToken = os.Getenv("FEEDBACK_GITHUB_TOKEN")
 	if raw := os.Getenv("FEEDBACK_GITHUB_PUBLIC"); raw != "" {
@@ -84,6 +87,13 @@ func LoadConfig() (Config, error) {
 	}
 	if c.StorageDriver == "s3" && (c.S3Endpoint == "" || c.S3Bucket == "" || c.S3AccessKey == "" || c.S3SecretKey == "") {
 		return c, fmt.Errorf("S3 配置不完整")
+	}
+	if c.S3PublicEndpoint != "" {
+		endpoint, err := url.Parse(c.S3PublicEndpoint)
+		if err != nil || endpoint.Host == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.Path != "" && endpoint.Path != "/" || endpoint.Scheme != "https" && (c.Environment == "production" || endpoint.Scheme != "http") {
+			return c, fmt.Errorf("S3_PUBLIC_ENDPOINT 必须为独立 HTTP 来源，生产环境必须使用 HTTPS")
+		}
+		c.S3PublicEndpoint = strings.TrimRight(c.S3PublicEndpoint, "/")
 	}
 	c.AppURL = strings.TrimRight(c.AppURL, "/")
 	return c, nil

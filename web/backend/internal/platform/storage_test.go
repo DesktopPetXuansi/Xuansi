@@ -88,3 +88,60 @@ func TestLocalStorageSizeAndTraversal(t *testing.T) {
 		t.Fatal("失败写入留下对象")
 	}
 }
+
+// 内网读写和公网预签名使用各自端点，代理改写请求头不会破坏服务端签名。
+func TestS3StorageUsesPublicEndpointOnlyForPresigning(t *testing.T) {
+	var methods []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.URL.Path != "/test/quarantine/probe" || !strings.HasPrefix(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
+			t.Error("服务端存储请求没有使用内网桶路径与签名")
+		}
+		if r.Method == "GET" {
+			_, _ = w.Write([]byte("test"))
+		}
+	}))
+	defer server.Close()
+	for key, value := range map[string]string{
+		"APP_ENV": "development", "APP_URL": "http://localhost:3000", "DATABASE_URL": "unused",
+		"STORAGE_DRIVER": "s3", "S3_ENDPOINT": server.URL, "S3_PUBLIC_ENDPOINT": "https://uploads.example.invalid",
+		"S3_BUCKET": "test", "S3_ACCESS_KEY_ID": "fixture-key", "S3_SECRET_ACCESS_KEY": "fixture-secret",
+		"FEEDBACK_GITHUB_REPOSITORY": "", "FEEDBACK_GITHUB_TOKEN": "", "FEEDBACK_GITHUB_PUBLIC": "false",
+	} {
+		t.Setenv(key, value)
+	}
+	c, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage, err := NewStorage(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := storage.PresignPut(context.Background(), "quarantine/probe", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(signed)
+	if err != nil || u.Scheme != "https" || u.Host != "uploads.example.invalid" || u.Path != "/test/quarantine/probe" {
+		t.Fatal("预签名没有使用配置的公网端点")
+	}
+	if u.Query().Get("X-Amz-Signature") == "" {
+		t.Fatal("公网上传缺少签名")
+	}
+	if err = storage.Put(context.Background(), "quarantine/probe", bytes.NewReader([]byte("test")), 4, "application/octet-stream"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := storage.Open(context.Background(), "quarantine/probe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, body)
+	_ = body.Close()
+	if err = storage.Delete(context.Background(), "quarantine/probe"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(methods, ",") != "PUT,GET,DELETE" {
+		t.Fatal("服务端读写被转发到公网端点")
+	}
+}
