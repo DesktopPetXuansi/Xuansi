@@ -80,6 +80,64 @@ def test_open_does_not_collect_or_send(controller, monkeypatch):
     assert controller.dialog.isVisible() and controller.pending is None
 
 
+@pytest.mark.parametrize("feedback_url, expected", [
+    ("https://xuansi.kukude.top", "https://xuansi.kukude.top"),
+    ("", "http://localhost:3100"),
+])
+def test_feedback_destination_is_independent_from_resource_platform(
+        controller, app, monkeypatch, feedback_url, expected):
+    calls = []
+    controller.settings_getter = lambda: SimpleNamespace(
+        platform_url="http://localhost:3100", feedback_url=feedback_url)
+
+    class Client:
+        def __init__(self, base):
+            calls.append(base)
+
+        async def submit(self, payload, key):
+            return FeedbackReceipt(key, "2026-10-20T16:00:00Z", "NEW")
+
+    monkeypatch.setattr(feedback, "FeedbackClient", Client)
+    controller.open()
+    assert controller.dialog.destination.text() == "发送到：" + expected
+    input_form(controller)
+    controller.dialog.submit_button.click()
+    wait_until(app, lambda: controller.pending is None)
+    assert calls == [expected]
+
+
+def test_legacy_settings_use_public_feedback_without_rewriting_file(tmp_path):
+    from pet.config import load_settings
+
+    path = tmp_path / "settings.json"
+    original = '{"platform_url":"http://localhost:3100"}'
+    path.write_text(original, encoding="utf-8")
+    settings = load_settings(path)
+    assert settings.feedback_url == "https://xuansi.kukude.top"
+    assert settings.platform_url == "http://localhost:3100"
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_official_feedback_failure_keeps_retry_without_resource_settings_link(controller, app, monkeypatch):
+    controller.settings_getter = lambda: SimpleNamespace(
+        platform_url="http://localhost:3100", feedback_url="https://xuansi.kukude.top")
+
+    class Client:
+        def __init__(self, _):
+            pass
+
+        async def submit(self, payload, key):
+            raise ValueError("合成连接失败，内容已保留。")
+
+    monkeypatch.setattr(feedback, "FeedbackClient", Client)
+    input_form(controller)
+    controller.dialog.submit_button.click()
+    wait_until(app, lambda: controller.pending is None)
+    assert controller.dialog.connection_button.isHidden()
+    assert controller.dialog.submit_button.isEnabled()
+    assert controller.dialog.description.toPlainText().startswith("仅用于")
+
+
 def test_retry_reuses_idempotency_key_but_edited_feedback_gets_new_key(controller, app, monkeypatch):
     calls = []
 

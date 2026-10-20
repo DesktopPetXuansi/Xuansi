@@ -50,6 +50,7 @@ class FeedbackDialog(QDialog):
         self._diagnostic_pending = False
         self._busy = False
         self._received = False
+        self.allow_connection_settings = True
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         self.scroll = QScrollArea()
@@ -211,7 +212,8 @@ class FeedbackDialog(QDialog):
     def failed(self, message):
         self.status.setText(message)
         self.set_busy(False)
-        self.connection_button.show()
+        # 官方反馈独立于资源连接，失败时保留重试与复制，不引导修改无关设置。
+        self.connection_button.setVisible(self.allow_connection_settings)
 
     def received(self, receipt):
         self._received = True

@@ -23,6 +23,8 @@ class Settings:
     pet_size: int = 160
     avatar_image: str = ""
     platform_url: str = "http://localhost:3000"
+    # 独立反馈入口不要求先连接资源平台；旧配置读取默认值而不重写用户文件。
+    feedback_url: str = "https://xuansi.kukude.top"
     platform_model_version: str = ""
     platform_expression_version: str = ""
     observe: bool = True
@@ -64,6 +66,8 @@ class Settings:
         from .platform_auth import website_url
 
         website_url(self.platform_url)
+        if self.feedback_url:
+            website_url(self.feedback_url)
         if self.platform_model_version or self.platform_expression_version:
             from .platform_resources import identifier
 

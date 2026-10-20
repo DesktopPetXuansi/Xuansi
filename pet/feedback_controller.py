@@ -26,6 +26,7 @@ class FeedbackController(QObject):
         super().__init__(parent)
         self.settings_getter, self.loop = settings_getter, loop
         self.dialog = FeedbackDialog(parent)
+        self.dialog.allow_connection_settings = not bool(getattr(settings_getter(), "feedback_url", ""))
         self.pending = None
         self.diagnostic_job = None
         self.closed = False
@@ -42,13 +43,19 @@ class FeedbackController(QObject):
             return
         if self.pending is None:
             try:
-                self.dialog.destination.setText("发送到：" + website_url(self.settings_getter().platform_url))
+                self.dialog.destination.setText("发送到：" + self.destination())
             except ValueError:
-                self.dialog.failed("请先在官网连接中填写正确的网站地址。")
+                self.dialog.failed("反馈接收地址无效，请联系维护者。内容已保留。")
         self.dialog.show()
         self.dialog.raise_()
         self.dialog.activateWindow()
         LOG.info("打开反馈中心，不自动请求或发送任何内容")
+
+    def destination(self):
+        # 显式空地址保留自建平台兼容；资源连接设置不会改动官方反馈目的地。
+        settings = self.settings_getter()
+        self.dialog.allow_connection_settings = not bool(getattr(settings, "feedback_url", ""))
+        return website_url(getattr(settings, "feedback_url", "") or settings.platform_url)
 
     def submit(self, draft):
         if self.closed:
@@ -57,7 +64,7 @@ class FeedbackController(QObject):
             return
         try:
             payload = draft.payload()
-            base = website_url(self.settings_getter().platform_url)
+            base = self.destination()
             if not self.loop.is_running():
                 raise ValueError("反馈暂时无法提交，内容已保留，请稍后重试。")
         except ValueError as exc:
