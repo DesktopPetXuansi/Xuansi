@@ -1420,6 +1420,8 @@ export interface components {
             qtVersion?: string;
         };
         FeedbackInput: {
+            /** @description 用户已明确同意将标题、说明和所选诊断公开到项目 GitHub；缺省为未同意，不转发到公开仓库。联系方式始终仅私有保存。 */
+            publicConsent?: boolean;
             category: components["schemas"]["FeedbackCategory"];
             title: string;
             description: string;

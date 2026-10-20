@@ -721,7 +721,10 @@ type FeedbackInput struct {
 	Contact     *string              `json:"contact,omitempty"`
 	Description string               `json:"description"`
 	Diagnostics *FeedbackDiagnostics `json:"diagnostics,omitempty"`
-	Title       string               `json:"title"`
+
+	// PublicConsent 用户已明确同意将标题、说明和所选诊断公开到项目 GitHub；缺省为未同意，不转发到公开仓库。联系方式始终仅私有保存。
+	PublicConsent *bool  `json:"publicConsent,omitempty"`
+	Title         string `json:"title"`
 }
 
 // FeedbackListResponse defines model for FeedbackListResponse.
