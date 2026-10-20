@@ -16,38 +16,21 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"xuansi/web/backend/internal/platform"
+	"xuansi/web/backend/internal/resource"
 )
 
 // 诊断只有主动授权的固定版本字段，不接收设备路径或自由日志。
-type feedbackDiagnostics struct {
-	AppVersion    string `json:"appVersion,omitempty"`
-	System        string `json:"system,omitempty"`
-	Architecture  string `json:"architecture,omitempty"`
-	PythonVersion string `json:"pythonVersion,omitempty"`
-	QtVersion     string `json:"qtVersion,omitempty"`
-}
+type feedbackDiagnostics = platform.FeedbackDiagnostics
 type feedbackInput struct {
-	Category    string               `json:"category"`
-	Title       string               `json:"title"`
-	Description string               `json:"description"`
-	Contact     string               `json:"contact"`
-	Diagnostics *feedbackDiagnostics `json:"diagnostics"`
+	Category      string               `json:"category"`
+	Title         string               `json:"title"`
+	Description   string               `json:"description"`
+	Contact       string               `json:"contact"`
+	Diagnostics   *feedbackDiagnostics `json:"diagnostics"`
+	PublicConsent bool                 `json:"publicConsent,omitempty"`
 }
-type feedbackEntry struct {
-	ID             string               `json:"id"`
-	IdempotencyKey string               `json:"-"`
-	RequestHash    string               `json:"-"`
-	Category       string               `json:"category"`
-	Title          string               `json:"title"`
-	Description    string               `json:"description"`
-	Contact        string               `json:"contact"`
-	Diagnostics    *feedbackDiagnostics `json:"diagnostics" gorm:"serializer:json"`
-	Status         string               `json:"status"`
-	CreatedAt      time.Time            `json:"createdAt"`
-	UpdatedAt      time.Time            `json:"updatedAt"`
-}
-
-func (feedbackEntry) TableName() string { return "feedback" }
+type feedbackEntry = platform.FeedbackEntry
 
 type feedbackReceipt struct {
 	ID        string    `json:"id"`
@@ -129,25 +112,42 @@ func (s *Server) createFeedback(w http.ResponseWriter, r *http.Request) {
 	sum := sha256.Sum256(body)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	row := feedbackEntry{ID: key, IdempotencyKey: key, RequestHash: hex.EncodeToString(sum[:]), Category: in.Category, Title: in.Title, Description: in.Description, Contact: in.Contact, Diagnostics: in.Diagnostics, Status: "NEW", CreatedAt: now, UpdatedAt: now}
-	result := gorm.WithResult()
-	e := gorm.G[feedbackEntry](s.DB, result, clause.OnConflict{Columns: []clause.Column{{Name: "idempotency_key"}}, DoNothing: true}).Create(r.Context(), &row)
+	status := 201
+	row.PublicConsent = in.PublicConsent
+	forward := s.Config.FeedbackGitHubRepository != "" && (!s.Config.FeedbackGitHubPublic || in.PublicConsent)
+	if forward {
+		row.GitHubRepository, row.GitHubPublic = s.Config.FeedbackGitHubRepository, s.Config.FeedbackGitHubPublic
+	}
+	conflict := errors.New("反馈请求编号冲突")
+	// 数据与投递责任在同一事务提交；返回成功不依赖 GitHub 的实时可用性。
+	e := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		result := gorm.WithResult()
+		if err := gorm.G[feedbackEntry](tx, result, clause.OnConflict{Columns: []clause.Column{{Name: "idempotency_key"}}, DoNothing: true}).Create(r.Context(), &row); err != nil {
+			return err
+		}
+		if result.RowsAffected == 0 {
+			old, err := gorm.G[feedbackEntry](tx).Where("idempotency_key=?", key).First(r.Context())
+			if err != nil {
+				return err
+			}
+			if old.RequestHash != row.RequestHash {
+				return conflict
+			}
+			row, status = old, 200
+			return nil
+		}
+		if forward {
+			return resource.QueueFeedback(r.Context(), tx, row.ID)
+		}
+		return nil
+	})
+	if errors.Is(e, conflict) {
+		problem(w, r, 409, "CONFLICT", "此请求编号已经用于其他反馈")
+		return
+	}
 	if e != nil {
 		s.feedbackFailure(w, r)
 		return
-	}
-	status := 201
-	if result.RowsAffected == 0 {
-		old, e := gorm.G[feedbackEntry](s.DB).Where("idempotency_key=?", key).First(r.Context())
-		if e != nil {
-			s.feedbackFailure(w, r)
-			return
-		}
-		if old.RequestHash != row.RequestHash {
-			problem(w, r, 409, "CONFLICT", "此请求编号已经用于其他反馈")
-			return
-		}
-		row = old
-		status = 200
 	}
 	s.Log.Info("反馈提交已确认", "feedbackId", row.ID)
 	// 状态更新不改变最初收据，提交重试始终得到相同的NEW收据。

@@ -17,6 +17,9 @@ type Config struct {
 	Environment, SMTPHost, SMTPPort, SMTPFrom, SMTPUser, SMTPPassword string
 	S3Endpoint, S3Region, S3Bucket, S3AccessKey, S3SecretKey          string
 	OAuthSecret                                                       string
+	FeedbackGitHubRepository                                          string
+	FeedbackGitHubToken                                               string `json:"-"`
+	FeedbackGitHubPublic                                              bool
 	MaxUploadBytes, QuotaBytes                                        int64
 	TrustedProxyCIDRs                                                 []netip.Prefix
 }
@@ -29,6 +32,18 @@ func env(key, fallback string) string {
 }
 func LoadConfig() (Config, error) {
 	c := Config{Address: env("HTTP_ADDRESS", "127.0.0.1:8080"), DatabaseURL: os.Getenv("DATABASE_URL"), AppURL: env("APP_URL", "http://localhost:3000"), Environment: env("APP_ENV", "development"), StorageDriver: env("STORAGE_DRIVER", "local"), StoragePath: env("STORAGE_PATH", "./data/storage"), SMTPHost: env("SMTP_HOST", "localhost"), SMTPPort: env("SMTP_PORT", "1025"), SMTPFrom: env("SMTP_FROM", "noreply@localhost"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), S3Endpoint: os.Getenv("S3_ENDPOINT"), S3Region: env("S3_REGION", "auto"), S3Bucket: os.Getenv("S3_BUCKET"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), OAuthSecret: os.Getenv("OAUTH_SECRET"), MaxUploadBytes: 512 << 20, QuotaBytes: 2 << 30}
+	c.FeedbackGitHubRepository = os.Getenv("FEEDBACK_GITHUB_REPOSITORY")
+	c.FeedbackGitHubToken = os.Getenv("FEEDBACK_GITHUB_TOKEN")
+	if raw := os.Getenv("FEEDBACK_GITHUB_PUBLIC"); raw != "" {
+		value, err := strconv.ParseBool(raw)
+		if err != nil {
+			return c, fmt.Errorf("FEEDBACK_GITHUB_PUBLIC 必须为布尔值")
+		}
+		c.FeedbackGitHubPublic = value
+	}
+	if err := validateFeedbackGitHub(c); err != nil {
+		return c, err
+	}
 	for key, dest := range map[string]*int64{"MAX_UPLOAD_BYTES": &c.MaxUploadBytes, "USER_QUOTA_BYTES": &c.QuotaBytes} {
 		if s := os.Getenv(key); s != "" {
 			v, e := strconv.ParseInt(s, 10, 64)
