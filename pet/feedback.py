@@ -21,11 +21,17 @@ class FeedbackDraft:
     description: str
     contact: str = ""
     diagnostics: dict[str, str] | None = None
+    public_consent: bool = False
 
     def payload(self):
         if self.category not in CATEGORIES:
             raise ValueError("请选择反馈类型。")
+        if not isinstance(self.public_consent, bool):
+            raise ValueError("公开反馈的同意选项无效，请重新确认。")
         data = {"category": self.category}
+        # 只有用户明确授权时才携带公开许可；旧客户端缺省仍为私有。
+        if self.public_consent:
+            data["publicConsent"] = True
         for field, text, limit, label in (
             ("title", self.title, 80, "标题"), ("description", self.description, 4000, "具体说明"),
             ("contact", self.contact, 160, "联系方式"),
@@ -48,8 +54,10 @@ class FeedbackDraft:
     def copy_text(self):
         data = self.payload()
         lines = [f"反馈类型：{CATEGORIES[self.category]}", f"标题：{data['title']}", "", data["description"]]
+        lines.extend(("", "公开范围：标题、具体说明及勾选的版本和系统信息可公开至 GitHub DesktopPetXuansi/Xuansi。"
+                      if self.public_consent else "公开范围：未同意公开，仅私有保存。"))
         if data.get("contact"):
-            lines.extend(("", f"联系方式：{data['contact']}"))
+            lines.extend(("", f"联系方式（仅私有保存）：{data['contact']}"))
         if self.diagnostics:
             lines.extend(("", "版本与系统信息：", diagnostic_text(self.diagnostics)))
         return "\n".join(lines)

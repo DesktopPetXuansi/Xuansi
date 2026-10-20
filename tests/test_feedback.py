@@ -22,6 +22,26 @@ def test_payload_omits_unselected_diagnostics_and_empty_contact():
     assert payload == {"category": "BUG", "title": "换形象失败", "description": "点击使用后仍是原形象。"}
 
 
+def test_public_consent_is_explicit_and_contact_remains_a_separate_private_field():
+    # 未授权的旧草稿仍能私有保存，不向公开同步提供许可。
+    assert "publicConsent" not in draft().payload()
+    payload = draft(public_consent=True, contact="private@example.test").payload()
+    assert payload["publicConsent"] is True
+    assert payload["contact"] == "private@example.test"
+
+
+@pytest.mark.parametrize("consent", [1, 0, "true", None, []])
+def test_public_consent_rejects_non_boolean_values(consent):
+    with pytest.raises(ValueError, match="公开"):
+        draft(public_consent=consent).payload()
+
+
+def test_copy_text_explains_public_scope_and_private_contact():
+    public = draft(public_consent=True, contact="private@example.test").copy_text()
+    assert "GitHub" in public and "公开" in public and "联系方式（仅私有保存）" in public
+    assert "仅私有保存" in draft().copy_text()
+
+
 @pytest.mark.parametrize("changes", [
     {"title": " "}, {"description": "\n"}, {"title": "字" * 81},
     {"description": "字" * 4001}, {"contact": "字" * 161}, {"category": "ADMIN"},

@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
+from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QTabBar
 
@@ -63,6 +64,14 @@ def inspect(pet, origin, output):
 
     view.title_input.setText("合成验收：软件反馈中心")
     view.description.setPlainText("这是一条本机自动验收反馈，用于确认软件提交、服务端收据与管理员后台一致。")
+    assert not view.public_consent.isChecked()
+    view.submit_button.click()
+    assert controller.pending is None and "同意公开" in view.status.text()
+    # 使用键盘明确授权公开，避免原验收流程被新的隐私确认拦截。
+    view.public_consent.setFocus()
+    QTest.keyClick(view.public_consent, Qt.Key.Key_Space)
+    assert view.public_consent.isChecked() and view.draft().payload()["publicConsent"] is True
+    report["checks"].append("公开许可默认不勾选；未确认不提交；键盘空格可以明确同意公开")
     view.submit_button.click()
     wait_until(lambda: controller.pending is None)
     assert "无法连接" in view.status.text() and view.title_input.text().startswith("合成验收")

@@ -62,6 +62,15 @@ def wait_until(app, condition):
 def input_form(controller):
     controller.dialog.title_input.setText("合成反馈")
     controller.dialog.description.setPlainText("仅用于自动验收，不是真实用户的问题。")
+    controller.dialog.public_consent.setChecked(True)
+
+
+def test_missing_public_consent_does_not_start_a_network_request(controller, monkeypatch):
+    monkeypatch.setattr(feedback, "FeedbackClient", lambda *_: pytest.fail("未同意公开不应联网"))
+    controller.dialog.title_input.setText("合成反馈")
+    controller.dialog.description.setPlainText("尚未同意公开")
+    controller.dialog.submit_button.click()
+    assert controller.pending is None and "同意公开" in controller.dialog.status.text()
 
 
 def test_open_does_not_collect_or_send(controller, monkeypatch):

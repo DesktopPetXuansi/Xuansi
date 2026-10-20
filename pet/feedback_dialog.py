@@ -59,7 +59,9 @@ class FeedbackDialog(QDialog):
         form = QVBoxLayout(content)
         form.setContentsMargins(16, 14, 16, 10)
         form.setSpacing(6)
-        intro = QLabel("遇到问题或有新想法，都可以告诉我们。反馈仅由开发者查看。")
+        intro = QLabel("无需 GitHub 账户，即可在这里反馈。提交后，标题、具体说明及你勾选的版本和系统信息"
+                       "会公开至 GitHub 的 DesktopPetXuansi/Xuansi，任何人都能查看。"
+                       "联系方式仅私有保存，不会公开。请勿在标题和说明中填写个人信息、密码或 API 密钥。")
         intro.setWordWrap(True)
         form.addWidget(intro)
         self.category = QComboBox()
@@ -94,6 +96,14 @@ class FeedbackDialog(QDialog):
         self.preview.setAccessibleName("将附带的版本和系统信息")
         self.preview.setFixedHeight(100)
         form.addWidget(self.preview)
+        # 许可不预选；较长公开范围由可换行说明承载，保证小窗口可读。
+        self.public_consent = QCheckBox("我同意公开这条反馈")
+        self.public_consent.setAccessibleName("我同意将这条反馈公开至 GitHub")
+        form.addWidget(self.public_consent)
+        consent_hint = QLabel("公开内容：标题、具体说明及勾选的版本和系统信息。联系方式不公开。")
+        consent_hint.setWordWrap(True)
+        consent_hint.setObjectName("hint")
+        form.addWidget(consent_hint)
         self.destination = QLabel()
         self.destination.setTextFormat(Qt.TextFormat.PlainText)
         self.destination.setWordWrap(True)
@@ -132,7 +142,8 @@ class FeedbackDialog(QDialog):
 
     def draft(self):
         return FeedbackDraft(self.category.currentData(), self.title_input.text(), self.description.toPlainText(),
-                             self.contact.text(), self._diagnostics if self.include_diagnostics.isChecked() else None)
+                             self.contact.text(), self._diagnostics if self.include_diagnostics.isChecked() else None,
+                             public_consent=self.public_consent.isChecked())
 
     def _submit(self):
         if self._busy:
@@ -143,6 +154,7 @@ class FeedbackDialog(QDialog):
             self.description.clear()
             self.contact.clear()
             self.include_diagnostics.setChecked(False)
+            self.public_consent.setChecked(False)
             self.status.clear()
             self._refresh()
             self.title_input.setFocus()
@@ -152,6 +164,12 @@ class FeedbackDialog(QDialog):
             draft.payload()
         except ValueError as exc:
             self.failed(str(exc))
+            return
+        if not draft.public_consent:
+            self.status.setText("请先勾选“我同意公开这条反馈”，确认后再提交。")
+            self.connection_button.hide()
+            self.public_consent.setFocus()
+            LOG.info("反馈尚未提交：用户未确认公开范围")
             return
         self.status.clear()
         self.connection_button.hide()
@@ -204,7 +222,8 @@ class FeedbackDialog(QDialog):
 
     def _refresh(self):
         editable = not self._busy and not self._received
-        for field in (self.category, self.title_input, self.description, self.contact, self.include_diagnostics):
+        for field in (self.category, self.title_input, self.description, self.contact,
+                      self.include_diagnostics, self.public_consent):
             field.setEnabled(editable)
         opted_in = self.include_diagnostics.isChecked()
         self.preview_button.setVisible(opted_in)

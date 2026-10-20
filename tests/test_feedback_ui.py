@@ -32,6 +32,19 @@ def view(app):
 def fill(view):
     view.title_input.setText("导入形象失败")
     view.description.setPlainText("点击使用之后显示文件不完整，希望补充提示。")
+    view.public_consent.setChecked(True)
+
+
+def test_publication_requires_explicit_consent_without_sending(view):
+    requests = []
+    view.submit_requested.connect(requests.append)
+    assert not view.public_consent.isChecked()
+    view.title_input.setText("反馈标题")
+    view.description.setPlainText("反馈说明")
+    view.submit_button.click()
+    assert not requests and "同意公开" in view.status.text()
+    assert view.public_consent.isEnabled()
+    assert not view.connection_button.isVisible()
 
 
 def test_empty_form_does_not_submit(view):
@@ -49,6 +62,8 @@ def test_submit_is_explicit_and_duplicate_clicks_are_blocked(view):
     QTest.mouseClick(view.submit_button, Qt.MouseButton.LeftButton)
     QTest.mouseClick(view.submit_button, Qt.MouseButton.LeftButton)
     assert len(requests) == 1 and requests[0].diagnostics is None
+    assert requests[0].public_consent is True
+    assert not view.public_consent.isEnabled()
     assert not view.submit_button.isEnabled()
     assert "正在提交" in view.submit_button.text()
 
@@ -98,8 +113,10 @@ def test_receipt_keeps_copyable_content_until_user_starts_a_new_feedback(view):
     assert "已收到" in view.status.text() and "11111111" in view.status.text()
     assert view.description.toPlainText().startswith("点击使用")
     assert view.submit_button.text() == "再写一条"
+    assert not view.public_consent.isEnabled()
     view.submit_button.click()
     assert not view.title_input.text() and not view.description.toPlainText()
+    assert not view.public_consent.isChecked() and view.public_consent.isEnabled()
 
 
 @pytest.mark.parametrize("size", [(520, 580), (440, 480)])
