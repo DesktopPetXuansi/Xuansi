@@ -114,6 +114,15 @@ class ActivationTests(unittest.TestCase):
         self.runtime.service.assert_not_called()
         self.runtime.link.assert_not_called()
 
+    @patch("ci_deploy.time.sleep")
+    def test_public_health_failure_restores_previous_version(self, sleep):
+        self.runtime.verify_public.side_effect = [RuntimeError("public unhealthy"), None]
+        with self.assertRaisesRegex(RuntimeError, "上一版应用已恢复"):
+            activate(self.runtime, self.release, self.old, "candidate", 18191, COMMIT)
+        self.assertEqual(self.runtime.link.call_args_list[-1].args[0], Path(self.old["release"]))
+        self.assertEqual(self.runtime.proxy.call_args_list[-1].args[0], self.old["config"])
+        self.assertEqual(self.runtime.verify_public.call_count, 2)
+
     def test_stale_commit_is_rejected_before_receiving_a_package(self):
         self.runtime.assert_latest.side_effect = ValueError("main 已有更新")
         stream = Mock()

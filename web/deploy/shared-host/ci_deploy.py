@@ -49,6 +49,7 @@ def activate(runtime, release, old, container, port, commit):
         runtime.proxy(config)
         runtime.wait_frontend(port)
         runtime.wait_api()
+        runtime.verify_public()
     except Exception:
         if not changed:
             if created:
@@ -63,6 +64,7 @@ def activate(runtime, release, old, container, port, commit):
             runtime.service("start", "xuansi-worker")
             runtime.wait_api()
             runtime.wait_frontend(old["port"])
+            runtime.verify_public()
             runtime.run(["docker", "rm", "--force", container])
         except Exception as error:
             raise RuntimeError("应用恢复未通过健康检查，需要检查服务器；数据库备份保留") from error

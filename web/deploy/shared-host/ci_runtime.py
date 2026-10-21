@@ -82,6 +82,23 @@ class Runtime:
                      "/_next/image?url=%2Fbrand%2Ficon.png&w=96&q=75"):
             self.get(port, path)
 
+    def verify_public(self):
+        # 公网验收放在事务内；失败时旧容器仍在，能够立即恢复应用入口。
+        for path in ("/", "/download", "/resources", "/login", "/api/v1/auth/config"):
+            for attempt in range(3):
+                try:
+                    request = urllib.request.Request("https://xuansi.kukude.top" + path,
+                        headers={"User-Agent": "Xuansi-Deployment/1.0"})
+                    with self.http.open(request, timeout=10) as response:
+                        if response.status == 200:
+                            break
+                except OSError:
+                    pass
+                if attempt == 2:
+                    raise RuntimeError("公网 HTTPS 健康检查失败：" + path)
+                time.sleep(2)
+        self.event("公网 HTTPS 页面与 API 检查通过")
+
     def snapshot(self):
         release = (self.root / "web-current").resolve(strict=True)
         if release.parent != (self.root / "releases").resolve():
