@@ -22,19 +22,16 @@ import {
 const schema = z.object({
   email: z.string(),
   password: z.string(),
-  displayName: z.string().max(80),
 });
 type Values = z.infer<typeof schema>;
 const labels: Record<string, string> = {
   login: "欢迎回来",
-  register: "创建账号",
   "forgot-password": "找回密码",
   "reset-password": "设置新密码",
   "verify-email": "验证邮箱",
 };
 const descriptions: Record<string, string> = {
   login: "登录后，接着使用你的收藏与形象历史。",
-  register: "管理喜欢的形象，保存自己的收藏。",
   "forgot-password": "输入注册邮箱，获取重置密码的链接。",
   "reset-password": "设置新的登录密码，完成后重新登录。",
   "verify-email": "输入注册邮箱，重新获取验证邮件。",
@@ -49,7 +46,7 @@ export function AuthPage({ mode }: { mode: string }) {
   const [success, setSuccess] = useState("");
   const [verifying, setVerifying] = useState(false);
   const confirmation = mode === "verify-email" && !!query.get("token");
-  const complete = !!success && (mode === "register" || mode === "reset-password" || confirmation);
+  const complete = !!success && (mode === "reset-password" || confirmation);
   // 单一表单类型保留稳定字段，按页面用途执行边界校验。
   const formSchema = schema.superRefine((values, context) => {
     if (mode !== "reset-password" && !z.email().safeParse(values.email).success)
@@ -58,7 +55,7 @@ export function AuthPage({ mode }: { mode: string }) {
         path: ["email"],
         message: "请输入有效的邮箱地址。",
       });
-    if (["register", "login", "reset-password"].includes(mode) && config.data) {
+    if (["login", "reset-password"].includes(mode) && config.data) {
       const message = passwordError(
         values.password,
         config.data.password,
@@ -74,29 +71,15 @@ export function AuthPage({ mode }: { mode: string }) {
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     resolver: zodResolver(formSchema),
-    defaultValues: { displayName: "", password: "", email: "" },
+    defaultValues: { password: "", email: "" },
   });
   async function submit(values: Values) {
     if (!config.data) return;
     setError(undefined);
     setSuccess("");
     try {
-      if (mode === "login" || mode === "register") {
-        await api(
-          `/auth/${mode}`,
-          "POST",
-          mode === "register"
-            ? values
-            : { email: values.email, password: values.password },
-        );
-        if (mode === "register") {
-          setSuccess(
-            config.data.email.mode === "LOCAL_MAILBOX"
-              ? "账号已创建。请打开下方本地收件箱，使用邮件中的验证链接完成验证，再返回登录。"
-              : "账号已创建。验证邮件已排队发送，请使用邮件中的链接完成验证，再返回登录。",
-          );
-          return;
-        }
+      if (mode === "login") {
+        await api("/auth/login", "POST", { email: values.email, password: values.password });
         await replaceSession(client, true);
         console.debug("[账号] 登录成功，返回原站内页面");
         router.replace(destination);
@@ -144,10 +127,9 @@ export function AuthPage({ mode }: { mode: string }) {
       <div className={styles.page}>
         <Heading
           eyebrow="YOUR ACCOUNT / 你的账号"
-          title={mode === "register" && complete ? "验证你的邮箱" : labels[mode] ?? "账号"}
+          title={labels[mode] ?? "账号"}
         >
-          {mode === "register" && complete ? "完成邮件验证后，就可以登录了。"
-            : confirmation ? "确认邮箱后，即可上传与分享作品。" : descriptions[mode]}
+          {confirmation ? "确认邮箱后，即可上传与分享作品。" : descriptions[mode]}
         </Heading>
         <div className={`panel ${styles.card}`}>
           {config.isPending && <Notice>正在加载账号配置…</Notice>}
@@ -174,12 +156,7 @@ export function AuthPage({ mode }: { mode: string }) {
                   )}
                 </Field>
               )}
-              {mode === "register" && (
-                <Field label="昵称">
-                  <input autoComplete="nickname" placeholder="怎么称呼你" {...register("displayName")} />
-                </Field>
-              )}
-              {["login", "register", "reset-password"].includes(mode) && (
+              {["login", "reset-password"].includes(mode) && (
                 <PasswordField
                   registration={register("password")}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -198,8 +175,6 @@ export function AuthPage({ mode }: { mode: string }) {
                   ? "正在处理…"
                   : mode === "login"
                     ? "登录"
-                    : mode === "register"
-                      ? "创建账号"
                       : mode === "reset-password"
                         ? "更新密码"
                         : "发送邮件"}
@@ -208,7 +183,7 @@ export function AuthPage({ mode }: { mode: string }) {
           ))}
           {confirmation && error !== undefined && <Notice error={error} />}
           {success && <Notice>{success}</Notice>}
-          {(mode === "verify-email" || (!!success && ["register", "forgot-password"].includes(mode))) &&
+          {(mode === "verify-email" || (!!success && mode === "forgot-password")) &&
             <LocalMailbox config={config.data} />}
           <AuthLinks mode={mode} destination={destination} complete={complete} />
         </div>

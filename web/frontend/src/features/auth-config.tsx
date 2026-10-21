@@ -30,13 +30,15 @@ export function passwordError(
   if (length > policy.maxLength) return `密码最多 ${policy.maxLength} 个字符。`;
 }
 
-export function LocalMailbox({ config }: { config?: AuthConfig }) {
+export function LocalMailbox({ config, purpose }: { config?: AuthConfig; purpose?: "registration" }) {
   if (config?.email.mode !== "LOCAL_MAILBOX" || !config.email.inboxUrl)
     return null;
   return (
     <Notice>
       <p>验证邮件会进入本地收件箱，不会发送到真实邮箱。</p>
-      <p>邮件内含有效期为 1 小时的验证链接，无需输入验证码。</p>
+	      <p>{purpose === "registration"
+	        ? "邮件内含 6 位验证码，请回到本页完成注册。"
+	        : "邮件内含有效期为 1 小时的验证链接，无需输入验证码。"}</p>
       <a
         className="quiet-link"
         href={safeUrl(config.email.inboxUrl)}

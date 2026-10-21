@@ -6,32 +6,34 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const origin = process.env.WEB_URL ?? 'http://localhost:3100';
-const mail = process.env.MAILPIT_URL ?? 'http://127.0.0.1:8125';
-assert.equal(origin, 'http://localhost:3100');
-assert.equal(mail, 'http://127.0.0.1:8125');
+const origin = process.env.WEB_URL ?? 'http://localhost:3123';
+const mail = process.env.MAILPIT_URL ?? 'http://127.0.0.1:8126';
+assert.equal(origin, 'http://localhost:3123');
+assert.equal(mail, 'http://127.0.0.1:8126');
 // 非默认SMTP端口的本机Mailpit会被服务报告为SMTP；核对本轮隔离启动清单而不放宽旧脚本守卫。
-const services = JSON.parse(await readFile(path.join(root, 'data/verification/personal-space-2026-10-19/services.json'), 'utf8'));
-assert.equal(services.web_url, origin);
-assert.equal(services.mailbox_url, mail);
-assert.equal(services.smtp_port, 1125);
-assert.match(services.database, /^personal_space_ui_/);
+const services = JSON.parse(await readFile(path.join(root, 'data/verification/inline-registration-2026-10-21/services.json'), 'utf8'));
+assert.equal(services.webUrl, origin);
+assert.equal(services.mailpitUrl, mail);
+assert.equal(services.smtpHost, '127.0.0.1');
+assert.equal(services.smtpPort, 1926);
+assert.match(services.database, /^xuansi_test_inline_registration_browser_/);
 assert.ok((await fetch(`${mail}/api/v1/messages`)).ok, '隔离本机收件箱未就绪');
 const config = (await (await fetch(`${origin}/api/v1/auth/config`)).json()).data;
-const output = path.join(root, 'data/verification/auth-layout-2026-10-19');
+assert.equal(config.email.mode, 'SMTP', '本轮隔离 SMTP 配置变化，停止发信验收');
+const output = path.join(root, 'data/verification/inline-registration-2026-10-21/auth-layout');
 await mkdir(output, { recursive: true });
 const { chromium, expect } = await import(pathToFileURL(path.join(root, 'web/frontend/node_modules/@playwright/test/index.mjs')).href);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
-const report = { checks: [], screenshots: [], layouts: [], consoleErrors: [] };
+const report = { checks: [], screenshots: [], layouts: [], consoleErrors: [], emails: [] };
 const counts = { login: 0, register: 0, reset: 0 };
 page.on('pageerror', error => report.consoleErrors.push(error.message));
 page.on('request', request => {
   if (request.method() !== 'POST') return;
   const endpoint = new URL(request.url()).pathname;
   if (endpoint === '/api/v1/auth/login') counts.login++;
-  if (endpoint === '/api/v1/auth/register') counts.register++;
+  if (endpoint === '/api/v1/auth/registrations') counts.register++;
   if (endpoint === '/api/v1/auth/password-resets/confirm') counts.reset++;
 });
 const checked = name => { report.checks.push(name); console.log(`通过：${name}`); };
@@ -74,6 +76,21 @@ async function emailLink(email, purpose = 'verify-email') {
     await page.waitForTimeout(200);
   }
   assert.fail('隔离worker没有投递本轮操作邮件');
+}
+
+async function emailCode(email) {
+  // 仅查看本轮独立地址，验证码不写日志和报告。
+  for (let attempt = 0; attempt < 70; attempt++) {
+    const listing = await (await fetch(`${mail}/api/v1/messages`)).json();
+    const messages = listing.messages?.filter(item => item.To?.some(recipient => recipient.Address === email)) ?? [];
+    for (const item of messages) {
+      const content = await (await fetch(`${mail}/api/v1/message/${item.ID}`)).json();
+      const code = content.Text?.match(/你的注册验证码是：([0-9]{6})/)?.[1];
+      if (code) return code;
+    }
+    await page.waitForTimeout(200);
+  }
+  assert.fail('隔离worker没有投递本轮验证码邮件');
 }
 
 try {
@@ -139,9 +156,10 @@ try {
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), destination);
   await noMailHelp();
   const email = `auth-layout-${randomBytes(8).toString('hex')}@example.invalid`;
+  report.emails.push(email);
   const password = randomBytes(18).toString('hex');
   await field('email').fill(email);
-  await field('displayName').fill('登录布局验收');
+  await expect(field('displayName')).toHaveCount(0);
   for (const value of ['a', '字'.repeat(config.password.minLength - 1), '🐱'.repeat(config.password.minLength - 1)]) {
     await field('password').fill(value);
     await submit().click();
@@ -150,26 +168,28 @@ try {
   assert.equal(counts.register, 0);
   checked('注册保留原目标，未提交前无邮件帮助，字符/中文/Emoji规则与服务端一致');
   await field('password').fill(password);
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText(email);
+  assert.equal(new URL(page.url()).pathname, '/register');
+  assert.ok(await field('password').inputValue() === password, '取码丢失密码输入');
+  await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled();
+  await expect(field('code')).toHaveAttribute('inputmode', 'numeric');
+  await expect(field('code')).toHaveAttribute('autocomplete', 'one-time-code');
+  await expect(field('code')).toHaveAttribute('maxlength', '6');
+  assert.equal(counts.register, 0, '获取验证码提前创建了账号');
+  await field('code').fill('123');
   await submit().click();
-  await expect(page.getByText('账号已创建', { exact: false })).toBeVisible();
-  assert.equal(counts.register, 1);
-  await expect(page.getByRole('link', { name: '重新发送验证邮件', exact: true })).toBeVisible();
-  const returnLogin = page.getByRole('link', { name: '返回登录', exact: true });
-  const loginHref = await returnLogin.getAttribute('href');
-  assert.equal(new URL(loginHref, origin).searchParams.get('returnTo'), destination);
-  await page.goto(await emailLink(email));
-  await page.getByRole('button', { name: '确认验证邮箱', exact: true }).click();
-  await expect(page.getByText('邮箱验证完成', { exact: false })).toBeVisible();
-  await page.goto(new URL(loginHref, origin).href);
-  await field('email').fill(email);
-  await field('password').fill(password);
+  await invalid('code', '请输入邮件中的 6 位数字验证码。');
+  assert.equal(counts.register, 0, '验证码本地校验没有阻断请求');
+  await field('code').fill(await emailCode(email));
   await submit().click();
   await page.waitForURL(`${origin}${destination}`);
+  assert.equal(counts.register, 1);
   await expect(page.getByLabel('个人空间导航', { exact: true })).toBeVisible();
   await page.goto(`${origin}/dashboard/account`);
   await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await page.waitForURL(`${origin}/`);
-  checked('真实UI注册→本轮邮件→验证→登录返回目标→退出首页完整闭环');
+  checked('真实UI原页取码→冷却/验证码ARIA校验→注册自动登录返回目标→退出首页完整闭环');
 
   await page.goto(`${origin}/reset-password?token=auth-layout-not-a-real-token`);
   await field('password').fill('a'.repeat(config.password.minLength - 1));
@@ -204,7 +224,7 @@ try {
   await page.waitForURL(`${origin}/`);
   checked('真实找回邮件→重置成功隐藏表单→返回原目标→新密码登录闭环');
 
-  // 仅隔离当前context的显示配置；真实投递仍由1125端口Mailpit捕获。
+  // 仅隔离当前context的显示配置；真实投递仍由1926端口Mailpit捕获。
   await page.route('**/api/v1/auth/config', route => route.fulfill({ json: {
     data: { password: config.password, email: { mode: 'LOCAL_MAILBOX', inboxUrl: `${mail}/` } },
   } }));
@@ -220,15 +240,26 @@ try {
   checked('本地收件箱按需出现：默认登录/找回无帮助，邮件发送后及验证页显示');
   await page.goto(`${origin}/register`);
   await noMailHelp();
-  await field('email').fill(`auth-layout-mail-${randomBytes(8).toString('hex')}@example.invalid`);
-  await field('displayName').fill('按需邮件帮助验收');
-  await field('password').fill(randomBytes(18).toString('hex'));
-  await submit().click();
-  await expect(page.getByText('账号已创建', { exact: false })).toBeVisible();
-  await expect(page.locator('form')).toHaveCount(0);
+  const helpEmail = `auth-layout-mail-${randomBytes(8).toString('hex')}@example.invalid`;
+  report.emails.push(helpEmail);
+  await field('email').fill(helpEmail);
+  const helpPassword = randomBytes(18).toString('hex');
+  await field('password').fill(helpPassword);
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText(helpEmail);
+  await expect(page.locator('form')).toHaveCount(1);
   await expect(page.getByRole('link', { name: '打开本地收件箱', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '重新发送验证邮件', exact: true })).toBeVisible();
-  checked('本地邮箱模式注册成功后才显示邮件帮助，已完成表单不重复提交');
+  await expect(page.getByText('邮件内含 6 位验证码，请回到本页完成注册。', { exact: true })).toBeVisible();
+  await field('code').fill(await emailCode(helpEmail));
+  // 邮箱纠错立即丢弃旧挑战和验证码，密码保留，不能错绑旧邮箱证明。
+  await field('email').fill(`corrected-${helpEmail}`);
+  await expect(field('code')).toHaveValue('');
+  assert.ok(await field('password').inputValue() === helpPassword, '邮箱纠错丢失密码输入');
+  await noMailHelp();
+  await submit().click();
+  await invalid('code', '请先获取邮箱验证码。');
+  assert.equal(counts.register, 1, '修改邮箱后沿用了旧验证码挑战');
+  checked('本地邮箱原页取码后显示帮助并保留表单，邮箱纠错清除旧验证码和挑战');
   assert.deepEqual(report.consoleErrors, []);
   checked('浏览器无未捕获异常');
 } catch (error) {

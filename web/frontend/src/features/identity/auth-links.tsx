@@ -2,7 +2,7 @@ import Link from "next/link";
 import { authHref } from "./return-path";
 import styles from "./auth.module.css";
 
-// 登录只保留注册入口，邮件帮助在注册成功后出现，避免初次访问面对一排操作。
+// 注册与登录互相保留入口，完成密码重置或旧邮件验证后返回登录。
 export function AuthLinks({ mode, destination, complete }: {
   mode: string;
   destination: string;
@@ -19,8 +19,6 @@ export function AuthLinks({ mode, destination, complete }: {
         <Link href={authHref("/login", destination)}>返回登录</Link>
       </>}
     </p>}
-    {mode === "register" && complete && <p className={styles.mailHelp}>
-      <span>没有收到邮件？</span><Link href={authHref("/verify-email", destination)}>重新发送验证邮件</Link>
-    </p>}
+
   </>;
 }
