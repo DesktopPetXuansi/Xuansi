@@ -71,6 +71,7 @@ func (s *Server) Router() http.Handler {
 		s.accountRoutes(r)
 		s.resourceRoutes(r)
 		s.historyRoutes(r)
+		s.feedbackRoutes(r)
 		s.releaseRoutes(r)
 		s.adminRoutes(r)
 	})

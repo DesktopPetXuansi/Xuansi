@@ -43,6 +43,10 @@ services:
       SMTP_FROM: noreply@localhost
       OAUTH_SECRET: ${OAUTH_SECRET:-}
       TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+      # API 与 worker 复用同一收件目标；真实授权仅留在服务端环境。
+      FEEDBACK_GITHUB_REPOSITORY: ${FEEDBACK_GITHUB_REPOSITORY:-}
+      FEEDBACK_GITHUB_PUBLIC: ${FEEDBACK_GITHUB_PUBLIC:-false}
+      FEEDBACK_GITHUB_TOKEN: ${FEEDBACK_GITHUB_TOKEN:-}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

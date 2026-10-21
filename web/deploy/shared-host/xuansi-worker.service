@@ -1,0 +1,35 @@
+# 邮件、资源校验/清理和 GitHub 投递共用数据库租约，不同时运行旧反馈 worker。
+[Unit]
+Description=Xuansi website background jobs
+After=network-online.target docker.service xuansi-api.service
+Wants=network-online.target xuansi-api.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=xuansi-web
+Group=xuansi-web
+WorkingDirectory=/opt/xuansi/web-current
+EnvironmentFile=/opt/xuansi/shared/web.env
+Environment=GOMEMLIMIT=96MiB
+Environment=GOMAXPROCS=1
+ExecStart=/opt/xuansi/web-current/worker
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryHigh=192M
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

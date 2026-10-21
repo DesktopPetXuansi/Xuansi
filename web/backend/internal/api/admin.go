@@ -17,6 +17,8 @@ import (
 func (s *Server) adminRoutes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(admin)
+		r.Get("/feedback", s.listFeedback)
+		r.Patch("/feedback/{id}", s.patchFeedback)
 		r.Get("/users", s.adminUsers)
 		r.Patch("/users/{id}", s.adminUserStatus)
 		r.Get("/resources", s.adminResources)

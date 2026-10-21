@@ -1,0 +1,185 @@
+name: 网站检查与自动部署
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/deploy-web.yml']
+  pull_request:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/deploy-web.yml']
+  workflow_dispatch:
+
+# PR 的检查任务没有生产环境授权，只有 main 的部署任务读取专用 SSH 密钥。
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://xuansi.kukude.top
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  checks:
+    name: 网站检查与构建
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: web-check-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: web/backend/go.mod
+          cache-dependency-path: web/backend/go.sum
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: 安装锁定的前端依赖
+        run: |
+          npm install --global pnpm@11.25.0
+          pnpm --dir web/frontend install --frozen-lockfile
+      - name: 类型、静态检查和生产依赖审计
+        run: |
+          pnpm --dir web/frontend exec next typegen
+          pnpm --dir web/frontend typecheck
+          pnpm --dir web/frontend lint
+          pnpm --dir web/frontend audit --prod --audit-level=high
+      - name: 校验生成契约
+        run: |
+          cd web/backend
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -generate types -package apicontract -o ../contracts/generated/api.go ../contracts/openapi.yaml
+          cd ../frontend
+          pnpm dlx openapi-typescript@7.13.0 ../contracts/openapi.yaml -o ../contracts/generated/api.d.ts
+          git diff --exit-code -- ../contracts/generated
+      - name: 启动隔离的 PostgreSQL 测试库
+        run: |
+          # 随机凭据只存在本次临时 runner，既不复用生产口令，也不要求外部 PR 读取 secrets。
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          echo "TEST_DATABASE_URL=postgres://xuansi:$POSTGRES_PASSWORD@127.0.0.1:5432/xuansi_test_ci?sslmode=disable" >> "$GITHUB_ENV"
+          echo "SITE_DATABASE_URL=postgres://xuansi:$POSTGRES_PASSWORD@127.0.0.1:5432/xuansi_test_ci_site?sslmode=disable" >> "$GITHUB_ENV"
+          docker run --detach --name xuansi-ci-postgres --publish 127.0.0.1:5432:5432 --env POSTGRES_USER=xuansi --env POSTGRES_DB=xuansi_test_ci --env POSTGRES_PASSWORD postgres:16
+          for attempt in $(seq 1 30); do
+            if docker exec xuansi-ci-postgres pg_isready -U xuansi -d xuansi_test_ci; then break; fi
+            sleep 1
+          done
+          docker exec xuansi-ci-postgres psql -U xuansi -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE xuansi_test_ci_site OWNER xuansi;'
+      - name: 后端静态检查、真实数据库测试和发布回归
+        run: |
+          cd web/backend
+          go vet ./...
+          go test -p 1 ./... -count=1
+          cd ../..
+          python3 -m unittest discover -s web/deploy/shared-host/tests -v
+      - name: 后端依赖漏洞检查
+        working-directory: web/backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: 构建 Linux 后端程序
+        run: |
+          mkdir -p "$RUNNER_TEMP/binaries"
+          cd web/backend
+          for command in api worker admin; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$RUNNER_TEMP/binaries/$command" "./cmd/$command"
+          done
+      - name: 构建前端 Linux 运行镜像
+        run: |
+          docker build --pull --platform linux/amd64 --file web/deploy/frontend.Dockerfile --tag "xuansi-frontend:ci-$GITHUB_SHA" --build-arg API_ORIGIN=http://172.17.0.1:18189 --build-arg "SITE_URL=$SITE_URL" web
+      - name: 启动隔离网站并检查实际运行
+        env:
+          APP_ENV: development
+          APP_URL: http://localhost:3000
+          HTTP_ADDRESS: 0.0.0.0:18189
+          STORAGE_DRIVER: local
+          SMTP_HOST: 127.0.0.1
+          SMTP_PORT: '1025'
+        run: |
+          export DATABASE_URL="$SITE_DATABASE_URL"
+          export STORAGE_PATH="$RUNNER_TEMP/website-storage"
+          "$RUNNER_TEMP/binaries/api" -migrate > "$RUNNER_TEMP/site-api.log" 2>&1 &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18189/readyz; then break; fi
+            sleep 1
+          done
+          docker run --detach --name xuansi-ci-frontend --memory=256m --memory-swap=512m --publish 127.0.0.1:3000:3000 "xuansi-frontend:ci-$GITHUB_SHA"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://localhost:3000; then break; fi
+            sleep 1
+          done
+          curl --fail --silent --output /dev/null http://localhost:3000/api/v1/resources
+      - name: 桌面与手机浏览器检查
+        env:
+          WEB_URL: http://localhost:3000
+        run: |
+          pnpm --dir web/frontend exec playwright install --with-deps chrome
+          node web/scripts/verify-browser-public.mjs
+      - name: 生成发布包和摘要
+        run: |
+          docker save "xuansi-frontend:ci-$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/frontend-image.tar.gz"
+          python3 web/scripts/build-deploy-bundle.py --binaries "$RUNNER_TEMP/binaries" --image-archive "$RUNNER_TEMP/frontend-image.tar.gz" --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --output "$RUNNER_TEMP/web-release.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-release-${{ github.sha }}
+          path: ${{ runner.temp }}/web-release.tar.gz
+          compression-level: 0
+          retention-days: 7
+          overwrite: true
+          if-no-files-found: error
+      - name: 清理本次临时服务
+        if: always()
+        run: |
+          docker rm --force xuansi-ci-frontend xuansi-ci-postgres 2>/dev/null || true
+          if [[ -n "${API_PID:-}" ]]; then kill "$API_PID" 2>/dev/null || true; fi
+
+  deploy:
+    name: 部署正式网站
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://xuansi.kukude.top
+    concurrency:
+      group: xuansi-production
+      cancel-in-progress: false
+    steps:
+      - name: 确认仍是 main 最新提交
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          if [[ "$latest" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'main 已有更新，本次旧构建不再发布。'
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.latest.outputs.current == 'true'
+        with:
+          name: web-release-${{ github.sha }}
+          path: ${{ runner.temp }}/release
+      - name: 上传产物并调用受限发布入口
+        if: steps.latest.outputs.current == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/xuansi-deploy-key"
+          hosts="$RUNNER_TEMP/xuansi-known-hosts"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
+          ssh -T -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "root@$DEPLOY_HOST" "deploy $GITHUB_SHA $GITHUB_RUN_ID $GITHUB_RUN_ATTEMPT" < "$RUNNER_TEMP/release/web-release.tar.gz"
+      - name: 公网 HTTPS 检查
+        if: steps.latest.outputs.current == 'true'
+        run: |
+          for route in / /download /resources /login /api/v1/auth/config; do
+            curl --fail --silent --show-error --retry 3 --output /dev/null "$SITE_URL$route"
+          done
+          echo "网站部署与公网检查通过：$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

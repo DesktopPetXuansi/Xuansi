@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,11 +18,12 @@ import (
 )
 
 type Worker struct {
-	DB      *gorm.DB
-	Storage platform.ObjectStorage
-	Config  platform.Config
-	Log     *slog.Logger
-	Owner   string
+	DB                 *gorm.DB
+	Storage            platform.ObjectStorage
+	Config             platform.Config
+	Log                *slog.Logger
+	Owner              string
+	FeedbackHTTPClient *http.Client
 }
 
 // Run 单进程顺序处理；数据库租约允许多个独立进程安全扩展。
@@ -62,8 +64,18 @@ func (w *Worker) Tick(ctx context.Context) error {
 		e = w.validate(workCtx, job.Payload)
 	case "CLEANUP":
 		e = w.cleanup(workCtx, job.Payload)
+	case "FEEDBACK_GITHUB":
+		e = w.deliverFeedback(workCtx, job.Payload)
 	default:
 		e = fmt.Errorf("未知任务")
+	}
+	var channelWait *feedbackChannelWait
+	if job.Kind == "FEEDBACK_GITHUB" && errors.As(e, &channelWait) {
+		// 仅推迟这次调度，保留真实远端投递的重试次数。
+		w.Log.Info("GitHub 反馈渠道等待", "jobId", job.ID)
+		return w.DB.WithContext(ctx).Model(&platform.Job{}).Where("id=? AND lease_owner=?", job.ID, w.Owner).Updates(map[string]interface{}{
+			"status": "QUEUED", "attempts": job.Attempts - 1, "lease_until": nil, "lease_owner": nil, "run_at": channelWait.until,
+		}).Error
 	}
 	status := "DONE"
 	var message *string
@@ -96,7 +108,13 @@ func (w *Worker) Tick(ctx context.Context) error {
 	if delay > 3600 {
 		delay = 3600
 	}
-	fields := map[string]interface{}{"status": status, "lease_until": nil, "lease_owner": nil, "last_error": message, "run_at": time.Now().Add(time.Duration(delay) * time.Second)}
+	retryDelay := time.Duration(delay) * time.Second
+	if job.Kind == "FEEDBACK_GITHUB" && e != nil {
+		var safe string
+		status, retryDelay, safe = feedbackRetry(e, job.Attempts)
+		message = &safe
+	}
+	fields := map[string]interface{}{"status": status, "lease_until": nil, "lease_owner": nil, "last_error": message, "run_at": time.Now().Add(retryDelay)}
 	if job.Kind == "MAIL" && (status == "DONE" || status == "FAILED") {
 		fields["payload"] = "{}"
 	}

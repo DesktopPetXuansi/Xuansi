@@ -39,6 +39,7 @@ class Panel(QWidget):
     upload_requested = Signal()
     stop_requested = Signal()
     speech_requested = Signal(bool)
+    feedback_requested = Signal()
 
     def __init__(self, settings: Settings, *, window_state_path: Path | None = None):
         super().__init__()
