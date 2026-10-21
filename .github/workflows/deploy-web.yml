@@ -61,10 +61,13 @@ jobs:
           echo "TEST_DATABASE_URL=postgres://xuansi:$POSTGRES_PASSWORD@127.0.0.1:5432/xuansi_test_ci?sslmode=disable" >> "$GITHUB_ENV"
           echo "SITE_DATABASE_URL=postgres://xuansi:$POSTGRES_PASSWORD@127.0.0.1:5432/xuansi_test_ci_site?sslmode=disable" >> "$GITHUB_ENV"
           docker run --detach --name xuansi-ci-postgres --publish 127.0.0.1:5432:5432 --env POSTGRES_USER=xuansi --env POSTGRES_DB=xuansi_test_ci --env POSTGRES_PASSWORD postgres:16
+          ready=false
           for attempt in $(seq 1 30); do
-            if docker exec xuansi-ci-postgres pg_isready -U xuansi -d xuansi_test_ci; then break; fi
+            # 初始化临时进程仅开 Unix socket，TCP 就绪才代表最终服务已启动。
+            if docker exec xuansi-ci-postgres pg_isready --host=127.0.0.1 -U xuansi -d xuansi_test_ci; then ready=true; break; fi
             sleep 1
           done
+          test "$ready" = true
           docker exec xuansi-ci-postgres psql -U xuansi -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE xuansi_test_ci_site OWNER xuansi;'
       - name: 后端静态检查、真实数据库测试和发布回归
         run: |
