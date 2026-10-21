@@ -2,7 +2,7 @@
 
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { api, apiPage, ApiError } from "@/lib/api";
-import type { Feedback } from "@/lib/types";
+import type { Feedback, FeedbackModerationInput } from "@/lib/types";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { FeedbackItem, feedbackStatuses } from "./feedback-item";
@@ -16,7 +16,7 @@ export function FeedbackCenter() {
   return (
     <>
       <Heading title="反馈中心">
-        查看软件中主动提交的问题与建议。正文、联系方式和系统信息仅管理员可见。
+        查看网站与客户端提交的问题和建议。先私有审核，获得作者许可后才可公开；联系方式始终仅管理员可见。
       </Heading>
       <div className={styles.toolbar}>
         <Field label="处理状态">
@@ -68,7 +68,10 @@ function FeedbackList({ filter }: { filter: Filter }) {
     getNextPageParam: (page) => page.meta?.nextCursor || undefined,
     retry: false,
   });
-  async function change(item: Feedback, status: Feedback["status"]) {
+  async function change(
+    item: Feedback,
+    update: { status: Feedback["status"] } | FeedbackModerationInput,
+  ) {
     if (saving.current) return;
     saving.current = true;
     setPendingId(item.id);
@@ -76,9 +79,9 @@ function FeedbackList({ filter }: { filter: Filter }) {
     setSaved("");
     try {
       const updated = await api<Feedback>(
-        `/admin/feedback/${item.id}`,
-        "PATCH",
-        { status },
+        `/admin/feedback/${item.id}${"decision" in update ? "/moderation" : ""}`,
+        "decision" in update ? "POST" : "PATCH",
+        update,
       );
       // 只在服务端确认后更新；失败保留正文和原状态，允许原地重试。
       cache.setQueryData<typeof query.data>(
@@ -98,8 +101,12 @@ function FeedbackList({ filter }: { filter: Filter }) {
         queryKey: ["admin-feedback"],
         refetchType: "none",
       });
-      setSaved(`已标记为${feedbackStatuses[updated.status]}。`);
-      console.debug("[反馈中心] 处理状态已保存");
+      setSaved(
+        "decision" in update
+          ? "审核操作已保存。"
+          : `已标记为${feedbackStatuses[updated.status]}。`,
+      );
+      console.debug("[反馈中心] 管理操作已保存");
     } catch (error) {
       setActionError({ id: item.id, error });
       console.warn("[反馈中心] 处理状态保存失败，保留原状态");
@@ -161,8 +168,9 @@ function FeedbackList({ filter }: { filter: Filter }) {
                 : undefined
             }
             onChange={(status) => {
-              void change(item, status);
+              void change(item, { status });
             }}
+            onModerate={(decision) => void change(item, { decision })}
           />
         ))}
       </div>

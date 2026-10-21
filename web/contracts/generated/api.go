@@ -129,6 +129,54 @@ func (e FeedbackCategory) Valid() bool {
 	}
 }
 
+// Defines values for FeedbackModerationInputDecision.
+const (
+	FeedbackModerationInputDecisionAPPROVE           FeedbackModerationInputDecision = "APPROVE"
+	FeedbackModerationInputDecisionCONFIRMWITHDRAWAL FeedbackModerationInputDecision = "CONFIRM_WITHDRAWAL"
+	FeedbackModerationInputDecisionSPAM              FeedbackModerationInputDecision = "SPAM"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackModerationInputDecision enum.
+func (e FeedbackModerationInputDecision) Valid() bool {
+	switch e {
+	case FeedbackModerationInputDecisionAPPROVE:
+		return true
+	case FeedbackModerationInputDecisionCONFIRMWITHDRAWAL:
+		return true
+	case FeedbackModerationInputDecisionSPAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedbackModerationStatus.
+const (
+	FeedbackModerationStatusAPPROVED            FeedbackModerationStatus = "APPROVED"
+	FeedbackModerationStatusPENDING             FeedbackModerationStatus = "PENDING"
+	FeedbackModerationStatusSPAM                FeedbackModerationStatus = "SPAM"
+	FeedbackModerationStatusWITHDRAWALREQUESTED FeedbackModerationStatus = "WITHDRAWAL_REQUESTED"
+	FeedbackModerationStatusWITHDRAWN           FeedbackModerationStatus = "WITHDRAWN"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackModerationStatus enum.
+func (e FeedbackModerationStatus) Valid() bool {
+	switch e {
+	case FeedbackModerationStatusAPPROVED:
+		return true
+	case FeedbackModerationStatusPENDING:
+		return true
+	case FeedbackModerationStatusSPAM:
+		return true
+	case FeedbackModerationStatusWITHDRAWALREQUESTED:
+		return true
+	case FeedbackModerationStatusWITHDRAWN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FeedbackStatus.
 const (
 	INPROGRESS FeedbackStatus = "IN_PROGRESS"
@@ -692,15 +740,18 @@ type Error struct {
 
 // Feedback 仅网站管理员可读的完整反馈条目。
 type Feedback struct {
-	Category    FeedbackCategory     `json:"category"`
-	Contact     string               `json:"contact"`
-	CreatedAt   time.Time            `json:"createdAt"`
-	Description string               `json:"description"`
-	Diagnostics *FeedbackDiagnostics `json:"diagnostics"`
-	Id          openapi_types.UUID   `json:"id"`
-	Status      FeedbackStatus       `json:"status"`
-	Title       string               `json:"title"`
-	UpdatedAt   time.Time            `json:"updatedAt"`
+	Category         FeedbackCategory         `json:"category"`
+	Contact          string                   `json:"contact"`
+	CreatedAt        time.Time                `json:"createdAt"`
+	Description      string                   `json:"description"`
+	Diagnostics      *FeedbackDiagnostics     `json:"diagnostics"`
+	GithubIssueUrl   string                   `json:"githubIssueUrl"`
+	Id               openapi_types.UUID       `json:"id"`
+	ModerationStatus FeedbackModerationStatus `json:"moderationStatus"`
+	PublicConsent    bool                     `json:"publicConsent"`
+	Status           FeedbackStatus           `json:"status"`
+	Title            string                   `json:"title"`
+	UpdatedAt        time.Time                `json:"updatedAt"`
 }
 
 // FeedbackCategory defines model for FeedbackCategory.
@@ -722,7 +773,10 @@ type FeedbackInput struct {
 	Description string               `json:"description"`
 	Diagnostics *FeedbackDiagnostics `json:"diagnostics,omitempty"`
 
-	// PublicConsent 用户已明确同意将标题、说明和所选诊断公开到项目 GitHub；缺省为未同意，不转发到公开仓库。联系方式始终仅私有保存。
+	// ManagementToken 匿名管理凭据；浏览器保存原文，数据库仅保存SHA-256摘要。旧客户端可以省略。
+	ManagementToken *string `json:"managementToken,omitempty"`
+
+	// PublicConsent 用户同意审核通过后公开到项目GitHub；缺省未同意。联系方式始终私有，提交不会立即公开。
 	PublicConsent *bool  `json:"publicConsent,omitempty"`
 	Title         string `json:"title"`
 }
@@ -734,6 +788,38 @@ type FeedbackListResponse struct {
 		NextCursor *string `json:"nextCursor"`
 	} `json:"meta"`
 }
+
+// FeedbackManagement defines model for FeedbackManagement.
+type FeedbackManagement struct {
+	// CanWithdraw 是否可以直接撤回；已开始公开投递时只能提交撤回申请。
+	CanWithdraw      bool                     `json:"canWithdraw"`
+	CreatedAt        time.Time                `json:"createdAt"`
+	GithubIssueUrl   string                   `json:"githubIssueUrl"`
+	Id               openapi_types.UUID       `json:"id"`
+	ModerationStatus FeedbackModerationStatus `json:"moderationStatus"`
+	Status           FeedbackStatus           `json:"status"`
+}
+
+// FeedbackManagementInput defines model for FeedbackManagementInput.
+type FeedbackManagementInput struct {
+	ManagementToken string `json:"managementToken"`
+}
+
+// FeedbackManagementResponse defines model for FeedbackManagementResponse.
+type FeedbackManagementResponse struct {
+	Data FeedbackManagement `json:"data"`
+}
+
+// FeedbackModerationInput defines model for FeedbackModerationInput.
+type FeedbackModerationInput struct {
+	Decision FeedbackModerationInputDecision `json:"decision"`
+}
+
+// FeedbackModerationInputDecision defines model for FeedbackModerationInput.Decision.
+type FeedbackModerationInputDecision string
+
+// FeedbackModerationStatus defines model for FeedbackModerationStatus.
+type FeedbackModerationStatus string
 
 // FeedbackReceipt 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。
 type FeedbackReceipt struct {
@@ -1697,6 +1783,9 @@ type PostApiV1AdminClientReleasesIdPublicationsJSONRequestBody = PostApiV1AdminC
 // PatchApiV1AdminFeedbackIdJSONRequestBody defines body for PatchApiV1AdminFeedbackId for application/json ContentType.
 type PatchApiV1AdminFeedbackIdJSONRequestBody = FeedbackStatusInput
 
+// PostApiV1AdminFeedbackIdModerationJSONRequestBody defines body for PostApiV1AdminFeedbackIdModeration for application/json ContentType.
+type PostApiV1AdminFeedbackIdModerationJSONRequestBody = FeedbackModerationInput
+
 // PatchApiV1AdminResourcesIdJSONRequestBody defines body for PatchApiV1AdminResourcesId for application/json ContentType.
 type PatchApiV1AdminResourcesIdJSONRequestBody PatchApiV1AdminResourcesIdJSONBody
 
@@ -1726,6 +1815,12 @@ type PostApiV1AuthRegisterJSONRequestBody = RegisterInput
 
 // PostApiV1FeedbackJSONRequestBody defines body for PostApiV1Feedback for application/json ContentType.
 type PostApiV1FeedbackJSONRequestBody = FeedbackInput
+
+// PostApiV1FeedbackIdManagementJSONRequestBody defines body for PostApiV1FeedbackIdManagement for application/json ContentType.
+type PostApiV1FeedbackIdManagementJSONRequestBody = FeedbackManagementInput
+
+// PostApiV1FeedbackIdWithdrawalJSONRequestBody defines body for PostApiV1FeedbackIdWithdrawal for application/json ContentType.
+type PostApiV1FeedbackIdWithdrawalJSONRequestBody = FeedbackManagementInput
 
 // PatchApiV1MeJSONRequestBody defines body for PatchApiV1Me for application/json ContentType.
 type PatchApiV1MeJSONRequestBody PatchApiV1MeJSONBody

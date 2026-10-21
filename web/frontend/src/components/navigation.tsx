@@ -138,13 +138,7 @@ export function Footer() {
         <nav aria-label="项目与反馈">
           <h2>项目与反馈</h2>
           <Link href="/changelog">更新记录</Link>
-          <a
-            href="https://github.com/DesktopPetXuansi/Xuansi/issues"
-            target="_blank"
-            rel="noreferrer"
-          >
-            问题反馈 ↗
-          </a>
+          <Link href="/#feedback">问题反馈</Link>
           <a
             href="https://github.com/DesktopPetXuansi/Xuansi"
             target="_blank"

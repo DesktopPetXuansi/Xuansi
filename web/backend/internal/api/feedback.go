@@ -1,15 +1,12 @@
 package api
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,18 +14,18 @@ import (
 	"time"
 	"unicode/utf8"
 	"xuansi/web/backend/internal/platform"
-	"xuansi/web/backend/internal/resource"
 )
 
 // 诊断只有主动授权的固定版本字段，不接收设备路径或自由日志。
 type feedbackDiagnostics = platform.FeedbackDiagnostics
 type feedbackInput struct {
-	Category      string               `json:"category"`
-	Title         string               `json:"title"`
-	Description   string               `json:"description"`
-	Contact       string               `json:"contact"`
-	Diagnostics   *feedbackDiagnostics `json:"diagnostics"`
-	PublicConsent bool                 `json:"publicConsent,omitempty"`
+	Category        string               `json:"category"`
+	Title           string               `json:"title"`
+	Description     string               `json:"description"`
+	Contact         string               `json:"contact"`
+	Diagnostics     *feedbackDiagnostics `json:"diagnostics"`
+	PublicConsent   bool                 `json:"publicConsent,omitempty"`
+	ManagementToken string               `json:"managementToken,omitempty"`
 }
 type feedbackEntry = platform.FeedbackEntry
 
@@ -51,6 +48,9 @@ func (in *feedbackInput) normalize() bool {
 		return false
 	}
 	if in.Title == "" || in.Description == "" || utf8.RuneCountInString(in.Title) > 80 || utf8.RuneCountInString(in.Description) > 4000 || utf8.RuneCountInString(in.Contact) > 160 {
+		return false
+	}
+	if in.ManagementToken != "" && !validFeedbackToken(in.ManagementToken) {
 		return false
 	}
 	if in.Diagnostics != nil {
@@ -88,70 +88,15 @@ func feedbackDecodeError(w http.ResponseWriter, r *http.Request, e error) {
 	}
 	invalid(w, r, "反馈格式无效")
 }
-func (s *Server) feedbackRoutes(r chi.Router) { r.Post("/feedback", s.createFeedback) }
+func (s *Server) feedbackRoutes(r chi.Router) {
+	r.Post("/feedback", s.createFeedback)
+	r.Post("/feedback/{id}/management", s.manageFeedback)
+	r.Post("/feedback/{id}/withdrawal", s.withdrawFeedback)
+}
 func (s *Server) feedbackFailure(w http.ResponseWriter, r *http.Request) {
 	// SQL错误可能含用户提供内容，只记固定事件及请求标识，由请求日志提供关联。
 	s.Log.Error("反馈存储操作失败")
 	problem(w, r, 500, "INTERNAL_ERROR", "服务暂时不可用")
-}
-func (s *Server) createFeedback(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get("Idempotency-Key")
-	if !canonicalFeedbackID(key) {
-		invalid(w, r, "请求编号必须为标准UUID")
-		return
-	}
-	var in feedbackInput
-	if !decodeFeedback(w, r, &in) {
-		return
-	}
-	if !in.normalize() {
-		invalid(w, r, "请检查反馈类型及内容长度")
-		return
-	}
-	body, _ := json.Marshal(in)
-	sum := sha256.Sum256(body)
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	row := feedbackEntry{ID: key, IdempotencyKey: key, RequestHash: hex.EncodeToString(sum[:]), Category: in.Category, Title: in.Title, Description: in.Description, Contact: in.Contact, Diagnostics: in.Diagnostics, Status: "NEW", CreatedAt: now, UpdatedAt: now}
-	status := 201
-	row.PublicConsent = in.PublicConsent
-	forward := s.Config.FeedbackGitHubRepository != "" && (!s.Config.FeedbackGitHubPublic || in.PublicConsent)
-	if forward {
-		row.GitHubRepository, row.GitHubPublic = s.Config.FeedbackGitHubRepository, s.Config.FeedbackGitHubPublic
-	}
-	conflict := errors.New("反馈请求编号冲突")
-	// 数据与投递责任在同一事务提交；返回成功不依赖 GitHub 的实时可用性。
-	e := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		result := gorm.WithResult()
-		if err := gorm.G[feedbackEntry](tx, result, clause.OnConflict{Columns: []clause.Column{{Name: "idempotency_key"}}, DoNothing: true}).Create(r.Context(), &row); err != nil {
-			return err
-		}
-		if result.RowsAffected == 0 {
-			old, err := gorm.G[feedbackEntry](tx).Where("idempotency_key=?", key).First(r.Context())
-			if err != nil {
-				return err
-			}
-			if old.RequestHash != row.RequestHash {
-				return conflict
-			}
-			row, status = old, 200
-			return nil
-		}
-		if forward {
-			return resource.QueueFeedback(r.Context(), tx, row.ID)
-		}
-		return nil
-	})
-	if errors.Is(e, conflict) {
-		problem(w, r, 409, "CONFLICT", "此请求编号已经用于其他反馈")
-		return
-	}
-	if e != nil {
-		s.feedbackFailure(w, r)
-		return
-	}
-	s.Log.Info("反馈提交已确认", "feedbackId", row.ID)
-	// 状态更新不改变最初收据，提交重试始终得到相同的NEW收据。
-	reply(w, status, feedbackReceipt{row.ID, row.CreatedAt.UTC(), "NEW"})
 }
 
 type feedbackCursor struct {

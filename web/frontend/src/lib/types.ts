@@ -7,6 +7,11 @@ export type Version = components["schemas"]["ResourceVersion"];
 export type Upload = components["schemas"]["Upload"];
 export type Release = components["schemas"]["Release"];
 export type Feedback = components["schemas"]["Feedback"];
+export type FeedbackInput = components["schemas"]["FeedbackInput"];
+export type FeedbackReceipt = components["schemas"]["FeedbackReceipt"];
+export type FeedbackManagement = components["schemas"]["FeedbackManagement"];
+export type FeedbackModerationInput =
+  components["schemas"]["FeedbackModerationInput"];
 export type FeedbackDiagnostics = components["schemas"]["FeedbackDiagnostics"];
 export interface Session {
   id: string;

@@ -34,6 +34,21 @@ func setupFeedbackGitHub(t *testing.T) (*Server, *testClient, *resource.Worker) 
 	return s, c, worker
 }
 
+// 投递测试也通过真实管理员接口审核；清除注册邮件，避免 Worker 先处理无关任务。
+func approveFeedbackForDelivery(t *testing.T, s *Server, c *testClient, id string) {
+	t.Helper()
+	if c.session == "" {
+		u := registered(t, s, c, "delivery-admin@example.test")
+		if err := s.DB.Exec("UPDATE users SET role='ADMIN' WHERE id=?", u.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := s.DB.Exec("DELETE FROM jobs WHERE kind='MAIL'").Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	c.call("POST", "/api/v1/admin/feedback/"+id+"/moderation", map[string]string{"decision": "APPROVE"}, 200, "")
+}
+
 func (tr feedbackGitHubTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	copy := r.Clone(r.Context())
 	copy.URL.Scheme, copy.URL.Host = tr.target.Scheme, tr.target.Host
@@ -49,6 +64,13 @@ func TestPostgresFeedbackGitHubAtomicQueueAndConsent(t *testing.T) {
 	key := uuid.NewString()
 	raw := feedbackCall(t, c, key, input, 201)
 	feedbackCall(t, c, key, input, 200)
+	moderationJobCount(t, s, 0)
+	var pending platform.FeedbackEntry
+	if err := s.DB.Where("id=?", key).First(&pending).Error; err != nil || pending.ModerationStatus != "PENDING" {
+		t.Fatalf("创建没有进入待审核: %s %v", pending.ModerationStatus, err)
+	}
+	approveFeedbackForDelivery(t, s, c, key)
+	approveFeedbackForDelivery(t, s, c, key)
 	var jobs []platform.Job
 	if err := s.DB.Where("kind='FEEDBACK_GITHUB'").Find(&jobs).Error; err != nil || len(jobs) != 1 {
 		t.Fatalf("反馈重试没有复用唯一任务: jobs=%d err=%v", len(jobs), err)
@@ -62,7 +84,10 @@ func TestPostgresFeedbackGitHubAtomicQueueAndConsent(t *testing.T) {
 	}
 	// 旧客户端没有公开确认：仍然收件，绝不自动公开正文。
 	input.PublicConsent = false
-	feedbackCall(t, c, uuid.NewString(), input, 201)
+	input.Title = "合成未授权公开问题"
+	privateKey := uuid.NewString()
+	feedbackCall(t, c, privateKey, input, 201)
+	c.call("POST", "/api/v1/admin/feedback/"+privateKey+"/moderation", map[string]string{"decision": "APPROVE"}, 409, "")
 	var count int64
 	s.DB.Model(&platform.Job{}).Where("kind='FEEDBACK_GITHUB'").Count(&count)
 	if count != 1 {
@@ -70,7 +95,7 @@ func TestPostgresFeedbackGitHubAtomicQueueAndConsent(t *testing.T) {
 	}
 }
 
-func TestPostgresFeedbackGitHubQueueFailureRollsBackReceipt(t *testing.T) {
+func TestPostgresFeedbackGitHubQueueFailureRollsBackApproval(t *testing.T) {
 	s, c, _ := setupFeedbackGitHub(t)
 	s.Config.FeedbackGitHubRepository, s.Config.FeedbackGitHubToken = "owner/feedback", "synthetic-token"
 	if err := s.DB.Exec("ALTER TABLE jobs ADD CONSTRAINT feedback_test_reject_job CHECK (kind <> 'FEEDBACK_GITHUB')").Error; err != nil {
@@ -78,11 +103,20 @@ func TestPostgresFeedbackGitHubQueueFailureRollsBackReceipt(t *testing.T) {
 	}
 	t.Cleanup(func() { s.DB.Exec("ALTER TABLE jobs DROP CONSTRAINT IF EXISTS feedback_test_reject_job") })
 	key := uuid.NewString()
-	feedbackCall(t, c, key, feedbackInput{Category: "BUG", Title: "合成问题", Description: "队列失败测试"}, 500)
-	var count int64
-	s.DB.Table("feedback").Where("id=?", key).Count(&count)
-	if count != 0 {
-		t.Fatal("队列写入失败后仍保存成功反馈，收据事务不完整")
+	input := feedbackInput{Category: "BUG", Title: "合成问题", Description: "队列失败测试", PublicConsent: true}
+	first := data[feedbackReceipt](t, feedbackCall(t, c, key, input, 201))
+	u := registered(t, s, c, "failed-approval-admin@example.test")
+	if err := s.DB.Exec("UPDATE users SET role='ADMIN' WHERE id=?", u.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	c.call("POST", "/api/v1/admin/feedback/"+key+"/moderation", map[string]string{"decision": "APPROVE"}, 500, "")
+	var row platform.FeedbackEntry
+	if err := s.DB.Where("id=?", key).First(&row).Error; err != nil || row.ModerationStatus != "PENDING" {
+		t.Fatalf("队列失败没有回滚审核: %s %v", row.ModerationStatus, err)
+	}
+	moderationJobCount(t, s, 0)
+	if retry := data[feedbackReceipt](t, feedbackCall(t, c, key, input, 200)); retry != first {
+		t.Fatal("审核失败改变了原始收据")
 	}
 }
 
@@ -125,6 +159,7 @@ func TestPostgresFeedbackGitHubDeliveryRecoversUncertainResponse(t *testing.T) {
 	worker.FeedbackHTTPClient = &http.Client{Transport: feedbackGitHubTransport{target, http.DefaultTransport}, Timeout: 5 * time.Second}
 	key := uuid.NewString()
 	feedbackCall(t, c, key, feedbackInput{Category: "BUG", Title: "合成公开问题", Description: "合成步骤", Contact: "must-stay-private@example.test", PublicConsent: true}, 201)
+	approveFeedbackForDelivery(t, s, c, key)
 	if err := worker.Tick(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +208,8 @@ func TestPostgresFeedbackGitHubRateLimitAndDestinationFreeze(t *testing.T) {
 	target, _ := url.Parse(remote.URL)
 	worker.FeedbackHTTPClient = &http.Client{Transport: feedbackGitHubTransport{target, http.DefaultTransport}}
 	key := uuid.NewString()
-	feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: "合成私有问题", Description: "频控测试"}, 201)
+	feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: "合成私有问题", Description: "频控测试", PublicConsent: true}, 201)
+	approveFeedbackForDelivery(t, s, c, key)
 	if err := worker.Tick(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -191,5 +227,21 @@ func TestPostgresFeedbackGitHubRateLimitAndDestinationFreeze(t *testing.T) {
 	s.DB.Where("id=?", job.ID).First(&job)
 	if job.Status != "FAILED" {
 		t.Fatal("目的地变化后仍尝试转发历史反馈")
+	}
+}
+
+// 私有仓库仍可能被其他协作者读取；未许可外送的反馈不能通过审核入队。
+func TestPostgresFeedbackGitHubPrivateRepositoryRequiresConsent(t *testing.T) {
+	s, c, _ := setupFeedbackGitHub(t)
+	s.Config.FeedbackGitHubRepository, s.Config.FeedbackGitHubToken = "synthetic/private-feedback", "synthetic-token"
+	s.Config.FeedbackGitHubPublic = false
+	key := uuid.NewString()
+	feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: "仅向管理员反馈", Description: "没有同意向任何GitHub仓库发送"}, 201)
+	moderationAdmin(t, s, c)
+	c.call("POST", "/api/v1/admin/feedback/"+key+"/moderation", map[string]string{"decision": "APPROVE"}, 409, "")
+	moderationJobCount(t, s, 0)
+	var row platform.FeedbackEntry
+	if err := s.DB.Where("id=?", key).First(&row).Error; err != nil || row.ModerationStatus != "PENDING" || row.GitHubRepository != "" {
+		t.Fatalf("未许可反馈绑定了外送目的地或改变审核状态: %+v %v", row, err)
 	}
 }

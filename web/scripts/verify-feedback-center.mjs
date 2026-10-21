@@ -14,7 +14,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const checks = [], errors = [];
 const checked = text => { checks.push(text); console.log(`通过：${text}`); };
 const feedback = (id, status = 'NEW') => ({ id, category: 'BUG', title: `合成反馈-${id}`, description: '第一行：换形象后没有反应。\n第二行：重新打开后正常。',
-  contact: '', diagnostics: null, status, createdAt: '2026-10-19T10:00:00Z', updatedAt: '2026-10-19T10:00:00Z' });
+  contact: '', diagnostics: null, status, moderationStatus: 'PENDING', publicConsent: false, githubIssueUrl: '', createdAt: '2026-10-19T10:00:00Z', updatedAt: '2026-10-19T10:00:00Z' });
 
 async function fixture(role = 'ADMIN') {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

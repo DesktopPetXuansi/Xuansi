@@ -99,7 +99,7 @@ func setup(t *testing.T) (*Server, *testClient, *resource.Worker) {
 	}
 	sql, _ := db.DB()
 	t.Cleanup(func() { _ = sql.Close() })
-	if e = db.Exec("TRUNCATE users,resources,client_releases,jobs,feedback_github_channels CASCADE").Error; e != nil {
+	if e = db.Exec("TRUNCATE users,resources,client_releases,jobs,feedback,feedback_github_channels,feedback_submission_limits CASCADE").Error; e != nil {
 		t.Fatal(e)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))

@@ -1,5 +1,5 @@
 import { Heading } from "@/components/ui";
-import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { helpTopics, type HelpTopic } from "./content";
 import { questions } from "./questions";
@@ -30,14 +30,9 @@ function FeedbackLink() {
         <h2>还没有解决？</h2>
         <p>带上版本、操作步骤和报错信息，方便我们找到原因。</p>
       </div>
-      <a
-        className="quiet-link"
-        href="https://github.com/DesktopPetXuansi/Xuansi/issues"
-        target="_blank"
-        rel="noreferrer"
-      >
-        到 GitHub 反馈 <ExternalLink size={15} aria-hidden />
-      </a>
+      <Link className="quiet-link" href="/#feedback">
+        写下反馈 <ArrowRight size={15} aria-hidden />
+      </Link>
     </div>
   );
 }

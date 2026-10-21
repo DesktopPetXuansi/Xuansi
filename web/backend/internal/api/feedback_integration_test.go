@@ -57,9 +57,11 @@ func TestPostgresFeedbackPrivateIdempotencyAndPagination(t *testing.T) {
 	if first != after {
 		t.Fatal("管理员更新改变了原收据")
 	}
-	// 切换来源地址避免将权限与分页断言耦合到提交频控。
+	// 分页使用不同内容，避免与持久化的重复内容保护耦合。
 	c.handler = s.Router()
+	input.Title = "另一条合成反馈"
 	feedbackCall(t, c, uuid.NewString(), input, 201)
+	input.Title = "第三条合成反馈"
 	feedbackCall(t, c, uuid.NewString(), input, 201)
 	var page struct {
 		Data []feedbackEntry `json:"data"`

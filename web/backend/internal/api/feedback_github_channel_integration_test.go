@@ -43,7 +43,9 @@ func TestPostgresFeedbackGitHubChannelSerializesWorkers(t *testing.T) {
 	worker.FeedbackHTTPClient = &http.Client{Transport: feedbackGitHubTransport{target, http.DefaultTransport}}
 	other := &resource.Worker{DB: s.DB, Config: s.Config, Log: s.Log, Owner: "concurrent-worker", FeedbackHTTPClient: worker.FeedbackHTTPClient}
 	for i := 0; i < 2; i++ {
-		feedbackCall(t, c, uuid.NewString(), feedbackInput{Category: "OTHER", Title: "合成问题", Description: "跨进程串行"}, 201)
+		key := uuid.NewString()
+		feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: fmt.Sprintf("合成问题%d", i), Description: "跨进程串行", PublicConsent: true}, 201)
+		approveFeedbackForDelivery(t, s, c, key)
 	}
 	done := make(chan error, 1)
 	go func() { done <- worker.Tick(context.Background()) }()
@@ -92,7 +94,9 @@ func TestPostgresFeedbackGitHubSharedChannelCooldown(t *testing.T) {
 			worker.FeedbackHTTPClient = &http.Client{Transport: feedbackGitHubTransport{target, http.DefaultTransport}}
 			other := &resource.Worker{DB: s.DB, Config: s.Config, Log: s.Log, Owner: "other-worker", FeedbackHTTPClient: worker.FeedbackHTTPClient}
 			for i := 0; i < 2; i++ {
-				feedbackCall(t, c, uuid.NewString(), feedbackInput{Category: "OTHER", Title: "合成问题", Description: "共享限流测试"}, 201)
+				key := uuid.NewString()
+				feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: fmt.Sprintf("合成问题%d", i), Description: "共享限流测试", PublicConsent: true}, 201)
+				approveFeedbackForDelivery(t, s, c, key)
 			}
 			if err := worker.Tick(context.Background()); err != nil {
 				t.Fatal(err)
@@ -157,7 +161,9 @@ func TestPostgresFeedbackGitHubChannelLeaseRecovery(t *testing.T) {
 	defer remote.Close()
 	target, _ := url.Parse(remote.URL)
 	worker.FeedbackHTTPClient = &http.Client{Transport: feedbackGitHubTransport{target, http.DefaultTransport}}
-	feedbackCall(t, c, uuid.NewString(), feedbackInput{Category: "OTHER", Title: "合成问题", Description: "租约恢复"}, 201)
+	key := uuid.NewString()
+	feedbackCall(t, c, key, feedbackInput{Category: "OTHER", Title: "合成问题", Description: "租约恢复", PublicConsent: true}, 201)
+	approveFeedbackForDelivery(t, s, c, key)
 	if err := s.DB.Exec("INSERT INTO feedback_github_channels(repository,not_before,lease_owner,lease_until) VALUES (?,now()-interval '1 second',?,now()+interval '3 minutes')", s.Config.FeedbackGitHubRepository, uuid.NewString()).Error; err != nil {
 		t.Fatal(err)
 	}

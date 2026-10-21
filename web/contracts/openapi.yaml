@@ -4292,6 +4292,153 @@
           }
         ]
       }
+    },
+    "/api/v1/feedback/{id}/management": {
+      "post": {
+        "operationId": "post__api_v1_feedback_id_management",
+        "summary": "凭匿名管理凭据查看状态",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackManagementInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackManagementResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "管理凭据无效或CSRF失败"
+          },
+          "429": {
+            "description": "请求过于频繁"
+          }
+        }
+      }
+    },
+    "/api/v1/feedback/{id}/withdrawal": {
+      "post": {
+        "operationId": "post__api_v1_feedback_id_withdrawal",
+        "summary": "撤回反馈或申请清理公开内容",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackManagementInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackManagementResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "管理凭据无效或CSRF失败"
+          },
+          "429": {
+            "description": "请求过于频繁"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/feedback/{id}/moderation": {
+      "post": {
+        "operationId": "post__api_v1_admin_feedback_id_moderation",
+        "summary": "审核反馈，或确认已清理公开内容",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackModerationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核后的条目",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "非管理员或CSRF失败"
+          },
+          "409": {
+            "description": "状态、许可或渠道配置不允许操作"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6109,7 +6256,7 @@
         "properties": {
           "publicConsent": {
             "type": "boolean",
-            "description": "用户已明确同意将标题、说明和所选诊断公开到项目 GitHub；缺省为未同意，不转发到公开仓库。联系方式始终仅私有保存。"
+            "description": "用户同意审核通过后公开到项目GitHub；缺省未同意。联系方式始终私有，提交不会立即公开。"
           },
           "category": {
             "$ref": "#/components/schemas/FeedbackCategory"
@@ -6137,6 +6284,11 @@
                 "type": "null"
               }
             ]
+          },
+          "managementToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "匿名管理凭据；浏览器保存原文，数据库仅保存SHA-256摘要。旧客户端可以省略。"
           }
         }
       },
@@ -6175,7 +6327,10 @@
           "description",
           "contact",
           "diagnostics",
-          "updatedAt"
+          "updatedAt",
+          "moderationStatus",
+          "publicConsent",
+          "githubIssueUrl"
         ],
         "properties": {
           "id": {
@@ -6217,6 +6372,15 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "moderationStatus": {
+            "$ref": "#/components/schemas/FeedbackModerationStatus"
+          },
+          "publicConsent": {
+            "type": "boolean"
+          },
+          "githubIssueUrl": {
+            "type": "string"
           }
         },
         "description": "仅网站管理员可读的完整反馈条目。"
@@ -6281,6 +6445,92 @@
                 ]
               }
             }
+          }
+        }
+      },
+      "FeedbackModerationStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "SPAM",
+          "WITHDRAWN",
+          "WITHDRAWAL_REQUESTED"
+        ]
+      },
+      "FeedbackManagementInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "managementToken"
+        ],
+        "properties": {
+          "managementToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "FeedbackModerationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "SPAM",
+              "CONFIRM_WITHDRAWAL"
+            ]
+          }
+        }
+      },
+      "FeedbackManagement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "status",
+          "moderationStatus",
+          "githubIssueUrl",
+          "canWithdraw"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "moderationStatus": {
+            "$ref": "#/components/schemas/FeedbackModerationStatus"
+          },
+          "githubIssueUrl": {
+            "type": "string"
+          },
+          "canWithdraw": {
+            "type": "boolean",
+            "description": "是否可以直接撤回；已开始公开投递时只能提交撤回申请。"
+          }
+        }
+      },
+      "FeedbackManagementResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackManagement"
           }
         }
       }

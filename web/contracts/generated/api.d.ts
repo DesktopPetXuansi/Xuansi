@@ -926,6 +926,57 @@ export interface paths {
         patch: operations["patch__api_v1_admin_feedback_id"];
         trace?: never;
     };
+    "/api/v1/feedback/{id}/management": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 凭匿名管理凭据查看状态 */
+        post: operations["post__api_v1_feedback_id_management"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback/{id}/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 撤回反馈或申请清理公开内容 */
+        post: operations["post__api_v1_feedback_id_withdrawal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/feedback/{id}/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 审核反馈，或确认已清理公开内容 */
+        post: operations["post__api_v1_admin_feedback_id_moderation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1420,13 +1471,15 @@ export interface components {
             qtVersion?: string;
         };
         FeedbackInput: {
-            /** @description 用户已明确同意将标题、说明和所选诊断公开到项目 GitHub；缺省为未同意，不转发到公开仓库。联系方式始终仅私有保存。 */
+            /** @description 用户同意审核通过后公开到项目GitHub；缺省未同意。联系方式始终私有，提交不会立即公开。 */
             publicConsent?: boolean;
             category: components["schemas"]["FeedbackCategory"];
             title: string;
             description: string;
             contact?: string;
             diagnostics?: components["schemas"]["FeedbackDiagnostics"] | null;
+            /** @description 匿名管理凭据；浏览器保存原文，数据库仅保存SHA-256摘要。旧客户端可以省略。 */
+            managementToken?: string;
         };
         /** @description 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。 */
         FeedbackReceipt: {
@@ -1450,6 +1503,9 @@ export interface components {
             diagnostics: components["schemas"]["FeedbackDiagnostics"] | null;
             /** Format: date-time */
             updatedAt: string;
+            moderationStatus: components["schemas"]["FeedbackModerationStatus"];
+            publicConsent: boolean;
+            githubIssueUrl: string;
         };
         FeedbackStatusInput: {
             status: components["schemas"]["FeedbackStatus"];
@@ -1465,6 +1521,29 @@ export interface components {
             meta: {
                 nextCursor: string | null;
             };
+        };
+        /** @enum {string} */
+        FeedbackModerationStatus: "PENDING" | "APPROVED" | "SPAM" | "WITHDRAWN" | "WITHDRAWAL_REQUESTED";
+        FeedbackManagementInput: {
+            managementToken: string;
+        };
+        FeedbackModerationInput: {
+            /** @enum {string} */
+            decision: "APPROVE" | "SPAM" | "CONFIRM_WITHDRAWAL";
+        };
+        FeedbackManagement: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            status: components["schemas"]["FeedbackStatus"];
+            moderationStatus: components["schemas"]["FeedbackModerationStatus"];
+            githubIssueUrl: string;
+            /** @description 是否可以直接撤回；已开始公开投递时只能提交撤回申请。 */
+            canWithdraw: boolean;
+        };
+        FeedbackManagementResponse: {
+            data: components["schemas"]["FeedbackManagement"];
         };
     };
     responses: never;
@@ -3749,6 +3828,133 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    post__api_v1_feedback_id_management: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackManagementInput"];
+            };
+        };
+        responses: {
+            /** @description 当前状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackManagementResponse"];
+                };
+            };
+            /** @description 管理凭据无效或CSRF失败 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 请求过于频繁 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post__api_v1_feedback_id_withdrawal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackManagementInput"];
+            };
+        };
+        responses: {
+            /** @description 当前状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackManagementResponse"];
+                };
+            };
+            /** @description 管理凭据无效或CSRF失败 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 请求过于频繁 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post__api_v1_admin_feedback_id_moderation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackModerationInput"];
+            };
+        };
+        responses: {
+            /** @description 审核后的条目 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 非管理员或CSRF失败 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 状态、许可或渠道配置不允许操作 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

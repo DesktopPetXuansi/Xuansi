@@ -90,7 +90,7 @@ func TestFeedbackRateLimitSeparateFromAuth(t *testing.T) {
 		h.ServeHTTP(w, httptest.NewRequest("POST", path, nil))
 		return w.Code
 	}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 60; i++ {
 		if call("/api/v1/feedback") != 204 {
 			t.Fatal("过早限流")
 		}
