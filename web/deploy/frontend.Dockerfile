@@ -1,7 +1,8 @@
 FROM node:24-alpine AS build
 RUN npm install -g pnpm@11.25.0
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+# 安装阶段也必须使用仓库既有的依赖脚本许可策略。
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 COPY contracts/generated/api.d.ts /app/contracts/generated/api.d.ts
