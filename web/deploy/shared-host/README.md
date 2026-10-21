@@ -4,6 +4,9 @@
 由 systemd 以 `xuansi-web` 身份运行，Next standalone 使用 Linux Node 24 镜像。
 日志由 journald / Docker 收集；Nginx 日志不记录查询字符串，避免泄露签名与一次性令牌。
 
+日常更新使用 [GitHub 自动部署](AUTOMATION.md)：main 的网站变更先检查和构建，再通过
+受限发布密钥更新，失败恢复上一版应用。下面保留主机初装与服务布局说明。
+
 - API 监听 `172.17.0.1:18189`，Next 容器只发布 `172.17.0.1:18190:3000`。
 - `/opt/xuansi/shared/web.env` 为 root:root 600，保持正式 HTTPS/S3/SMTP 配置校验。
 - `/opt/xuansi/web-current` 指向已校验 SHA256 的不可变发布目录。
