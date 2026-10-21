@@ -20,12 +20,17 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 	windows := map[string]rateWindow{}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		feedback := r.Method == "POST" && r.URL.Path == "/api/v1/feedback"
-		if !feedback && (!(strings.HasPrefix(r.URL.Path, "/api/v1/auth/") || r.URL.Path == "/oauth/token") || r.Method == "GET") {
+		management := r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/api/v1/feedback/")
+		if !feedback && !management && (!(strings.HasPrefix(r.URL.Path, "/api/v1/auth/") || r.URL.Path == "/oauth/token") || r.Method == "GET") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		host := s.clientIP(r)
 		key := host + ":" + r.URL.Path
+		if management {
+			// 管理与撤回独立计数，轮换反馈编号不能绕过凭据尝试的限流。
+			key = host + ":feedback-management"
+		}
 		now := time.Now()
 		mu.Lock()
 		if len(windows) > 10000 {
@@ -43,7 +48,8 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 		windows[key] = window
 		maximum := 20
 		if feedback {
-			maximum = 5
+			// 外层抑制无效请求洪泛；有效新收件由数据库执行5次/分钟与20次/小时限制。
+			maximum = 60
 		}
 		allowed := window.Count <= maximum
 		mu.Unlock()

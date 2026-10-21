@@ -70,6 +70,7 @@ func run(ctx context.Context, log *slog.Logger, migrate, only bool) error {
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- server.ListenAndServe() }()
 	log.Info("反馈服务已启动", "address", c.Address, "githubEnabled", c.FeedbackGitHubRepository != "")
+	log.Info("新反馈须在连接同一数据库的完整官网后台审核后，才会进入 GitHub 投递队列")
 	var serveErr error
 	select {
 	case <-ctx.Done():

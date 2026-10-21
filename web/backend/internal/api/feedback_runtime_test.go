@@ -20,6 +20,9 @@ func TestFeedbackRuntimeRouteBoundary(t *testing.T) {
 	}{
 		{"GET", "/healthz", 200}, {"GET", "/api/v1/auth/csrf", 200},
 		{"POST", "/api/v1/feedback", 403},
+		{"POST", "/api/v1/feedback/10000000-0000-4000-8000-000000000001/management", 403},
+		{"POST", "/api/v1/feedback/10000000-0000-4000-8000-000000000001/withdrawal", 403},
+		{"POST", "/api/v1/feedback/10000000-0000-4000-8000-000000000001/moderation", 404},
 		{"POST", "/api/v1/auth/register", 404}, {"GET", "/api/v1/resources", 404},
 		{"GET", "/api/v1/admin/feedback", 404}, {"GET", "/oauth/authorize", 404},
 		{"GET", "/api/v1/feedback", 404}, {"DELETE", "/api/v1/feedback", 404},

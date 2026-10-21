@@ -18,22 +18,27 @@ type FeedbackDiagnostics struct {
 }
 
 type FeedbackEntry struct {
-	ID                string               `json:"id"`
-	IdempotencyKey    string               `json:"-"`
-	RequestHash       string               `json:"-"`
-	Category          string               `json:"category"`
-	Title             string               `json:"title"`
-	Description       string               `json:"description"`
-	Contact           string               `json:"contact"`
-	Diagnostics       *FeedbackDiagnostics `json:"diagnostics" gorm:"serializer:json"`
-	Status            string               `json:"status"`
-	CreatedAt         time.Time            `json:"createdAt"`
-	UpdatedAt         time.Time            `json:"updatedAt"`
-	PublicConsent     bool                 `json:"-"`
-	GitHubRepository  string               `json:"-"`
-	GitHubPublic      bool                 `json:"-"`
-	GitHubIssueNumber int64                `json:"-"`
-	GitHubIssueURL    string               `json:"-"`
+	ID                   string               `json:"id"`
+	IdempotencyKey       string               `json:"-"`
+	RequestHash          string               `json:"-"`
+	Category             string               `json:"category"`
+	Title                string               `json:"title"`
+	Description          string               `json:"description"`
+	Contact              string               `json:"contact"`
+	Diagnostics          *FeedbackDiagnostics `json:"diagnostics" gorm:"serializer:json"`
+	Status               string               `json:"status"`
+	CreatedAt            time.Time            `json:"createdAt"`
+	UpdatedAt            time.Time            `json:"updatedAt"`
+	PublicConsent        bool                 `json:"publicConsent"`
+	ModerationStatus     string               `json:"moderationStatus"`
+	ManagementTokenHash  string               `json:"-"`
+	ClientHash           string               `json:"-"`
+	ContentHash          string               `json:"-"`
+	PublicationStartedAt *time.Time           `json:"-"`
+	GitHubRepository     string               `json:"-"`
+	GitHubPublic         bool                 `json:"-"`
+	GitHubIssueNumber    int64                `json:"-"`
+	GitHubIssueURL       string               `json:"githubIssueUrl"`
 }
 
 func (FeedbackEntry) TableName() string { return "feedback" }

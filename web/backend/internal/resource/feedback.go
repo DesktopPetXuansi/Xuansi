@@ -78,13 +78,17 @@ func (w *Worker) deliverFeedback(ctx context.Context, payload json.RawMessage) (
 		// 数据库错误有时包含字段值，因此仅向任务日志返回固定事件。
 		return fmt.Errorf("反馈记录暂时无法读取")
 	}
+	if row.ModerationStatus != "APPROVED" {
+		// 已撤回、垃圾或等待人工清理的任务均不得再发出公开请求。
+		return nil
+	}
 	if row.GitHubIssueNumber > 0 {
 		return nil
 	}
 	if row.GitHubRepository == "" || row.GitHubRepository != w.Config.FeedbackGitHubRepository || row.GitHubPublic != w.Config.FeedbackGitHubPublic {
 		return &feedbackgithub.Error{Reason: feedbackgithub.ReasonConfig, Phase: feedbackgithub.PhaseConfig, Permanent: true}
 	}
-	if row.GitHubPublic && !row.PublicConsent {
+	if !row.PublicConsent {
 		return &feedbackgithub.Error{Reason: feedbackgithub.ReasonConsent, Phase: feedbackgithub.PhaseValidation, Permanent: true}
 	}
 	client, err := feedbackgithub.New(row.GitHubRepository, w.Config.FeedbackGitHubToken, row.GitHubPublic, w.FeedbackHTTPClient)
@@ -111,6 +115,29 @@ func (w *Worker) deliverFeedback(ctx context.Context, payload json.RawMessage) (
 			}
 		}
 	}()
+	allowed := false
+	if err := w.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=?", row.ID).First(&row).Error; err != nil {
+			return err
+		}
+		if row.ModerationStatus != "APPROVED" || row.GitHubIssueNumber > 0 {
+			return nil
+		}
+		if row.PublicationStartedAt == nil {
+			now := time.Now().UTC()
+			row.PublicationStartedAt = &now
+			if err := tx.Model(&row).Update("publication_started_at", now).Error; err != nil {
+				return err
+			}
+		}
+		allowed = true
+		return nil
+	}); err != nil {
+		return fmt.Errorf("反馈投递状态暂时无法确认")
+	}
+	if !allowed {
+		return nil
+	}
 	diagnostics := map[string]string{}
 	if row.Diagnostics != nil {
 		diagnostics = map[string]string{"appVersion": row.Diagnostics.AppVersion, "system": row.Diagnostics.System, "architecture": row.Diagnostics.Architecture, "pythonVersion": row.Diagnostics.PythonVersion, "qtVersion": row.Diagnostics.QtVersion}
