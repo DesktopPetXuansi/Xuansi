@@ -36,14 +36,14 @@ func (s *Server) moderateFeedback(w http.ResponseWriter, r *http.Request) {
 		}
 		switch input.Decision {
 		case "APPROVE":
-			if row.ModerationStatus == "APPROVED" {
+			if row.ModerationStatus == "APPROVED" && row.GitHubIssueNumber > 0 {
 				return nil
 			}
-			if row.ModerationStatus != "PENDING" || !row.PublicConsent || row.GitHubRepository == "" || row.GitHubRepository != s.Config.FeedbackGitHubRepository || row.GitHubPublic != s.Config.FeedbackGitHubPublic || s.Config.FeedbackGitHubToken == "" {
+			if (row.ModerationStatus != "PENDING" && row.ModerationStatus != "APPROVED") || !row.PublicConsent || row.GitHubRepository == "" || row.GitHubRepository != s.Config.FeedbackGitHubRepository || row.GitHubPublic != s.Config.FeedbackGitHubPublic || s.Config.FeedbackGitHubToken == "" {
 				return errFeedbackTransition
 			}
 			row.ModerationStatus = "APPROVED"
-			// 审核状态与唯一投递责任同事务保存，入队失败不留下已批准状态。
+			// 审核与唯一投递责任同事务保存；恢复任务仍须原作者许可和原定渠道。
 			if err := resource.QueueFeedback(r.Context(), tx, row.ID); err != nil {
 				return err
 			}
@@ -63,7 +63,7 @@ func (s *Server) moderateFeedback(w http.ResponseWriter, r *http.Request) {
 				return errFeedbackTransition
 			}
 			var running int64
-			if err := tx.Table("jobs").Where("kind='FEEDBACK_GITHUB' AND status='RUNNING' AND payload->>'feedbackId'=?", row.ID).Count(&running).Error; err != nil {
+			if err := tx.Table("jobs").Where("kind='FEEDBACK_GITHUB' AND status='RUNNING' AND payload->>'reviewedFeedbackId'=?", row.ID).Count(&running).Error; err != nil {
 				return err
 			}
 			if running > 0 {

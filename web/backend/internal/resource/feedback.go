@@ -16,7 +16,7 @@ import (
 )
 
 type feedbackPayload struct {
-	FeedbackID string `json:"feedbackId"`
+	FeedbackID string `json:"reviewedFeedbackId"`
 }
 
 // 渠道等待不属于投递失败，不消耗任务的远端重试预算。
@@ -62,7 +62,17 @@ func QueueFeedback(ctx context.Context, tx *gorm.DB, id string) error {
 		return err
 	}
 	dedupe := "feedback-github:" + id
-	return gorm.G[platform.Job](tx, clause.OnConflict{DoNothing: true}).Create(ctx, &platform.Job{
+	// 只恢复终态任务；重复审核不能重置活动租约、退避或失败次数。
+	conflict := clause.OnConflict{
+		Columns: []clause.Column{{Name: "dedupe_key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"status": "QUEUED", "attempts": 0, "last_error": nil,
+			"lease_owner": nil, "lease_until": nil, "run_at": time.Now(),
+			"payload": gorm.Expr("EXCLUDED.payload"),
+		}),
+		Where: clause.Where{Exprs: []clause.Expression{clause.Expr{SQL: "jobs.status IN ('FAILED','DONE')"}}},
+	}
+	return gorm.G[platform.Job](tx, conflict).Create(ctx, &platform.Job{
 		ID: uuid.NewString(), Kind: "FEEDBACK_GITHUB", Payload: payload, Status: "QUEUED",
 		RunAt: time.Now(), CreatedAt: time.Now(), DedupeKey: &dedupe,
 	})

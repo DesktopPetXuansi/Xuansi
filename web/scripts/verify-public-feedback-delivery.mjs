@@ -120,7 +120,7 @@ try {
   await browser.close();
   // 只清理本脚本创建的合成记录，保留库中其他测试及用户数据。
   for (const id of feedbackIDs) {
-    sql(`DELETE FROM jobs WHERE kind='FEEDBACK_GITHUB' AND payload->>'feedbackId'='${checkedID(id)}'`);
+    sql(`DELETE FROM jobs WHERE kind='FEEDBACK_GITHUB' AND payload->>'reviewedFeedbackId'='${checkedID(id)}'`);
     sql(`DELETE FROM feedback WHERE id='${id}'`);
   }
   if (adminID) {

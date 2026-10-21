@@ -428,7 +428,7 @@ func TestPostgresModerationInFlightPublicationRequiresCompletedCleanup(t *testin
 	moderationPath := "/api/v1/admin/feedback/" + key + "/moderation"
 	c.call("POST", moderationPath, map[string]string{"decision": "CONFIRM_WITHDRAWAL"}, 409, "")
 	var running int64
-	if err := s.DB.Table("jobs").Where("kind='FEEDBACK_GITHUB' AND status='RUNNING' AND payload->>'feedbackId'=?", key).Count(&running).Error; err != nil || running != 1 {
+	if err := s.DB.Table("jobs").Where("kind='FEEDBACK_GITHUB' AND status='RUNNING' AND payload->>'reviewedFeedbackId'=?", key).Count(&running).Error; err != nil || running != 1 {
 		t.Fatalf("没有命中真实运行中投递: running=%d err=%v", running, err)
 	}
 	releaseOnce.Do(func() { close(release) })

@@ -59,6 +59,18 @@ export function FeedbackModeration({
             </Button>
           </>
         )}
+        {/* 管理响应以公开链接表示已取得 Issue；重试复用审核动作，由服务端协调投递任务。 */}
+        {item.moderationStatus === "APPROVED" &&
+          item.publicConsent &&
+          !item.githubIssueUrl && (
+            <Button
+              className="secondary"
+              disabled={busy}
+              onClick={() => onModerate("APPROVE")}
+            >
+              重试同步到 GitHub
+            </Button>
+          )}
         {item.moderationStatus === "WITHDRAWAL_REQUESTED" && (
           <div>
             <p>
