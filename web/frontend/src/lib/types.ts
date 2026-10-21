@@ -2,6 +2,8 @@ import type { components } from "../../../contracts/generated/api";
 // 公共实体直接引用OpenAPI生成类型，避免网站与Go协议漂移。
 export type User = components["schemas"]["User"];
 export type AuthConfig = components["schemas"]["AuthConfig"];
+export type RegistrationCodeReceipt = components["schemas"]["RegistrationCodeReceipt"];
+export type RegistrationInput = components["schemas"]["RegistrationInput"];
 export type Resource = components["schemas"]["Resource"];
 export type Version = components["schemas"]["ResourceVersion"];
 export type Upload = components["schemas"]["Upload"];

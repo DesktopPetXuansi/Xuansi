@@ -4098,7 +4098,7 @@
           "feedback"
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": "请求成功",
             "content": {
               "application/json": {
@@ -4108,7 +4108,7 @@
               }
             }
           },
-          "200": {
+          "201": {
             "description": "请求成功",
             "content": {
               "application/json": {
@@ -4438,6 +4438,112 @@
             "description": "状态、许可或渠道配置不允许操作"
           }
         }
+      }
+    },
+    "/api/v1/auth/registrations": {
+      "post": {
+        "operationId": "post__api_v1_auth_registrations",
+        "summary": "验证邮件验证码、创建账号并登录",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "201": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/registration-codes": {
+      "post": {
+        "operationId": "post__api_v1_auth_registration-codes",
+        "summary": "获取同页注册的邮件验证码",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "202": {
+            "description": "验证码邮件已进入投递队列",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCodeResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCodeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+          }
+        ]
       }
     }
   },
@@ -6531,6 +6637,84 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/FeedbackManagement"
+          }
+        }
+      },
+      "RegistrationCodeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          }
+        }
+      },
+      "RegistrationCodeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "challengeId",
+          "expiresAt",
+          "resendAt"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resendAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RegistrationCodeResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RegistrationCodeReceipt"
+          }
+        }
+      },
+      "RegistrationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "challengeId",
+          "code",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
           }
         }
       }
