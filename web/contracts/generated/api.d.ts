@@ -977,6 +977,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 验证邮件验证码、创建账号并登录 */
+        post: operations["post__api_v1_auth_registrations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/registration-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 获取同页注册的邮件验证码 */
+        post: operations["post__api_v1_auth_registration-codes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1544,6 +1578,29 @@ export interface components {
         };
         FeedbackManagementResponse: {
             data: components["schemas"]["FeedbackManagement"];
+        };
+        RegistrationCodeInput: {
+            /** Format: email */
+            email: string;
+        };
+        RegistrationCodeReceipt: {
+            /** Format: uuid */
+            challengeId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            resendAt: string;
+        };
+        RegistrationCodeResponse: {
+            data: components["schemas"]["RegistrationCodeReceipt"];
+        };
+        RegistrationInput: {
+            /** Format: email */
+            email: string;
+            /** Format: uuid */
+            challengeId: string;
+            code: string;
+            password: string;
         };
     };
     responses: never;
@@ -3955,6 +4012,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    post__api_v1_auth_registrations: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "post__api_v1_auth_registration-codes": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationCodeInput"];
+            };
+        };
+        responses: {
+            /** @description 验证码邮件已进入投递队列 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationCodeResponse"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };

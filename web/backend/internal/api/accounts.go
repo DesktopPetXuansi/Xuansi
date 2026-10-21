@@ -31,6 +31,8 @@ func (s *Server) accountRoutes(r chi.Router) {
 		reply(w, 200, map[string]string{"token": token})
 	})
 	r.Post("/auth/register", s.register)
+	r.Post("/auth/registration-codes", s.requestRegistrationCode)
+	r.Post("/auth/registrations", s.completeRegistration)
 	r.Post("/auth/login", s.login)
 	r.Post("/auth/logout", s.logout)
 	r.Post("/auth/email-verifications", s.requestToken("VERIFY"))
@@ -70,12 +72,21 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	}
 	u := platform.User{ID: uuid.NewString(), Email: email, PasswordHash: hash, DisplayName: strings.TrimSpace(in.DisplayName), Role: "USER", Status: "ACTIVE", QuotaBytes: s.Config.QuotaBytes, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	e = s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		// 旧缓存页面与同页验证码流程共享额度，不能成为额外发信通道。
+		if err := s.registrationQuota(tx, r, email, time.Now().UTC()); err != nil {
+			return err
+		}
 		if e := gorm.G[platform.User](tx).Create(r.Context(), &u); e != nil {
 			return e
 		}
 		return s.issueAccountToken(r.Context(), tx, u, "VERIFY")
 	})
 	if e != nil {
+		var limited *registrationRateError
+		if errors.As(e, &limited) {
+			registrationRateProblem(w, r, limited)
+			return
+		}
 		s.fail(w, r, e)
 		return
 	}
@@ -135,12 +146,33 @@ func (s *Server) requestToken(purpose string) http.HandlerFunc {
 		if !decode(w, r, &in) {
 			return
 		}
-		email, _ := normalizedEmail(in.Email)
-		u, e := gorm.G[platform.User](s.DB).Where("email = ? AND status = 'ACTIVE'", email).First(r.Context())
-		if e == nil {
-			e = s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error { return s.issueAccountToken(r.Context(), tx, u, purpose) })
+		email, valid := normalizedEmail(in.Email)
+		if !valid {
+			invalid(w, r, "请输入有效的邮箱地址")
+			return
 		}
-		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+		e := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+			// 所有有效邮箱先走相同额度，不能通过冷却状态探测账号是否存在。
+			if purpose == "VERIFY" {
+				if err := s.registrationQuota(tx, r, email, time.Now().UTC()); err != nil {
+					return err
+				}
+			}
+			u, err := gorm.G[platform.User](tx).Where("email=? AND status='ACTIVE'", email).First(r.Context())
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			return s.issueAccountToken(r.Context(), tx, u, purpose)
+		})
+		if e != nil {
+			var limited *registrationRateError
+			if errors.As(e, &limited) {
+				registrationRateProblem(w, r, limited)
+				return
+			}
 			s.fail(w, r, e)
 			return
 		}

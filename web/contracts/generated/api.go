@@ -1014,6 +1014,31 @@ type RegisterInput struct {
 	Password string `json:"password"`
 }
 
+// RegistrationCodeInput defines model for RegistrationCodeInput.
+type RegistrationCodeInput struct {
+	Email openapi_types.Email `json:"email"`
+}
+
+// RegistrationCodeReceipt defines model for RegistrationCodeReceipt.
+type RegistrationCodeReceipt struct {
+	ChallengeId openapi_types.UUID `json:"challengeId"`
+	ExpiresAt   time.Time          `json:"expiresAt"`
+	ResendAt    time.Time          `json:"resendAt"`
+}
+
+// RegistrationCodeResponse defines model for RegistrationCodeResponse.
+type RegistrationCodeResponse struct {
+	Data RegistrationCodeReceipt `json:"data"`
+}
+
+// RegistrationInput defines model for RegistrationInput.
+type RegistrationInput struct {
+	ChallengeId openapi_types.UUID  `json:"challengeId"`
+	Code        string              `json:"code"`
+	Email       openapi_types.Email `json:"email"`
+	Password    string              `json:"password"`
+}
+
 // Release defines model for Release.
 type Release struct {
 	Artifacts    []Artifact         `json:"artifacts"`
@@ -1453,6 +1478,18 @@ type PostApiV1AuthRegisterParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// PostApiV1AuthRegistrationCodesParams defines parameters for PostApiV1AuthRegistrationCodes.
+type PostApiV1AuthRegistrationCodesParams struct {
+	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// PostApiV1AuthRegistrationsParams defines parameters for PostApiV1AuthRegistrations.
+type PostApiV1AuthRegistrationsParams struct {
+	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // GetApiV1ClientReleasesParams defines parameters for GetApiV1ClientReleases.
 type GetApiV1ClientReleasesParams struct {
 	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1812,6 +1849,12 @@ type PostApiV1AuthPasswordResetsConfirmJSONRequestBody PostApiV1AuthPasswordRese
 
 // PostApiV1AuthRegisterJSONRequestBody defines body for PostApiV1AuthRegister for application/json ContentType.
 type PostApiV1AuthRegisterJSONRequestBody = RegisterInput
+
+// PostApiV1AuthRegistrationCodesJSONRequestBody defines body for PostApiV1AuthRegistrationCodes for application/json ContentType.
+type PostApiV1AuthRegistrationCodesJSONRequestBody = RegistrationCodeInput
+
+// PostApiV1AuthRegistrationsJSONRequestBody defines body for PostApiV1AuthRegistrations for application/json ContentType.
+type PostApiV1AuthRegistrationsJSONRequestBody = RegistrationInput
 
 // PostApiV1FeedbackJSONRequestBody defines body for PostApiV1Feedback for application/json ContentType.
 type PostApiV1FeedbackJSONRequestBody = FeedbackInput

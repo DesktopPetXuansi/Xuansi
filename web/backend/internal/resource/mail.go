@@ -10,13 +10,32 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // SMTP连接带截止时间；正文不写入日志，避免验证与重置链接泄漏。
 func (w *Worker) sendMail(ctx context.Context, payload json.RawMessage) error {
-	var in struct{ To, Subject, Body string }
+	var in struct {
+		To, Subject, Body string
+		RegistrationID    string `json:"registrationId"`
+	}
 	if e := json.Unmarshal(payload, &in); e != nil {
 		return e
+	}
+	if in.RegistrationID != "" {
+		if uuid.Validate(in.RegistrationID) != nil {
+			return fmt.Errorf("注册邮件任务无效")
+		}
+		var active int64
+		if err := w.DB.WithContext(ctx).Table("registration_challenges").Where("id=? AND consumed_at IS NULL AND expires_at>now() AND attempts<5", in.RegistrationID).Count(&active).Error; err != nil {
+			return fmt.Errorf("注册邮件状态暂时无法读取")
+		}
+		if active == 0 {
+			// 重发、已消费和已过期邮件正常结束，任务终态沿用既有正文清理。
+			w.Log.Info("失效注册邮件已跳过", "challengeId", in.RegistrationID)
+			return nil
+		}
 	}
 	if _, e := mail.ParseAddress(in.To); e != nil {
 		return e
