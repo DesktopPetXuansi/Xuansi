@@ -18,13 +18,15 @@ export async function api<T>(
   method = "GET",
   body?: unknown,
   includeMeta = false,
+  options?: { idempotencyKey?: string },
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (method !== "GET") {
     const csrf = await api<{ token: string }>("/auth/csrf");
     headers["X-CSRF-Token"] = csrf.token;
     headers["Content-Type"] = "application/json";
-    headers["Idempotency-Key"] = crypto.randomUUID();
+    // 提交结果不确定时允许调用方复用请求编号，避免网络重试产生重复反馈。
+    headers["Idempotency-Key"] = options?.idempotencyKey ?? crypto.randomUUID();
   }
   let response: Response;
   try {
@@ -53,7 +55,9 @@ export async function api<T>(
   const envelope = z
     .object({
       data: z.unknown(),
-      meta: z.object({ nextCursor: z.string().nullable().optional() }).optional(),
+      meta: z
+        .object({ nextCursor: z.string().nullable().optional() })
+        .optional(),
     })
     .safeParse(payload);
   if (!envelope.success) throw new ApiError("服务返回了无法识别的数据。", 502);

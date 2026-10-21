@@ -89,6 +89,20 @@
   gap: 8px;
   margin-bottom: 16px;
 }
+.confirmation {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.confirmation input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin-top: 5px;
+  padding: 0;
+}
 @media (max-width: 540px) {
   .item {
     padding: 16px;

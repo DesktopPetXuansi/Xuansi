@@ -1,4 +1,5 @@
 import { HomeSections } from "@/features/home-sections";
+import { PublicFeedback } from "@/features/feedback/public-feedback";
 import { clientRelease } from "@/lib/client-release";
 import { ArrowUpRight, Download } from "lucide-react";
 import Image from "next/image";
@@ -87,6 +88,7 @@ export default function Home() {
         </div>
       </section>
       <HomeSections />
+      <PublicFeedback />
     </>
   );
 }

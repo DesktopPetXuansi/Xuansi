@@ -1,5 +1,6 @@
 import { Button, Notice } from "@/components/ui";
-import type { Feedback } from "@/lib/types";
+import type { Feedback, FeedbackModerationInput } from "@/lib/types";
+import { FeedbackModeration } from "./feedback-moderation";
 import styles from "./feedback.module.css";
 
 export const feedbackStatuses = {
@@ -20,16 +21,18 @@ export function FeedbackItem({
   saving,
   error,
   onChange,
+  onModerate,
 }: {
   item: Feedback;
   busy: boolean;
   saving: boolean;
   error?: unknown;
   onChange: (status: Feedback["status"]) => void;
+  onModerate: (decision: FeedbackModerationInput["decision"]) => void;
 }) {
   const diagnostics = item.diagnostics;
   return (
-    <article className={styles.item} aria-label={item.title}>
+    <article className={styles.item} aria-label={item.title || "已撤回的反馈"}>
       <div className={styles.meta}>
         <span>{categories[item.category]}</span>
         <span className={styles.status}>{feedbackStatuses[item.status]}</span>
@@ -37,9 +40,10 @@ export function FeedbackItem({
           {new Date(item.createdAt).toLocaleString("zh-CN")}
         </time>
       </div>
-      <h2>{item.title}</h2>
+      <h2>{item.title || "已撤回的反馈"}</h2>
       <details>
         <summary>查看反馈与处理</summary>
+        <FeedbackModeration item={item} busy={busy} onModerate={onModerate} />
         <p className={styles.description}>{item.description}</p>
         <dl className={styles.info}>
           <dt>联系方式</dt>
