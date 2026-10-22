@@ -29,12 +29,27 @@
   margin-bottom: 24px;
   color: var(--muted);
   line-height: 1.9;
+  font-size: 16px;
 }
 .hero-description span {
   display: block;
 }
 .hero-actions {
   gap: 24px;
+}
+.hero-access {
+  margin: 12px 0 0;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 600;
+}
+.hero-project {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.hero-project > span {
+  margin-inline: 8px;
 }
 .hero-note {
   display: flex;
@@ -57,7 +72,7 @@
   margin: 0;
 }
 .hero-art {
-  height: 528px;
+  height: 456px;
   position: relative;
   margin: 0;
   overflow: hidden;
@@ -106,42 +121,11 @@
   font-size: 10px;
   letter-spacing: 3px;
 }
-.principles {
-  max-width: var(--content-width);
-  margin: 40px auto 0;
-  padding: 0 var(--gutter);
-}
-.principles-inner {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
-  padding: 24px 0;
-  border-block: 1px solid var(--line);
-}
-.principles article {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-.principles article > span {
-  color: var(--green);
-  font-size: 12px;
-  padding-top: 4px;
-}
-.principles h2 {
-  font-size: 15px;
-  margin-bottom: 4px;
-}
-.principles p {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0;
-}
 .home-section {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
   gap: 64px;
-  padding: 64px 0;
+  padding: 56px 0 0;
 }
 .section-top h2 {
   max-width: 12em;
@@ -199,6 +183,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--green-soft);
+  margin-top: 48px;
 }
 .library-promo h2 {
   margin-bottom: 16px;
@@ -279,9 +264,6 @@
   .hero-actions {
     gap: 12px;
   }
-  .principles-inner {
-    gap: 24px;
-  }
   .library-promo {
     padding: 32px;
     gap: 32px;
@@ -318,16 +300,9 @@
   .hero-art::before {
     inset-inline: 48px;
   }
-  .principles {
-    margin-top: 32px;
-  }
-  .principles-inner {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-  }
   .home-section {
     grid-template-columns: minmax(0, 1fr);
-    padding-block: 40px;
+    padding-top: 40px;
     gap: 32px;
   }
   .section-top h2 {

@@ -1,58 +1,86 @@
 import { HomeSections } from "@/features/home-sections";
 import { PublicFeedback } from "@/features/feedback/public-feedback";
+import { ProductPreview } from "@/features/product-preview";
+import { HomeClosing } from "@/features/home-closing";
 import { clientRelease } from "@/lib/client-release";
-import { ArrowUpRight, Download } from "lucide-react";
+import { publicPageMetadata } from "@/lib/site-metadata";
+import { ArrowDown, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import "./home.css";
 
-const principles = [
-  {
-    title: "文字、语音都能聊",
-    description: "先开始文字聊天，再按需配置语音。",
-  },
-  {
-    title: "按你的节奏陪伴",
-    description: "看屏幕、朗读和休眠，由你决定。",
-  },
-  {
-    title: "换成喜欢的形象",
-    description: "使用自带角色，也能导入图片、动图或 Live2D。",
-  },
-];
+export const metadata = {
+  ...publicPageMetadata(
+    "你的桌面 AI 伙伴",
+    "玄司是个人开发者维护的开源 Windows 桌面伙伴。查看真实客户端界面，了解聊天、记忆和换形象；选择本机模型或在线 API，无需注册即可下载体验。",
+    "/",
+  ),
+  // 根路由页面不会继承同层 layout 的标题模板，明确保留品牌名称。
+  title: { absolute: "玄司 Xuansi · 你的桌面 AI 伙伴" },
+};
 
 // 首页保持服务端渲染，复用真实品牌素材，不添加持续动画和额外请求。
 export default function Home() {
   return (
     <>
+      {/* 发行事实由同一配置提供，结构化数据不包含评分或未经核实的用户数字。 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "玄司 Xuansi",
+            applicationCategory: "LifestyleApplication",
+            operatingSystem: "Windows 10 1809 或更新版本，x64",
+            softwareVersion: clientRelease.version,
+            datePublished: clientRelease.publishedAt,
+            downloadUrl: clientRelease.downloadUrl,
+            url: "https://xuansi.kukude.top/",
+            description:
+              "可选择本机模型或在线 AI 的 Windows 桌面伙伴，支持文字交流、记忆和自定义形象。",
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
       <section className="hero" aria-labelledby="home-title">
         <div className="hero-copy">
-          <p className="eyebrow">玄司 · AI 桌面伙伴</p>
+          <p className="eyebrow">玄司 · WINDOWS 桌面伙伴</p>
           <h1 id="home-title">
             把陪伴，
             <br />
             留在你的<em>桌面。</em>
           </h1>
           <p className="hero-description">
-            <span>一个住在 Windows 桌面上的 AI 伙伴。</span>
-            <span>聊聊今天的事，换个喜欢的形象，忙起来就让她安静待着。</span>
-            <span>选择在线服务或本机模型后，就能开始聊天。</span>
+            <span>能聊天、记事，也能换成你喜欢的样子。</span>
+            <span>选择本机模型，或连接自己的在线 AI 服务。</span>
+            <span>忙起来，就让玄司安静地陪着你。</span>
           </p>
           <div className="actions hero-actions">
             <Link className="button-link" href="/download">
               <Download size={17} aria-hidden />
               下载 Windows 客户端
             </Link>
-            <Link href="/resources" className="quiet-link">
-              挑选桌宠形象 <ArrowUpRight size={16} aria-hidden />
-            </Link>
+            <a href="#product-preview" className="quiet-link">
+              看看实际界面 <ArrowDown size={16} aria-hidden />
+            </a>
           </div>
+          <p className="hero-access">无需注册即可下载和本地使用</p>
           <p className="hero-note">
             <span className="hero-version">v{clientRelease.version}</span>
             <span>Windows 10 1809 及以上 · 64 位</span>
           </p>
           <p className="hero-requirements">
             首次安装需联网。在线聊天需自备服务商 API 密钥，费用由服务商收取。
+          </p>
+          <p className="hero-project">
+            个人开发者维护 <span aria-hidden>·</span>{" "}
+            <a
+              href="https://github.com/DesktopPetXuansi/Xuansi"
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看开源项目 ↗
+            </a>
           </p>
         </div>
         <figure className="hero-art">
@@ -74,20 +102,9 @@ export default function Home() {
           </figcaption>
         </figure>
       </section>
-      <section className="principles" aria-label="陪伴的三个原则">
-        <div className="principles-inner">
-          {principles.map(({ title, description }, index) => (
-            <article key={title}>
-              <span aria-hidden>0{index + 1}</span>
-              <div>
-                <h2>{title}</h2>
-                <p>{description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ProductPreview />
       <HomeSections />
+      <HomeClosing />
       <PublicFeedback />
     </>
   );

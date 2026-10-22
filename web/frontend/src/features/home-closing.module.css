@@ -1,0 +1,62 @@
+.update,
+.download {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+}
+.update {
+  padding-block: 32px;
+  margin-top: 40px;
+  border-block: 1px solid var(--line);
+}
+.update h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.update > div {
+  max-width: 48em;
+}
+.update > a {
+  flex-shrink: 0;
+}
+.update p:last-child {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 0;
+}
+.download {
+  padding: 40px;
+  margin-top: 40px;
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+.download h2 {
+  margin-bottom: 12px;
+  font-size: clamp(26px, 2.6vw, 32px);
+}
+.download p {
+  color: var(--muted);
+}
+.download > div:last-child {
+  flex-shrink: 0;
+}
+.download .note {
+  font-size: 13px;
+  margin: 12px 0 0;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .update,
+  .download {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .download {
+    padding: 24px;
+  }
+  .download .note {
+    text-align: left;
+  }
+}

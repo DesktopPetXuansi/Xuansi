@@ -46,6 +46,8 @@ jobs:
           pnpm --dir web/frontend typecheck
           pnpm --dir web/frontend lint
           pnpm --dir web/frontend audit --prod --audit-level=high
+      - name: 前端请求超时与取消回归
+        run: pnpm --dir web/frontend test:api
       - name: 校验生成契约
         run: |
           cd web/backend
@@ -115,9 +117,12 @@ jobs:
       - name: 桌面与手机浏览器检查
         env:
           WEB_URL: http://localhost:3000
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
         run: |
           pnpm --dir web/frontend exec playwright install --with-deps chrome
           node web/scripts/verify-browser-public.mjs
+          # 复用上一步的 Linux 生产镜像；API 拦截仅在测试浏览器中生效。
+          pnpm --dir web/frontend test:browser
       - name: 生成发布包和摘要
         run: |
           docker save "xuansi-frontend:ci-$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/frontend-image.tar.gz"

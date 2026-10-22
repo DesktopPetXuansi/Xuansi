@@ -21,9 +21,10 @@ export function ResourceList({ personal = false }: { personal?: boolean }) {
   });
   const query = useQuery({
     queryKey: ["resources", personal, filter],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiPage<Resource>(
         `${personal ? "/me/resources" : "/resources"}?${new URLSearchParams(filter)}`,
+        { signal },
       ),
   });
   const filtered = Boolean(filter.search || filter.kind || filter.tag);

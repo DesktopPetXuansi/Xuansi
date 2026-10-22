@@ -103,6 +103,7 @@ function AccountLink({
     <Link
       className={`nav-account nav-account-${mobile ? "mobile" : "desktop"}`}
       href={user ? "/dashboard" : "/login"}
+      aria-label={user ? undefined : "登录或注册，用于收藏、上传与历史同步"}
     >
       <UserRound size={15} aria-hidden />
       {user ? (
@@ -126,6 +127,7 @@ export function Footer() {
         </Link>
         <p>一个在你桌面上，认真陪伴的伙伴。</p>
         <small>形象、聊天方式与分享，由你选择。</small>
+        <p>个人开发者维护 · 客户端下载和本地使用无需注册</p>
       </div>
       {/* 低频入口按用途分组，问答归入帮助，项目资料不占主导航。 */}
       <div className="footer-groups">
@@ -145,6 +147,13 @@ export function Footer() {
             rel="noreferrer"
           >
             GitHub 源码 ↗
+          </a>
+          <a
+            href="https://github.com/DesktopPetXuansi/Xuansi/issues"
+            target="_blank"
+            rel="noreferrer"
+          >
+            公开问题记录 ↗
           </a>
         </nav>
         <nav aria-label="条款与许可">
