@@ -44,6 +44,8 @@ export function ProductPreview() {
   const [imageFailed, setImageFailed] = useState(false);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const view = views[selected];
+  // 高 DPI 原生无损图直接供浏览器显示，避免截图文字再次有损转码。
+  const screenshot = `/product/client-${view.image}-v0.8.0-3x.png`;
 
   function selectView(index: number) {
     setSelected(index);
@@ -118,16 +120,21 @@ export function ProductPreview() {
         className={styles.panel}
       >
         <div className={styles.copy}>
-          <p className={styles.version}>WINDOWS · v0.8.0</p>
-          <h3>{view.title}</h3>
-          <p>{view.description}</p>
-          <Link className="quiet-link" href={view.href}>
-            {view.link} →
-          </Link>
+          <div>
+            <p className={styles.version}>WINDOWS · v0.8.0</p>
+            <h3>{view.title}</h3>
+          </div>
+          <div className={styles.description}>
+            <p>{view.description}</p>
+            <Link className="quiet-link" href={view.href}>
+              {view.link} →
+            </Link>
+          </div>
         </div>
         <figure className={styles.figure}>
           <a
-            href={`/product/client-${view.image}-v0.8.0.webp`}
+            className={styles.imageLink}
+            href={screenshot}
             target="_blank"
             rel="noreferrer"
             aria-label={`查看${view.label}界面原图（新窗口）`}
@@ -139,19 +146,24 @@ export function ProductPreview() {
             ) : (
               <Image
                 key={view.id}
-                src={`/product/client-${view.image}-v0.8.0.webp`}
+                src={screenshot}
                 alt={`玄司 0.8.0 客户端${view.label}页面，示例数据`}
-                width={880}
-                height={660}
+                width={2640}
+                height={1980}
+                unoptimized
                 onError={() => {
                   setImageFailed(true);
                   console.warn("[客户端实拍] 截图加载失败");
                 }}
-                sizes="(max-width: 640px) calc(100vw - 40px), (max-width: 900px) calc(100vw - 64px), 760px"
               />
             )}
           </a>
-          <figcaption>v0.8.0 客户端实拍 · 点击查看原图</figcaption>
+          <figcaption>
+            <span>v0.8.0 客户端实拍</span>
+            <a className={styles.enlarge} href={screenshot} target="_blank" rel="noreferrer">
+              放大查看原图 ↗
+            </a>
+          </figcaption>
         </figure>
       </div>
       <p className={styles.note}>
