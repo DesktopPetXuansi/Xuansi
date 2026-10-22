@@ -478,6 +478,11 @@ code {
 .prose li {
   color: var(--muted);
 }
+.prose a {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .skip-link {
   position: absolute;
   left: 10px;

@@ -1,7 +1,10 @@
 import type { MetadataRoute } from "next";
 import { helpTopics } from "@/features/help/content";
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.SITE_URL ?? "http://localhost:3000";
+  const base = (process.env.SITE_URL ?? "https://xuansi.kukude.top").replace(
+    /\/$/,
+    "",
+  );
   return [
     "",
     "/features",

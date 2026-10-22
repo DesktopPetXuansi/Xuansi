@@ -54,26 +54,6 @@
 .details code {
   overflow-wrap: anywhere;
 }
-.chatSection {
-  margin-top: 48px;
-  padding-block: 32px;
-  border-block: 1px solid var(--line);
-}
-.chatSection > h2 {
-  font-size: 26px;
-}
-.chatChoices {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 48px;
-  margin: 24px 0 12px;
-}
-.chatChoices h3 {
-  font-size: 18px;
-}
-.chatChoices p {
-  color: var(--muted);
-}
 .upgrade {
   display: flex;
   justify-content: space-between;
@@ -102,9 +82,62 @@
 .artifact {
   margin-top: 16px;
 }
+/* 摘要和命令可在窄屏换行，不撑开下载卡片。 */
+.packageFacts {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+  font-size: 14px;
+}
+.packageFacts > div {
+  display: grid;
+  grid-template-columns: 5em minmax(0, 1fr);
+  gap: 12px;
+}
+.packageFacts dt {
+  color: var(--muted);
+}
+.packageFacts dd {
+  margin: 0;
+}
+.checksum {
+  display: block;
+  margin-top: 8px;
+  user-select: all;
+}
+.checksumActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.verifySteps {
+  padding-left: 20px;
+  color: var(--muted);
+}
+.command {
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.currentRelease {
+  margin-bottom: 24px;
+}
+.currentRelease h2 {
+  font-size: clamp(22px, 3vw, 30px);
+}
+.currentRelease ul {
+  padding-left: 20px;
+}
+.currentRelease li {
+  margin: 12px 0;
+}
 @media (max-width: 640px) {
-  .downloadLayout,
-  .chatChoices {
+  .downloadLayout {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
@@ -117,8 +150,5 @@
   .upgrade {
     flex-direction: column;
     gap: 8px;
-  }
-  .chatSection {
-    margin-top: 32px;
   }
 }

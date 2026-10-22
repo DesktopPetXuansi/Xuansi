@@ -1,0 +1,160 @@
+/* 原生截图保留完整比例，外壳只负责说明与切换，不仿造客户端控件。 */
+.section {
+  max-width: var(--content-width);
+  margin: 56px auto 0;
+  padding: 0 var(--gutter);
+  scroll-margin-top: 24px;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+.heading h2 {
+  max-width: 18em;
+  margin-bottom: 0;
+  font-size: clamp(24px, 2.6vw, 32px);
+}
+.heading > p {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 0;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 20px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.tabs button > span {
+  font-size: 12px;
+}
+.tabs button:hover {
+  color: var(--green);
+  background: var(--green-soft);
+}
+.tabs button[aria-selected="true"] {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: var(--line);
+  font-weight: 600;
+}
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.8fr);
+  gap: 40px;
+  padding-top: 24px;
+  align-items: center;
+}
+.copy h3 {
+  font-size: 24px;
+  line-height: 1.5;
+  max-width: 12em;
+}
+.copy > p {
+  color: var(--muted);
+  font-size: 15px;
+}
+.copy .version {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--green);
+}
+.figure {
+  margin: 0;
+  min-width: 0;
+}
+.figure a {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--white);
+}
+.figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.unavailable {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+.figure figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  text-align: right;
+  font-size: 12px;
+}
+.note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 16px 0 0;
+}
+@media (max-width: 900px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .copy h3 {
+    max-width: none;
+    margin-bottom: 8px;
+  }
+  .copy .version {
+    display: none;
+  }
+  .copy > p {
+    margin-bottom: 8px;
+  }
+}
+@media (max-width: 640px) {
+  .section {
+    margin-top: 40px;
+  }
+  .heading {
+    display: block;
+  }
+  .heading > p {
+    margin-top: 12px;
+  }
+  .heading > p br {
+    display: none;
+  }
+  .tabs {
+    gap: 4px;
+  }
+  .tabs button {
+    flex: 1;
+    gap: 6px;
+    padding: 8px;
+    font-size: 14px;
+  }
+  .tabs button > span {
+    display: none;
+  }
+  .copy h3 {
+    font-size: 21px;
+  }
+  .figure figcaption {
+    text-align: left;
+  }
+}

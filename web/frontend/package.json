@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:api": "node --experimental-transform-types --test tests/api.test.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",

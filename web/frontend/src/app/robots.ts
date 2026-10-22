@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/dashboard", "/admin", "/authorize", "/api", "/oauth"],
     },
-    sitemap: `${process.env.SITE_URL ?? "http://localhost:3000"}/sitemap.xml`,
+    sitemap: `${(process.env.SITE_URL ?? "https://xuansi.kukude.top").replace(/\/$/, "")}/sitemap.xml`,
   };
 }

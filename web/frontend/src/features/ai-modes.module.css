@@ -1,0 +1,84 @@
+/* 两列描述列表避免横向大表格，手机按相同阅读顺序单列呈现。 */
+.section {
+  margin-top: 56px;
+  padding: 40px 0;
+  border-block: 1px solid var(--line);
+  scroll-margin-top: 24px;
+}
+.section h2 {
+  font-size: clamp(24px, 2.6vw, 32px);
+  margin-bottom: 12px;
+}
+.intro {
+  color: var(--muted);
+  font-size: 15px;
+}
+.modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 40px;
+  margin: 32px 0 20px;
+}
+.modes article + article {
+  padding-left: 40px;
+  border-left: 1px solid var(--line);
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--green);
+}
+.title h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 22px;
+}
+.subtitle {
+  margin: 8px 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.modes dl {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.modes dl > div {
+  display: grid;
+  grid-template-columns: 2em minmax(0, 1fr);
+  gap: 16px;
+  font-size: 14px;
+}
+.modes dt {
+  color: var(--green);
+}
+.modes dd {
+  margin: 0;
+  color: var(--muted);
+}
+.note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+.section > :global(.actions) {
+  margin-top: 20px;
+  gap: 24px;
+}
+@media (max-width: 640px) {
+  .section {
+    margin-top: 40px;
+    padding: 32px 0;
+  }
+  .modes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    margin-top: 24px;
+  }
+  .modes article + article {
+    padding: 24px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}

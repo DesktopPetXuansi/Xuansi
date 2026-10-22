@@ -1,34 +1,21 @@
-import {
-  ArrowUpRight,
-  Images,
-  Layers3,
-  MemoryStick,
-  MessagesSquare,
-  Monitor,
-} from "lucide-react";
+import { ArrowUpRight, Images, Layers3, Moon, Monitor } from "lucide-react";
 import Link from "next/link";
+import { AiModes } from "@/features/ai-modes";
 
 const moments = [
   {
-    icon: MessagesSquare,
-    label: "01 / 对话",
-    title: "想到什么，就聊什么。",
-    description:
-      "文字交流与连续语音，在工作间隙分享想法。语音功能需要相应模型与设备支持。",
-  },
-  {
     icon: Monitor,
-    label: "02 / 观察",
+    label: "01 / 观察",
     title: "一起看看你的屏幕。",
     description:
       "开启看屏幕后，玄司能结合画面回应。使用在线 AI 时，截图会发送给你选择的服务商；开启前请确认屏幕内容。",
   },
   {
-    icon: MemoryStick,
-    label: "03 / 记忆",
-    title: "记住你愿意留下的事。",
+    icon: Moon,
+    label: "02 / 安静陪伴",
+    title: "专注的时候，就让她休息。",
     description:
-      "在记忆页查看、编辑和保存长期记忆。记忆保存在本机，聊天时使用的相关内容会交给你选择的 AI 处理。",
+      "随时让桌宠休眠，再按需要唤醒。朗读、连续对话与看屏幕分别设置，按自己的节奏使用。",
   },
 ];
 
@@ -66,7 +53,7 @@ export function HomeSections() {
       <section className="home-section" aria-labelledby="everyday-title">
         <header className="section-top">
           <p className="eyebrow">她能做什么</p>
-          <h2 id="everyday-title">不只是桌面上的一个身影。</h2>
+          <h2 id="everyday-title">想聊就聊，想安静也可以。</h2>
           <p className="muted">从一句闲聊开始，按你的节奏慢慢熟悉。</p>
           <Link className="quiet-link" href="/features">
             查看全部功能 <ArrowUpRight size={16} aria-hidden />
@@ -87,6 +74,7 @@ export function HomeSections() {
           ))}
         </div>
       </section>
+      <AiModes />
       <section className="library-promo" aria-labelledby="library-title">
         <div>
           <p className="eyebrow">桌宠长什么样，由你来选</p>
