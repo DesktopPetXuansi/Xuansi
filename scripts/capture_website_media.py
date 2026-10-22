@@ -17,6 +17,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "web/frontend/public/product"
 RELEASE = "v0.8.0"
+LOGICAL_SIZE = (880, 660)
+CAPTURE_SCALE = 3
 LOG = logging.getLogger(__name__)
 
 
@@ -53,7 +55,8 @@ def render(source, output):
     application.setQuitOnLastWindowClosed(False)
     panel = Panel(replace(Settings(), observe=False, speak_replies=False))
     panel.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-    panel.resize(880, 660)
+    # 固定逻辑窗口，按 Qt 高 DPI 原生绘制；不把旧位图插值放大。
+    panel.setFixedSize(*LOGICAL_SIZE)
     # 使用未发送草稿和未保存记忆，避免伪装成真实模型的回复或用户聊天。
     panel.input.setText("今天想专心读完一章书，陪我一起开始吧。")
     panel.memory.setPlainText(
@@ -87,10 +90,15 @@ def render(source, output):
             if key == "appearance":
                 renderer = appearance.preview.renderer
                 assert renderer._live2d_active and not renderer._live2d_failed, "Live2D 预览未成功，拒绝发布空截图"
-            filename = f"client-{key}-{RELEASE}.webp"
+            filename = f"client-{key}-{RELEASE}-3x.png"
             image = panel.grab().toImage()
-            assert image.save(str(output / filename), "WEBP", 94), "截图保存失败"
-            record = {"file": filename, "width": image.width(), "height": image.height()}
+            expected_size = tuple(size * CAPTURE_SCALE for size in LOGICAL_SIZE)
+            assert (image.width(), image.height()) == expected_size, "未得到原生 3 倍像素截图"
+            assert image.devicePixelRatio() == CAPTURE_SCALE, "Qt 高 DPI 倍率不正确"
+            # PNG 保留文字与细线的原始像素，避免 WebP 有损编码及二次转码。
+            assert image.save(str(output / filename), "PNG"), "无损截图保存失败"
+            record = {"file": filename, "width": image.width(), "height": image.height(),
+                      "devicePixelRatio": image.devicePixelRatio()}
             records.append(record)
             LOG.info("已采集发行界面 %s", record)
             QTimer.singleShot(0, advance)
@@ -119,7 +127,7 @@ async def prepare(output):
         source = Path(directory)
         with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
             bundle.extractall(source)
-        environment = dict(os.environ, QT_SCALE_FACTOR="1", QT_AUTO_SCREEN_SCALE_FACTOR="0",
+        environment = dict(os.environ, QT_SCALE_FACTOR=str(CAPTURE_SCALE), QT_AUTO_SCREEN_SCALE_FACTOR="0",
                            PYTHONIOENCODING="utf-8")
         environment.pop("QT_QPA_PLATFORM", None)
         process = await asyncio.create_subprocess_exec(
@@ -139,11 +147,13 @@ async def prepare(output):
         "# 玄司官网真实客户端截图来源\n\n"
         f"- 发行源码：[`{RELEASE}`](https://github.com/DesktopPetXuansi/Xuansi/tree/{RELEASE})，提交 `{commit}`。\n"
         "- 从 Git 发行 tag 隔离导出 `pet/`、`assets/` 与 `VERSION`，未修改发行代码。\n"
-        "- 通过该版本的 `Panel` 和 `AppearanceHub` 原生 Qt 窗口渲染，`QWidget.grab()` 保存 WebP。没有拼接、合成或重绘界面。\n"
+        "- 通过该版本的 `Panel` 和 `AppearanceHub` 原生 Qt 窗口渲染，`QWidget.grab()` 保存无损 PNG。没有拼接、合成或伪造界面。\n"
+        "- 使用 `QT_SCALE_FACTOR=3` 原生高 DPI 绘制文字与控件，像素为 2640×1980；不是对旧 880×660 位图插值放大。网页直接展示 PNG，不经过有损转码。\n"
         "- 对话图只填写未发送草稿，不包含虚构 AI 回复；记忆内容为明确标注的演示草稿，未保存。形象图使用发行内置玄司 Live2D。\n"
         "- 没有启动 AI 运行时、模型下载、联网、麦克风、屏幕观察、账号系统或反馈发送；未读取用户配置、真实聊天或密钥。\n"
         "- 展示标注建议：**v0.8.0 客户端实拍；对话草稿和记忆为示例数据，未连接 AI 服务。**\n"
-        f"- 渲染环境：Qt {report['qt']} / {report['platform']}；统一逻辑窗口 880 × 660，实际图片尺寸如下。\n"
+        f"- 渲染环境：Qt {report['qt']} / {report['platform']}；统一逻辑窗口 880 × 660，设备像素比为 3，实际图片尺寸如下。\n"
+        "- 旧 WebP 路径保留供已有链接使用；当前首页采用下列无损 PNG。\n"
         "- 复现：在仓库根目录运行 `.venv/Scripts/python.exe scripts/capture_website_media.py`。Windows 原生 Qt/Live2D 会短暂显示独立窗口，不主动抢占焦点；不支持 OpenGL 的 offscreen 平台不用于伪装成功预览。\n\n"
         "| 文件 | 像素 | SHA-256 |\n| --- | --- | --- |\n" + "\n".join(entries) + "\n"
     )

@@ -120,9 +120,8 @@ test("真实截图可用键盘切换，菜单关闭后归还焦点", async ({ pa
 });
 
 test("截图加载失败时保留说明，切换后可恢复查看", async ({ page }) => {
-  await page.route("**/_next/image?*", async (route) => {
-    const image = new URL(route.request().url()).searchParams.get("url");
-    if (image?.includes("client-appearance")) await route.abort();
+  await page.route("**/product/client-*-3x.png", async (route) => {
+    if (new URL(route.request().url()).pathname.includes("client-appearance")) await route.abort();
     else await route.continue();
   });
   await page.goto("/");
