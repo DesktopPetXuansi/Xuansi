@@ -1,18 +1,29 @@
-.toolbar {
+.toolbar,
+.filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 16px 32px;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar {
   margin-bottom: 24px;
 }
-.toolbar > label {
-  min-width: 160px;
-}
-.toolbar p,
 .meta,
 .label {
   color: var(--muted);
   font-size: 13px;
+}
+.listHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.listHeader h2 {
+  font-size: 20px;
+  margin: 0;
 }
 .list {
   display: grid;
@@ -27,7 +38,7 @@
   background: var(--white);
   overflow-wrap: anywhere;
 }
-.item h2 {
+.item h3 {
   font-size: 18px;
   margin: 12px 0;
 }
@@ -51,12 +62,13 @@
 }
 .description {
   white-space: pre-wrap;
-  margin: 16px 0 24px;
+  margin: 12px 0 16px;
 }
 .info {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 12px;
+  margin: 12px 0 16px;
 }
 .info > dt {
   color: var(--muted);
@@ -81,7 +93,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-block: 16px;
+}
+.extra {
+  border-top: 1px solid var(--line);
+}
+.extra > summary {
+  color: var(--muted);
+  font-size: 14px;
+}
+.technical {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
 }
 .failure {
   display: grid;
@@ -104,6 +127,15 @@
   padding: 0;
 }
 @media (max-width: 540px) {
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+  .filters :global(.button) {
+    padding-inline: 6px;
+    min-width: 0;
+  }
   .item {
     padding: 16px;
   }
