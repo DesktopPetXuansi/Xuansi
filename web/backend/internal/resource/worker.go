@@ -124,7 +124,12 @@ func (w *Worker) claim(ctx context.Context) (platform.Job, error) {
 	var job platform.Job
 	e := w.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var e error
-		job, e = gorm.G[platform.Job](tx, clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Where("(status='QUEUED' AND run_at<=?) OR (status='RUNNING' AND lease_until<?)", time.Now(), time.Now()).Order("run_at ASC").First(ctx)
+		query := gorm.G[platform.Job](tx, clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Where("(status='QUEUED' AND run_at<=?) OR (status='RUNNING' AND lease_until<?)", time.Now(), time.Now())
+		if w.Config.MailDeliveryDisabled {
+			// 领取前排除邮件，保留原状态、租约和重试次数；其他任务照常调度。
+			query = query.Where("kind <> ?", "MAIL")
+		}
+		job, e = query.Order("run_at ASC").First(ctx)
 		if e != nil {
 			return e
 		}

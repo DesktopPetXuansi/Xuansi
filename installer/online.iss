@@ -52,8 +52,11 @@ Source: "{#Payload}\pet\tool_protocol.py"; DestDir: "{tmp}\preflight\pet"; Flags
 Source: "{#Payload}\pet\text_stream.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
 Source: "{#Payload}\pet\model_memory.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
 Source: "{#Payload}\scripts\preflight*.py"; DestDir: "{tmp}\preflight\scripts"; Flags: dontcopy
-; 桌面包不携带官网源码；运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
-Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 桌面包不携带官网源码和开发笔记；安装须知已由 InfoBeforeFile 编译嵌入。
+; 运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
+Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\omx_wiki\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 单独保留 NOTICE 引用的公开第三方许可，维持原路径和相对许可链接。
+Source: "{#Payload}\omx_wiki\项目\THIRD_PARTY.md"; DestDir: "{app}\omx_wiki\项目"; Flags: ignoreversion
 ; 安装版资源回归与 Go 共用这份校验样例，显式保留数据文件，不部署官网程序。
 Source: "{#Payload}\web\contracts\fixtures\model-references.json"; DestDir: "{app}\web\contracts\fixtures"; Flags: ignoreversion
 
