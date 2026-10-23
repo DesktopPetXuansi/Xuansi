@@ -43,13 +43,15 @@ export function FeedbackModeration({
       <div className={styles.actions}>
         {item.moderationStatus === "PENDING" && (
           <>
-            <Button
-              className="secondary"
-              disabled={busy || !item.publicConsent}
-              onClick={() => onModerate("APPROVE")}
-            >
-              {item.publicConsent ? "审核通过并排队公开" : "未授权公开"}
-            </Button>
+            {item.publicConsent && (
+              <Button
+                className="secondary"
+                disabled={busy}
+                onClick={() => onModerate("APPROVE")}
+              >
+                审核通过并排队公开
+              </Button>
+            )}
             <Button
               className="secondary"
               disabled={busy}

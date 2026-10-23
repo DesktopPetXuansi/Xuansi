@@ -12,8 +12,10 @@ export const feedbackStatuses = {
 const categories = {
   BUG: "使用问题",
   SUGGESTION: "功能建议",
-  OTHER: "其他",
+  OTHER: "问题与建议",
 } satisfies Record<Feedback["category"], string>;
+
+const progressActions = ["NEW", "IN_PROGRESS", "RESOLVED"] as const;
 
 export function FeedbackItem({
   item,
@@ -31,6 +33,14 @@ export function FeedbackItem({
   onModerate: (decision: FeedbackModerationInput["decision"]) => void;
 }) {
   const diagnostics = item.diagnostics;
+  const needsCleanup = item.moderationStatus === "WITHDRAWAL_REQUESTED";
+  // 官网标题取自正文首行，相同内容只显示一次，长正文仍完整可读。
+  const hasDescription = item.description.trim() !== item.title.trim();
+  const actionLabels = {
+    NEW: item.status === "RESOLVED" ? "重新打开" : "移回待处理",
+    IN_PROGRESS: item.status === "RESOLVED" ? "继续处理" : "开始处理",
+    RESOLVED: "标记已解决",
+  } satisfies Record<Feedback["status"], string>;
   return (
     <article className={styles.item} aria-label={item.title || "已撤回的反馈"}>
       <div className={styles.meta}>
@@ -40,61 +50,58 @@ export function FeedbackItem({
           {new Date(item.createdAt).toLocaleString("zh-CN")}
         </time>
       </div>
-      <h2>{item.title || "已撤回的反馈"}</h2>
-      <details>
-        <summary>查看反馈与处理</summary>
-        <FeedbackModeration item={item} busy={busy} onModerate={onModerate} />
+      <h3>{item.title || "已撤回的反馈"}</h3>
+      {hasDescription && (
         <p className={styles.description}>{item.description}</p>
+      )}
+      {item.contact && (
         <dl className={styles.info}>
           <dt>联系方式</dt>
-          <dd>{item.contact || "未填写"}</dd>
-          <dt>版本与系统</dt>
-          <dd>
-            {diagnostics ? (
-              <dl className={styles.diagnostics}>
-                {(
-                  [
-                    ["软件版本", diagnostics.appVersion],
-                    ["操作系统", diagnostics.system],
-                    ["系统架构", diagnostics.architecture],
-                    ["Python 版本", diagnostics.pythonVersion],
-                    ["Qt 版本", diagnostics.qtVersion],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value || "未提供"}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              "未附带"
-            )}
-          </dd>
+          <dd>{item.contact}</dd>
         </dl>
-        <p className={styles.label}>处理状态</p>
-        <div className={styles.actions} aria-label="修改处理状态">
-          {Object.entries(feedbackStatuses).map(([status, label]) => (
+      )}
+      <div className={styles.actions} aria-label="修改处理状态">
+        {progressActions
+          .filter((status) => status !== item.status)
+          .map((status) => (
             <Button
               key={status}
-              className="secondary"
-              disabled={busy || status === item.status}
-              onClick={() => {
-                // 状态值来自同一枚举，避免接纳外部输入作为处理操作。
-                if (
-                  status === "NEW" ||
-                  status === "IN_PROGRESS" ||
-                  status === "RESOLVED"
-                )
-                  onChange(status);
-              }}
+              className={status === "RESOLVED" ? "" : "secondary"}
+              disabled={busy}
+              onClick={() => onChange(status)}
             >
-              标记为{label}
+              {actionLabels[status]}
             </Button>
           ))}
-        </div>
-        {saving && <Notice>正在保存处理状态…</Notice>}
-        {error !== undefined && <Notice error={error} />}
+      </div>
+      {saving && <Notice>正在保存处理操作…</Notice>}
+      {error !== undefined && <Notice error={error} />}
+      <details className={styles.extra} open={needsCleanup}>
+        <summary>
+          {needsCleanup ? "撤回请求：待清理公开内容" : "公开与其他操作"}
+        </summary>
+        <FeedbackModeration item={item} busy={busy} onModerate={onModerate} />
+        {diagnostics && (
+          <div className={styles.technical}>
+            <p className={styles.label}>版本与系统</p>
+            <dl className={styles.diagnostics}>
+              {(
+                [
+                  ["软件版本", diagnostics.appVersion],
+                  ["操作系统", diagnostics.system],
+                  ["系统架构", diagnostics.architecture],
+                  ["Python 版本", diagnostics.pythonVersion],
+                  ["Qt 版本", diagnostics.qtVersion],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value || "未提供"}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
       </details>
     </article>
   );
