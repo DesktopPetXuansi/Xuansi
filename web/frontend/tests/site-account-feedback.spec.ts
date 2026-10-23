@@ -115,7 +115,7 @@ test("匿名反馈只需填写正文，成功后显示简洁回执并可开始�
   });
   await expect(text).toHaveCount(0);
   await expect(
-    section.getByRole("link", { name: /^查看或撤回反馈/ }),
+    section.getByRole("link", { name: /^查看回复、补充或撤回/ }),
   ).toHaveAttribute("href", "/feedback/manage");
   await expect(
     section.getByRole("button", { name: "查看最新状态" }),

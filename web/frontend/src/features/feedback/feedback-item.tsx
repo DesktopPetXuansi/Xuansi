@@ -3,11 +3,10 @@ import type { Feedback, FeedbackModerationInput } from "@/lib/types";
 import { FeedbackModeration } from "./feedback-moderation";
 import styles from "./feedback.module.css";
 
-export const feedbackStatuses = {
-  NEW: "待处理",
-  IN_PROGRESS: "处理中",
-  RESOLVED: "已解决",
-} satisfies Record<Feedback["status"], string>;
+export { feedbackStatuses } from "./feedback-statuses";
+import { feedbackStatuses } from "./feedback-statuses";
+import { FeedbackConversationPanel } from "./feedback-conversation";
+import type { ComponentProps } from "react";
 
 const categories = {
   BUG: "使用问题",
@@ -24,6 +23,7 @@ export function FeedbackItem({
   error,
   onChange,
   onModerate,
+  conversation,
 }: {
   item: Feedback;
   busy: boolean;
@@ -31,6 +31,10 @@ export function FeedbackItem({
   error?: unknown;
   onChange: (status: Feedback["status"]) => void;
   onModerate: (decision: FeedbackModerationInput["decision"]) => void;
+  conversation: Omit<
+    ComponentProps<typeof FeedbackConversationPanel>,
+    "id" | "busy"
+  >;
 }) {
   const diagnostics = item.diagnostics;
   const needsCleanup = item.moderationStatus === "WITHDRAWAL_REQUESTED";
@@ -74,6 +78,16 @@ export function FeedbackItem({
             </Button>
           ))}
       </div>
+      {item.moderationStatus === "WITHDRAWN" ? (
+        <Notice>这条反馈已撤回，原文与私有对话已清理。</Notice>
+      ) : (
+        <FeedbackConversationPanel
+          key={`${item.id}:${item.moderationStatus}`}
+          id={item.id}
+          busy={busy}
+          {...conversation}
+        />
+      )}
       {saving && <Notice>正在保存处理操作…</Notice>}
       {error !== undefined && <Notice error={error} />}
       <details className={styles.extra} open={needsCleanup}>
