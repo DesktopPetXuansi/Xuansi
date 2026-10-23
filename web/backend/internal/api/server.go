@@ -48,7 +48,7 @@ func CurrentUser(r *http.Request) *platform.User {
 func who(r *http.Request) *Identity { i, _ := r.Context().Value(identityKey{}).(*Identity); return i }
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.Recoverer, s.headers, s.rateLimit, s.authentication, s.requestLog)
+	r.Use(privateRequestID, middleware.Recoverer, s.headers, s.rateLimit, s.authentication, s.requestLog)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		reply(w, 200, map[string]string{"status": "ok"})
 	})

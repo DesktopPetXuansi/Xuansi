@@ -56,6 +56,9 @@ func normalizedEmail(s string) (string, bool) {
 	return s, e == nil && a.Address == s && len(s) <= 254
 }
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	if s.mailDeliveryPaused(w, r) {
+		return
+	}
 	var in struct{ Email, Password, DisplayName string }
 	if !decode(w, r, &in) {
 		return
@@ -142,6 +145,9 @@ func (s *Server) issueAccountToken(ctx context.Context, tx *gorm.DB, u platform.
 }
 func (s *Server) requestToken(purpose string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.mailDeliveryPaused(w, r) {
+			return
+		}
 		var in struct{ Email string }
 		if !decode(w, r, &in) {
 			return

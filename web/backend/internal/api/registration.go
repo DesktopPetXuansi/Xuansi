@@ -36,6 +36,9 @@ type registrationCodeReceipt struct {
 
 // 取码只创建短期挑战和邮件任务，不预建用户，也不返回验证码。
 func (s *Server) requestRegistrationCode(w http.ResponseWriter, r *http.Request) {
+	if s.mailDeliveryPaused(w, r) {
+		return
+	}
 	var input struct{ Email string }
 	if !decode(w, r, &input) {
 		return
