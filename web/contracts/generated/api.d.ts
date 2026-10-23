@@ -1011,6 +1011,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/feedback/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员读取私有对话 */
+        get: operations["adminFeedbackMessages"];
+        put?: never;
+        /** 管理员回复，可同时标记已解决 */
+        post: operations["adminReplyFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback/{id}/messages/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 凭管理凭据读取私有对话 */
+        post: operations["queryFeedbackMessages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 用户补充说明并重新进入待处理 */
+        post: operations["appendFeedbackMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1601,6 +1653,56 @@ export interface components {
             challengeId: string;
             code: string;
             password: string;
+        };
+        /** @description 私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。 */
+        FeedbackMessage: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            authorRole: "ADMIN" | "USER";
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        FeedbackConversation: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            description: string;
+            status: components["schemas"]["FeedbackStatus"];
+            moderationStatus: components["schemas"]["FeedbackModerationStatus"];
+            canReply: boolean;
+            messages: components["schemas"]["FeedbackMessage"][];
+        };
+        /** @description 默认最新20条，每页内部升序；游标绑定反馈编号并加载更早的消息。 */
+        FeedbackConversationResponse: {
+            data: components["schemas"]["FeedbackConversation"];
+            meta: {
+                nextCursor: string | null;
+            };
+        };
+        FeedbackMessageQuery: {
+            managementToken: string;
+            cursor?: string;
+            /** @default 20 */
+            limit: number;
+        };
+        FeedbackAdminMessageInput: {
+            body: string;
+            /** @default false */
+            resolve: boolean;
+        };
+        FeedbackUserMessageInput: {
+            managementToken: string;
+            body: string;
+        };
+        FeedbackMessageReceipt: {
+            message: components["schemas"]["FeedbackMessage"];
+            /** @description 响应时父反馈的当前状态；幂等重放保持原消息，不重写已被后续操作改变的状态。 */
+            feedbackStatus: components["schemas"]["FeedbackStatus"];
+        };
+        FeedbackMessageResponse: {
+            data: components["schemas"]["FeedbackMessageReceipt"];
         };
     };
     responses: never;
@@ -4077,6 +4179,176 @@ export interface operations {
                 };
             };
             /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    adminFeedbackMessages: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取或发送成功，幂等重试返回原消息。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackConversationResponse"];
+                };
+            };
+            /** @description 沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    adminReplyFeedback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 精确 Origin 与双提交 Cookie 校验。 */
+                "X-CSRF-Token": string;
+                /** @description 同一次发送及重试复用；不同正文或管理员身份复用返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackAdminMessageInput"];
+            };
+        };
+        responses: {
+            /** @description 幂等重放返回原消息及响应时的当前反馈状态，不重复改变状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageResponse"];
+                };
+            };
+            /** @description 新消息与处理状态已原子保存。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageResponse"];
+                };
+            };
+            /** @description 沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    queryFeedbackMessages: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 精确 Origin 与双提交 Cookie 校验。 */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackMessageQuery"];
+            };
+        };
+        responses: {
+            /** @description 读取或发送成功，幂等重试返回原消息。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackConversationResponse"];
+                };
+            };
+            /** @description 沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    appendFeedbackMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 精确 Origin 与双提交 Cookie 校验。 */
+                "X-CSRF-Token": string;
+                /** @description 同一次发送及重试复用；不同正文或管理员身份复用返回409。 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackUserMessageInput"];
+            };
+        };
+        responses: {
+            /** @description 幂等重放返回原消息及响应时的当前反馈状态，不重复改变状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageResponse"];
+                };
+            };
+            /** @description 新消息与处理状态已原子保存。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageResponse"];
+                };
+            };
+            /** @description 沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。 */
             default: {
                 headers: {
                     [name: string]: unknown;

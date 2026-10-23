@@ -90,6 +90,8 @@ func feedbackDecodeError(w http.ResponseWriter, r *http.Request, e error) {
 }
 func (s *Server) feedbackRoutes(r chi.Router) {
 	r.Post("/feedback", s.createFeedback)
+	r.Post("/feedback/{id}/messages/query", s.queryFeedbackMessages)
+	r.Post("/feedback/{id}/messages", s.sendUserFeedbackMessage)
 	r.Post("/feedback/{id}/management", s.manageFeedback)
 	r.Post("/feedback/{id}/withdrawal", s.withdrawFeedback)
 }

@@ -105,5 +105,9 @@ func saveFeedbackWithdrawal(tx *gorm.DB, row *feedbackEntry) error {
 		updates["title"], updates["description"], updates["contact"] = "", "", ""
 		updates["diagnostics"], updates["git_hub_issue_url"] = nil, ""
 	}
-	return tx.Model(row).Updates(updates).Error
+	if err := tx.Model(row).Updates(updates).Error; err != nil {
+		return err
+	}
+	// 发起外部清理时即删除私信正文，不等待最终公开内容撤回确认。
+	return tx.Model(&feedbackMessage{}).Where("feedback_id=?", row.ID).Update("body", "").Error
 }

@@ -129,6 +129,24 @@ func (e FeedbackCategory) Valid() bool {
 	}
 }
 
+// Defines values for FeedbackMessageAuthorRole.
+const (
+	FeedbackAuthorAdmin FeedbackMessageAuthorRole = "ADMIN"
+	FeedbackAuthorUser  FeedbackMessageAuthorRole = "USER"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackMessageAuthorRole enum.
+func (e FeedbackMessageAuthorRole) Valid() bool {
+	switch e {
+	case FeedbackAuthorAdmin:
+		return true
+	case FeedbackAuthorUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FeedbackModerationInputDecision.
 const (
 	FeedbackModerationInputDecisionAPPROVE           FeedbackModerationInputDecision = "APPROVE"
@@ -754,8 +772,33 @@ type Feedback struct {
 	UpdatedAt        time.Time                `json:"updatedAt"`
 }
 
+// FeedbackAdminMessageInput defines model for FeedbackAdminMessageInput.
+type FeedbackAdminMessageInput struct {
+	Body    string `json:"body"`
+	Resolve *bool  `json:"resolve,omitempty"`
+}
+
 // FeedbackCategory defines model for FeedbackCategory.
 type FeedbackCategory string
+
+// FeedbackConversation defines model for FeedbackConversation.
+type FeedbackConversation struct {
+	CanReply         bool                     `json:"canReply"`
+	Description      string                   `json:"description"`
+	Id               openapi_types.UUID       `json:"id"`
+	Messages         []FeedbackMessage        `json:"messages"`
+	ModerationStatus FeedbackModerationStatus `json:"moderationStatus"`
+	Status           FeedbackStatus           `json:"status"`
+	Title            string                   `json:"title"`
+}
+
+// FeedbackConversationResponse 默认最新20条，每页内部升序；游标绑定反馈编号并加载更早的消息。
+type FeedbackConversationResponse struct {
+	Data FeedbackConversation `json:"data"`
+	Meta struct {
+		NextCursor *string `json:"nextCursor"`
+	} `json:"meta"`
+}
 
 // FeedbackDiagnostics 仅用户主动附带的固定版本信息；每值先trim后最多80字符。
 type FeedbackDiagnostics struct {
@@ -810,6 +853,38 @@ type FeedbackManagementResponse struct {
 	Data FeedbackManagement `json:"data"`
 }
 
+// FeedbackMessage 私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。
+type FeedbackMessage struct {
+	AuthorRole FeedbackMessageAuthorRole `json:"authorRole"`
+	Body       string                    `json:"body"`
+	CreatedAt  time.Time                 `json:"createdAt"`
+	Id         openapi_types.UUID        `json:"id"`
+}
+
+// FeedbackMessageAuthorRole defines model for FeedbackMessage.AuthorRole.
+type FeedbackMessageAuthorRole string
+
+// FeedbackMessageQuery defines model for FeedbackMessageQuery.
+type FeedbackMessageQuery struct {
+	Cursor          *string `json:"cursor,omitempty"`
+	Limit           *int    `json:"limit,omitempty"`
+	ManagementToken string  `json:"managementToken"`
+}
+
+// FeedbackMessageReceipt defines model for FeedbackMessageReceipt.
+type FeedbackMessageReceipt struct {
+	// FeedbackStatus 响应时父反馈的当前状态；幂等重放保持原消息，不重写已被后续操作改变的状态。
+	FeedbackStatus FeedbackStatus `json:"feedbackStatus"`
+
+	// Message 私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。
+	Message FeedbackMessage `json:"message"`
+}
+
+// FeedbackMessageResponse defines model for FeedbackMessageResponse.
+type FeedbackMessageResponse struct {
+	Data FeedbackMessageReceipt `json:"data"`
+}
+
 // FeedbackModerationInput defines model for FeedbackModerationInput.
 type FeedbackModerationInput struct {
 	Decision FeedbackModerationInputDecision `json:"decision"`
@@ -846,6 +921,12 @@ type FeedbackStatus string
 // FeedbackStatusInput defines model for FeedbackStatusInput.
 type FeedbackStatusInput struct {
 	Status FeedbackStatus `json:"status"`
+}
+
+// FeedbackUserMessageInput defines model for FeedbackUserMessageInput.
+type FeedbackUserMessageInput struct {
+	Body            string `json:"body"`
+	ManagementToken string `json:"managementToken"`
 }
 
 // Grant defines model for Grant.
@@ -1345,6 +1426,21 @@ type PatchApiV1AdminFeedbackIdParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// AdminFeedbackMessagesParams defines parameters for AdminFeedbackMessages.
+type AdminFeedbackMessagesParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// AdminReplyFeedbackParams defines parameters for AdminReplyFeedback.
+type AdminReplyFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// IdempotencyKey 同一次发送及重试复用；不同正文或管理员身份复用返回409。
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
 // GetApiV1AdminJobsParams defines parameters for GetApiV1AdminJobs.
 type GetApiV1AdminJobsParams struct {
 	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1509,6 +1605,21 @@ type PostApiV1FeedbackParams struct {
 
 	// IdempotencyKey 标准小写非零UUID；同编号不同内容409。
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// AppendFeedbackMessageParams defines parameters for AppendFeedbackMessage.
+type AppendFeedbackMessageParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// IdempotencyKey 同一次发送及重试复用；不同正文或管理员身份复用返回409。
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// QueryFeedbackMessagesParams defines parameters for QueryFeedbackMessages.
+type QueryFeedbackMessagesParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
 // PatchApiV1MeJSONBody defines parameters for PatchApiV1Me.
@@ -1820,6 +1931,9 @@ type PostApiV1AdminClientReleasesIdPublicationsJSONRequestBody = PostApiV1AdminC
 // PatchApiV1AdminFeedbackIdJSONRequestBody defines body for PatchApiV1AdminFeedbackId for application/json ContentType.
 type PatchApiV1AdminFeedbackIdJSONRequestBody = FeedbackStatusInput
 
+// AdminReplyFeedbackJSONRequestBody defines body for AdminReplyFeedback for application/json ContentType.
+type AdminReplyFeedbackJSONRequestBody = FeedbackAdminMessageInput
+
 // PostApiV1AdminFeedbackIdModerationJSONRequestBody defines body for PostApiV1AdminFeedbackIdModeration for application/json ContentType.
 type PostApiV1AdminFeedbackIdModerationJSONRequestBody = FeedbackModerationInput
 
@@ -1861,6 +1975,12 @@ type PostApiV1FeedbackJSONRequestBody = FeedbackInput
 
 // PostApiV1FeedbackIdManagementJSONRequestBody defines body for PostApiV1FeedbackIdManagement for application/json ContentType.
 type PostApiV1FeedbackIdManagementJSONRequestBody = FeedbackManagementInput
+
+// AppendFeedbackMessageJSONRequestBody defines body for AppendFeedbackMessage for application/json ContentType.
+type AppendFeedbackMessageJSONRequestBody = FeedbackUserMessageInput
+
+// QueryFeedbackMessagesJSONRequestBody defines body for QueryFeedbackMessages for application/json ContentType.
+type QueryFeedbackMessagesJSONRequestBody = FeedbackMessageQuery
 
 // PostApiV1FeedbackIdWithdrawalJSONRequestBody defines body for PostApiV1FeedbackIdWithdrawal for application/json ContentType.
 type PostApiV1FeedbackIdWithdrawalJSONRequestBody = FeedbackManagementInput

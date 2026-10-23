@@ -4545,6 +4545,299 @@
           }
         ]
       }
+    },
+    "/api/v1/admin/feedback/{id}/messages": {
+      "get": {
+        "operationId": "adminFeedbackMessages",
+        "summary": "管理员读取私有对话",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "读取或发送成功，幂等重试返回原消息。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackConversationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "adminReplyFeedback",
+        "summary": "管理员回复，可同时标记已解决",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "同一次发送及重试复用；不同正文或管理员身份复用返回409。"
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "幂等重放返回原消息及响应时的当前反馈状态，不重复改变状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新消息与处理状态已原子保存。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackAdminMessageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback/{id}/messages/query": {
+      "post": {
+        "operationId": "queryFeedbackMessages",
+        "summary": "凭管理凭据读取私有对话",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "读取或发送成功，幂等重试返回原消息。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackConversationResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackMessageQuery"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback/{id}/messages": {
+      "post": {
+        "operationId": "appendFeedbackMessage",
+        "summary": "用户补充说明并重新进入待处理",
+        "tags": [
+          "feedback"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "同一次发送及重试复用；不同正文或管理员身份复用返回409。"
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "幂等重放返回原消息及响应时的当前反馈状态，不重复改变状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "沿用统一业务错误；无效管理凭据与不存在的匿名反馈统一403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新消息与处理状态已原子保存。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackUserMessageInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6715,6 +7008,199 @@
             "type": "string",
             "minLength": 12,
             "maxLength": 128
+          }
+        }
+      },
+      "FeedbackMessage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "authorRole",
+          "body",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorRole": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "USER"
+            ],
+            "x-enum-varnames": [
+              "FeedbackAuthorAdmin",
+              "FeedbackAuthorUser"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。"
+      },
+      "FeedbackConversation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "moderationStatus",
+          "canReply",
+          "messages"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "moderationStatus": {
+            "$ref": "#/components/schemas/FeedbackModerationStatus"
+          },
+          "canReply": {
+            "type": "boolean"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackMessage"
+            }
+          }
+        }
+      },
+      "FeedbackConversationResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackConversation"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nextCursor"
+            ],
+            "properties": {
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "description": "默认最新20条，每页内部升序；游标绑定反馈编号并加载更早的消息。"
+      },
+      "FeedbackMessageQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "managementToken"
+        ],
+        "properties": {
+          "managementToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        }
+      },
+      "FeedbackAdminMessageInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "resolve": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "FeedbackUserMessageInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "managementToken",
+          "body"
+        ],
+        "properties": {
+          "managementToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "FeedbackMessageReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "message",
+          "feedbackStatus"
+        ],
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/FeedbackMessage"
+          },
+          "feedbackStatus": {
+            "$ref": "#/components/schemas/FeedbackStatus",
+            "description": "响应时父反馈的当前状态；幂等重放保持原消息，不重写已被后续操作改变的状态。"
+          }
+        }
+      },
+      "FeedbackMessageResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackMessageReceipt"
           }
         }
       }

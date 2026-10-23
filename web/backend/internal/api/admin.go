@@ -18,6 +18,8 @@ func (s *Server) adminRoutes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(admin)
 		r.Get("/feedback", s.listFeedback)
+		r.Get("/feedback/{id}/messages", s.adminFeedbackMessages)
+		r.Post("/feedback/{id}/messages", s.sendAdminFeedbackMessage)
 		r.Patch("/feedback/{id}", s.patchFeedback)
 		r.Post("/feedback/{id}/moderation", s.moderateFeedback)
 		r.Get("/users", s.adminUsers)
