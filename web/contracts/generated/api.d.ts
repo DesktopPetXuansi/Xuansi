@@ -569,7 +569,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 需要管理员角色 */
+        /** 管理员查询全站账号，先筛选再按注册时间和ID稳定分页 */
         get: operations["get__api_v1_admin_users"];
         put?: never;
         post?: never;
@@ -1570,8 +1570,13 @@ export interface components {
         };
         UserList: {
             data: components["schemas"]["User"][];
-            meta?: {
-                nextCursor?: string;
+            meta: {
+                nextCursor: string | null;
+                /**
+                 * Format: int64
+                 * @description 全部匹配账号数量，不受游标影响。
+                 */
+                total: number;
             };
         };
         CreatedVersionResponse: {
@@ -1899,6 +1904,11 @@ export interface components {
         FeedbackClaimInput: {
             managementToken: string;
         };
+        /**
+         * @description APPEARANCE为MODEL/IMAGE/ANIMATION，ADDON为MOTION/EXPRESSION。
+         * @enum {string}
+         */
+        ResourceGroup: "APPEARANCE" | "ADDON";
     };
     responses: never;
     parameters: never;
@@ -2447,6 +2457,8 @@ export interface operations {
                 arch?: string;
                 channel?: string;
                 limit?: number;
+                /** @description 可选用途分组，先筛选再分页；不传时保留原全资源范围。 */
+                group?: components["schemas"]["ResourceGroup"];
             };
             header?: never;
             path?: never;
@@ -2521,6 +2533,8 @@ export interface operations {
                 arch?: string;
                 channel?: string;
                 limit?: number;
+                /** @description 可选用途分组，先筛选再分页；不传时保留原全资源范围。 */
+                group?: components["schemas"]["ResourceGroup"];
             };
             header?: never;
             path?: never;
@@ -3253,14 +3267,13 @@ export interface operations {
     get__api_v1_admin_users: {
         parameters: {
             query?: {
+                /** @description 按注册时间与ID稳定翻页的不透明游标，不包含邮箱或搜索词。 */
                 cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
                 limit?: number;
+                /** @description 昵称或邮箱，忽略大小写的字面子串，最多120个Unicode码点。 */
+                search?: string;
+                role?: "USER" | "ADMIN";
+                status?: "ACTIVE" | "DISABLED";
             };
             header?: never;
             path?: never;

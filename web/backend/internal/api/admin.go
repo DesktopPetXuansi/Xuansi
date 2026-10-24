@@ -37,19 +37,6 @@ func (s *Server) adminRoutes(r chi.Router) {
 		r.Get("/audit-logs", s.adminAudit)
 	})
 }
-func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request) {
-	limit, _ := page(r)
-	rows, e := gorm.G[platform.User](s.DB).Order("created_at DESC").Limit(limit).Find(r.Context())
-	if e != nil {
-		s.fail(w, r, e)
-		return
-	}
-	out := []platform.UserView{}
-	for _, u := range rows {
-		out = append(out, u.View())
-	}
-	reply(w, 200, out)
-}
 func (s *Server) adminUserStatus(w http.ResponseWriter, r *http.Request) {
 	id, ok := validID(w, r, "id")
 	if !ok {

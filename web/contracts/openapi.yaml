@@ -983,6 +983,14 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "可选用途分组，先筛选再分页；不传时保留原全资源范围。",
+            "schema": {
+              "$ref": "#/components/schemas/ResourceGroup"
+            }
           }
         ]
       },
@@ -1145,6 +1153,14 @@
               "minimum": 1,
               "maximum": 100,
               "default": 20
+            }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "可选用途分组，先筛选再分页；不传时保留原全资源范围。",
+            "schema": {
+              "$ref": "#/components/schemas/ResourceGroup"
             }
           }
         ]
@@ -2520,7 +2536,7 @@
     "/api/v1/admin/users": {
       "get": {
         "operationId": "get__api_v1_admin_users",
-        "summary": "需要管理员角色",
+        "summary": "管理员查询全站账号，先筛选再按注册时间和ID稳定分页",
         "tags": [
           "admin"
         ],
@@ -2555,50 +2571,10 @@
           {
             "name": "cursor",
             "in": "query",
+            "description": "按注册时间与ID稳定翻页的不透明游标，不包含邮箱或搜索词。",
             "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1024
             }
           },
           {
@@ -2609,6 +2585,45 @@
               "minimum": 1,
               "maximum": 100,
               "default": 20
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "昵称或邮箱，忽略大小写的字面子串，最多120个Unicode码点。",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USER",
+                "ADMIN"
+              ],
+              "x-enum-varnames": [
+                "AdminUsersRoleUser",
+                "AdminUsersRoleAdmin"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED"
+              ],
+              "x-enum-varnames": [
+                "AdminUsersStatusActive",
+                "AdminUsersStatusDisabled"
+              ]
             }
           }
         ]
@@ -6878,14 +6893,25 @@
             "type": "object",
             "properties": {
               "nextCursor": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
+              },
+              "total": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0,
+                "description": "全部匹配账号数量，不受游标影响。"
               }
             },
-            "required": []
+            "required": [
+              "nextCursor",
+              "total"
+            ]
           }
         },
         "required": [
-          "data"
+          "data",
+          "meta"
         ]
       },
       "CreatedVersionResponse": {
@@ -8126,6 +8152,18 @@
         "required": [
           "managementToken"
         ]
+      },
+      "ResourceGroup": {
+        "type": "string",
+        "enum": [
+          "APPEARANCE",
+          "ADDON"
+        ],
+        "x-enum-varnames": [
+          "ResourceGroupAppearance",
+          "ResourceGroupAddon"
+        ],
+        "description": "APPEARANCE为MODEL/IMAGE/ANIMATION，ADDON为MOTION/EXPRESSION。"
       }
     },
     "securitySchemes": {
