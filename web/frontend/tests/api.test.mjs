@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { api, ApiError } from "../src/lib/api.ts";
+import { QueryClient } from "@tanstack/react-query";
+import { redactChatCaches } from "../src/features/feedback/chat/chat-cache.ts";
 
 // 请求不返回时，列表必须退出加载状态；这里使用短时限验证真实取消语义。
 test("公开读取超时返回可重试错误", { timeout: 1000 }, async (context) => {
@@ -21,6 +23,95 @@ test("公开读取超时返回可重试错误", { timeout: 1000 }, async (contex
       error.status === 408 &&
       error.code === "REQUEST_TIMEOUT",
   );
+});
+
+test("撤回同步清理个人与管理员的所有聊天和收件快照", async () => {
+  const cache = new QueryClient();
+  const original = {
+    id: "target",
+    title: "私有原文",
+    description: "私有原文",
+    contact: "private@example.invalid",
+    diagnostics: {},
+    githubIssueUrl: "",
+  };
+  const thread = {
+    id: original.id,
+    title: original.title,
+    preview: "私有原文",
+    lastMessage: { body: "私有原文" },
+    unreadCount: 3,
+    canReply: true,
+  };
+  const keys = [
+    ["feedback-chat", "owner", false],
+    ["feedback-chat", "owner", true],
+    ["feedback-chat", "other", true],
+  ];
+  for (const key of keys)
+    cache.setQueryData(key, { pages: [{ data: [thread] }], pageParams: [""] });
+  cache.setQueryData(["admin-feedback", "NEW"], {
+    pages: [{ data: [original] }],
+    pageParams: [""],
+  });
+  await redactChatCaches(cache, "target", "WITHDRAWN");
+  for (const [, data] of cache.getQueriesData({
+    queryKey: ["feedback-chat"],
+  })) {
+    assert.equal(data.pages[0].data[0].unreadCount, 0);
+    assert.equal(data.pages[0].data[0].canReply, false);
+    assert.equal(JSON.stringify(data).includes("私有原文"), false);
+  }
+  const inbox = cache.getQueryData(["admin-feedback", "NEW"]);
+  assert.equal(inbox.pages[0].data[0].description, "");
+  assert.equal(inbox.pages[0].data[0].contact, "");
+  cache.clear();
+});
+
+test("外部清理申请只清聊天快照，原收件正文仍供管理员清理", async () => {
+  const cache = new QueryClient();
+  cache.setQueryData(["feedback-chat", "owner", true], {
+    pages: [
+      {
+        data: [
+          {
+            id: "target",
+            preview: "私有消息",
+            lastMessage: { body: "私有消息" },
+            unreadCount: 2,
+            canReply: true,
+          },
+        ],
+      },
+    ],
+    pageParams: [""],
+  });
+  cache.setQueryData(["admin-feedback", "ALL"], {
+    pages: [
+      {
+        data: [
+          {
+            id: "target",
+            description: "公开原问题",
+            contact: "private@example.invalid",
+          },
+        ],
+      },
+    ],
+    pageParams: [""],
+  });
+  await redactChatCaches(cache, "target", "WITHDRAWAL_REQUESTED");
+  assert.equal(
+    JSON.stringify(
+      cache.getQueryData(["feedback-chat", "owner", true]),
+    ).includes("私有消息"),
+    false,
+  );
+  assert.equal(
+    cache.getQueryData(["admin-feedback", "ALL"]).pages[0].data[0].description,
+    "公开原问题",
+  );
+  cache.clear();
 });
 
 test("筛选或切页取消请求时保留取消原因", async (context) => {

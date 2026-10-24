@@ -43,6 +43,19 @@ export function readSavedCredentials() {
   const single = credentialsSchema.safeParse(raw);
   return single.success ? [single.data] : [];
 }
+// 只清除用户已主动关联的这条旧凭据，不影响同一浏览器的其他旧反馈。
+export function forgetCredentials(key: string) {
+  try {
+    const remaining = readSavedCredentials().filter(
+      (item) => item.idempotencyKey !== key,
+    );
+    if (remaining.length)
+      localStorage.setItem(storageKey, JSON.stringify(remaining));
+    else localStorage.removeItem(storageKey);
+  } catch {
+    console.warn("[公众反馈] 旧凭据本机清理未完成，服务器已撤销原权限");
+  }
+}
 export function restoreCredentials() {
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   const fromLink = credentialsSchema.safeParse({

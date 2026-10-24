@@ -14,6 +14,7 @@ import {
 import styles from "./public-feedback.module.css";
 import { ManagementStatus } from "./management-status";
 import { FeedbackConversationPanel } from "./feedback-conversation";
+import { FeedbackClaim } from "./feedback-claim";
 
 const subscribe = (listener: () => void) => {
   window.addEventListener("hashchange", listener);
@@ -192,6 +193,24 @@ function BrowserManagementPanel({
         </Notice>
       )}
       {view && <ManagementStatus view={view} />}
+      {credentials.id &&
+        !denied &&
+        view?.moderationStatus !== "WITHDRAWN" &&
+        view?.moderationStatus !== "WITHDRAWAL_REQUESTED" && (
+          <FeedbackClaim
+            credentials={credentials}
+            busy={busy}
+            begin={beginConversation}
+            end={endConversation}
+            onClaimed={() => {
+              accessEpoch.current += 1;
+              setView(undefined);
+              setDenied(true);
+              setLink("");
+              setConversationVersion((previous) => previous + 1);
+            }}
+          />
+        )}
       {credentials.id &&
         !denied &&
         view?.moderationStatus !== "WITHDRAWN" &&

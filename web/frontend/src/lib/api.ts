@@ -7,6 +7,7 @@ type RequestOptions = {
   idempotencyKey?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  expectedAccountId?: string;
 };
 export class ApiError extends Error {
   constructor(
@@ -26,6 +27,9 @@ export async function api<T>(
   options?: RequestOptions,
 ): Promise<T> {
   const headers: Record<string, string> = {};
+  // 只作为会话匹配护栏，防止跨标签页切号后旧操作误归属新账号。
+  if (options?.expectedAccountId)
+    headers["X-Feedback-Account"] = options.expectedAccountId;
   if (method !== "GET") {
     const csrf = await api<{ token: string }>("/auth/csrf");
     headers["X-CSRF-Token"] = csrf.token;

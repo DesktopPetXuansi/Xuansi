@@ -755,22 +755,25 @@ code {
   .sidebar-label { flex-basis: 100%; margin: 0 8px; }
   .sidebar a { padding: 8px; }
   .history-row .actions { width: 100%; justify-content: flex-start; }
-  /* 后台导航允许左右滑动，把首屏空间留给反馈与回复；个人空间保持分组。 */
-  .sidebar[aria-label="管理后台导航"] {
+  /* 后台与反馈聊天优先留出首屏消息区域，普通个人空间继续保留分组。 */
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) {
     flex-wrap: nowrap;
     overflow-x: auto;
     gap: 8px;
     white-space: nowrap;
   }
-  .sidebar[aria-label="管理后台导航"] .sidebar-group {
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) .sidebar-group {
     display: contents;
   }
-  .sidebar[aria-label="管理后台导航"] .sidebar-label {
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) .sidebar-label {
     display: none;
   }
-  .sidebar[aria-label="管理后台导航"] a {
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) a {
     flex-shrink: 0;
     min-height: 44px;
+  }
+  .sidebar[data-feedback-chat="true"] .sidebar-group:not([data-feedback-primary="true"]) {
+    display: none;
   }
 }
 @media (max-width: 900px) {

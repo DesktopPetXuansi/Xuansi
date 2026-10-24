@@ -16,6 +16,9 @@ export type FeedbackManagement = components["schemas"]["FeedbackManagement"];
 export type FeedbackModerationInput =
   components["schemas"]["FeedbackModerationInput"];
 export type FeedbackDiagnostics = components["schemas"]["FeedbackDiagnostics"];
+export type FeedbackParticipant = components["schemas"]["FeedbackParticipant"];
+export type FeedbackThread = components["schemas"]["FeedbackThread"];
+export type FeedbackThreadPage = components["schemas"]["FeedbackThreadPage"];
 export type FeedbackMessage = components["schemas"]["FeedbackMessage"];
 export type FeedbackConversation =
   components["schemas"]["FeedbackConversation"];
