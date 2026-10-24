@@ -13,6 +13,30 @@ import (
 	"xuansi/web/backend/internal/platform"
 )
 
+// 已登录会话应支持连续沟通，并保持独立的持久防刷额度。
+func TestPostgresAccountChatHasIndependentMessageQuota(t *testing.T) {
+	s, a := setupModeration(t)
+	registered(t, s, a, "chat-rate@example.test")
+	id := uuid.NewString()
+	input := moderationInput("连续聊天限频验收", false)
+	delete(input, "managementToken")
+	messageCall(t, a, "POST", "/api/v1/me/feedback", id, input, 201)
+	path := "/api/v1/me/feedback/" + id + "/messages"
+	firstKey := uuid.NewString()
+	body := map[string]string{"body": "连续聊天消息"}
+	messageCall(t, a, "POST", path, firstKey, body, 201)
+	for index := 1; index < 30; index++ {
+		messageCall(t, a, "POST", path, uuid.NewString(), body, 201)
+	}
+	messageCall(t, a, "POST", path, uuid.NewString(), body, 429)
+	messageCall(t, a, "POST", path, firstKey, body, 200)
+	var count int64
+	s.DB.Model(&feedbackMessage{}).Where("feedback_id=?", id).Count(&count)
+	if count != 30 {
+		t.Fatal("聊天限频或幂等重放改变了已提交消息数")
+	}
+}
+
 // 最小真实会话请求可加入账号护栏，验证跨标签页切换不会首次提交到另一个账号。
 func TestPostgresAccountFeedbackStrictInputAndSessionGuard(t *testing.T) {
 	s, a := setupModeration(t)

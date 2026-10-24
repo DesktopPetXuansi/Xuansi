@@ -152,11 +152,20 @@ func (e *feedbackQuotaError) Error() string { return "反馈提交频率超过�
 
 // 条件 UPSERT 对每个来源的额度串行化，多进程与并发请求共享同一限制。
 func reserveFeedbackQuota(tx *gorm.DB, clientHash string, now time.Time) error {
+	return reserveFeedbackQuotaWithLimits(tx, clientHash, now, 5, 20)
+}
+
+// 账号聊天独立于投稿额度，支持连续对话，仍由数据库在多进程间限频。
+func reserveFeedbackChatQuota(tx *gorm.DB, clientHash string, now time.Time) error {
+	return reserveFeedbackQuotaWithLimits(tx, clientHash, now, 30, 300)
+}
+
+func reserveFeedbackQuotaWithLimits(tx *gorm.DB, clientHash string, now time.Time, minuteLimit, hourLimit int) error {
 	for _, window := range []struct {
 		kind     string
 		limit    int
 		duration time.Duration
-	}{{"MINUTE", 5, time.Minute}, {"HOUR", 20, time.Hour}} {
+	}{{"MINUTE", minuteLimit, time.Minute}, {"HOUR", hourLimit, time.Hour}} {
 		var result struct{ Submissions int }
 		query := tx.Raw(`INSERT INTO feedback_submission_limits(client_hash,window_kind,submissions,resets_at)
 		 VALUES(?,?,1,?) ON CONFLICT(client_hash,window_kind) DO UPDATE SET

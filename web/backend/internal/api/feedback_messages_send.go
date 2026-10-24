@@ -140,8 +140,13 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 		if admin || account {
 			source = actor
 		}
-		mac.Write([]byte("feedback-message:" + role + ":" + source))
-		if e := reserveFeedbackQuota(tx, hex.EncodeToString(mac.Sum(nil)), now); e != nil {
+		namespace := "feedback-message:"
+		reserve := reserveFeedbackQuota
+		if parent.OwnerUserID != nil {
+			namespace, reserve = "feedback-chat:", reserveFeedbackChatQuota
+		}
+		mac.Write([]byte(namespace + role + ":" + source))
+		if e := reserve(tx, hex.EncodeToString(mac.Sum(nil)), now); e != nil {
 			return e
 		}
 		next := parent.Status

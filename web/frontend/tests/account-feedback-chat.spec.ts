@@ -159,6 +159,10 @@ test("列表自动同步新消息，仅已展示的消息发送已读水位", as
   await expect(
     page.getByText("开发者的私有答复", { exact: true }).last(),
   ).toBeVisible();
+  await page
+    .getByRole("log")
+    .getByText("开发者的私有答复", { exact: true })
+    .evaluate((element) => element.scrollIntoView({ block: "center" }));
   await expect
     .poll(() => state.reads.some((read) => read.messageId === messageId))
     .toBe(true);
@@ -213,6 +217,10 @@ test("隐藏标签页暂停读取，恢复可见立即同步新回复", async ({
   const { path, state } = await accountChat(page);
   await page.goto(`${path}?id=${threadId}`);
   await expect(page.getByLabel("消息内容", { exact: true })).toBeVisible();
+  await page
+    .getByRole("log")
+    .getByText("开发者的私有答复", { exact: true })
+    .evaluate((element) => element.scrollIntoView({ block: "center" }));
   await expect.poll(() => state.reads.length).toBeGreaterThan(0);
   // 用可控制的浏览器可见性事件替代窗口管理器，避免 CI 中失焦标签页不稳定。
   await page.evaluate(() => {
