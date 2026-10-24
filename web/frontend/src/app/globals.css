@@ -615,7 +615,9 @@ code {
   .nav-inner {
     min-height: 76px;
     gap: 12px;
-    flex-wrap: wrap;
+    /* 品牌按实际字体占宽，账号只使用剩余空间，菜单保持完整触控区。 */
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) 44px;
     padding-block: 12px;
   }
   .brand {
@@ -646,6 +648,7 @@ code {
   .primary-navigation {
     display: none;
     order: 4;
+    grid-column: 1 / -1;
     flex-basis: 100%;
     margin: 0;
     padding-top: 12px;
@@ -744,8 +747,8 @@ code {
 .consent-permissions { padding-left: 24px; }
 .consent-permissions li { margin-bottom: 12px; }
 @media (max-width: 640px) {
-  /* 为品牌与菜单保留宽度，长昵称不再把菜单挤到第二行。 */
-  .nav-account { max-width: calc(100% - 170px); min-width: 0; gap: 5px; }
+  /* 可收缩的账号列兼容不同系统字体，长昵称不再挤换菜单。 */
+  .nav-account { max-width: 100%; min-width: 0; justify-self: end; gap: 5px; }
   .nav-nickname { max-width: 5em; }
   .sidebar { display: flex; flex-wrap: wrap; overflow-x: visible; white-space: normal; gap: 12px 20px; }
   .sidebar-group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; }
