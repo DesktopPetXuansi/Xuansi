@@ -94,13 +94,15 @@ func redactFeedback(row *feedbackEntry) {
 	row.ModerationStatus = "WITHDRAWN"
 	row.Title, row.Description, row.Contact = "", "", ""
 	row.Diagnostics = nil
+	row.SubmitterName = ""
 	row.GitHubIssueURL = ""
 }
 
 // 明确写入零值，保证撤回会真正清空正文、联系方式与诊断。
 func saveFeedbackWithdrawal(tx *gorm.DB, row *feedbackEntry) error {
 	row.UpdatedAt = time.Now().UTC()
-	updates := map[string]interface{}{"moderation_status": row.ModerationStatus, "updated_at": row.UpdatedAt}
+	row.SubmitterName = ""
+	updates := map[string]interface{}{"moderation_status": row.ModerationStatus, "updated_at": row.UpdatedAt, "submitter_name": "", "admin_read_at": nil, "admin_read_id": nil, "owner_read_at": nil, "owner_read_id": nil}
 	if row.ModerationStatus == "WITHDRAWN" {
 		updates["title"], updates["description"], updates["contact"] = "", "", ""
 		updates["diagnostics"], updates["git_hub_issue_url"] = nil, ""
@@ -109,5 +111,5 @@ func saveFeedbackWithdrawal(tx *gorm.DB, row *feedbackEntry) error {
 		return err
 	}
 	// 发起外部清理时即删除私信正文，不等待最终公开内容撤回确认。
-	return tx.Model(&feedbackMessage{}).Where("feedback_id=?", row.ID).Update("body", "").Error
+	return tx.Model(&feedbackMessage{}).Where("feedback_id=?", row.ID).Updates(map[string]interface{}{"body": "", "author_name": ""}).Error
 }

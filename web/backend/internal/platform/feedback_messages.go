@@ -7,6 +7,7 @@ type FeedbackMessage struct {
 	ID             string    `json:"id"`
 	FeedbackID     string    `json:"-"`
 	AuthorRole     string    `json:"authorRole"`
+	AuthorName     string    `json:"authorName,omitempty"`
 	Body           string    `json:"body"`
 	CreatedAt      time.Time `json:"createdAt"`
 	IdempotencyKey string    `json:"-"`

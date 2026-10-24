@@ -18,6 +18,12 @@ type FeedbackDiagnostics struct {
 }
 
 type FeedbackEntry struct {
+	OwnerUserID          *string              `json:"-"`
+	SubmitterName        string               `json:"-"`
+	AdminReadAt          *time.Time           `json:"-"`
+	AdminReadID          *string              `json:"-"`
+	OwnerReadAt          *time.Time           `json:"-"`
+	OwnerReadID          *string              `json:"-"`
 	ID                   string               `json:"id"`
 	IdempotencyKey       string               `json:"-"`
 	RequestHash          string               `json:"-"`

@@ -27,17 +27,22 @@ type messageQuery struct {
 	Limit           *int   `json:"limit,omitempty"`
 }
 type feedbackConversation struct {
-	ID               string            `json:"id"`
-	Title            string            `json:"title"`
-	Description      string            `json:"description"`
-	Status           string            `json:"status"`
-	ModerationStatus string            `json:"moderationStatus"`
-	CanReply         bool              `json:"canReply"`
-	Messages         []feedbackMessage `json:"messages"`
+	ID               string               `json:"id"`
+	Title            string               `json:"title"`
+	Description      string               `json:"description"`
+	Status           string               `json:"status"`
+	ModerationStatus string               `json:"moderationStatus"`
+	CanReply         bool                 `json:"canReply"`
+	Participant      *feedbackParticipant `json:"participant,omitempty"`
+	SubmitterName    string               `json:"submitterName,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
+	UnreadCount      int64                `json:"unreadCount"`
+	Contact          *string              `json:"contact,omitempty"`
+	Messages         []feedbackMessage    `json:"messages"`
 }
 
 func canReplyFeedback(row feedbackEntry) bool {
-	return row.ManagementTokenHash != "" && (row.ModerationStatus == "PENDING" || row.ModerationStatus == "APPROVED")
+	return (row.ManagementTokenHash != "" || row.OwnerUserID != nil) && (row.ModerationStatus == "PENDING" || row.ModerationStatus == "APPROVED")
 }
 func (s *Server) queryFeedbackMessages(w http.ResponseWriter, r *http.Request) {
 	s.readFeedbackMessages(w, r, false)
@@ -46,8 +51,9 @@ func (s *Server) adminFeedbackMessages(w http.ResponseWriter, r *http.Request) {
 	s.readFeedbackMessages(w, r, true)
 }
 func (s *Server) readFeedbackMessages(w http.ResponseWriter, r *http.Request, admin bool) {
+	account := r.Method == http.MethodGet && !admin
 	var in messageQuery
-	if admin {
+	if admin || account {
 		in.Cursor = r.URL.Query().Get("cursor")
 		if raw, ok := r.URL.Query()["limit"]; ok {
 			n, e := strconv.Atoi(raw[0])
@@ -61,8 +67,12 @@ func (s *Server) readFeedbackMessages(w http.ResponseWriter, r *http.Request, ad
 		return
 	}
 	id := chi.URLParam(r, "id")
-	if !canonicalFeedbackID(id) || (!admin && !validFeedbackToken(in.ManagementToken)) {
-		s.messageReadError(w, r, admin, errFeedbackManagement)
+	if !canonicalFeedbackID(id) || (!admin && !account && !validFeedbackToken(in.ManagementToken)) {
+		if account {
+			s.accountFeedbackError(w, r, gorm.ErrRecordNotFound)
+		} else {
+			s.messageReadError(w, r, admin, errFeedbackManagement)
+		}
 		return
 	}
 	limit := 20
@@ -84,16 +94,32 @@ func (s *Server) readFeedbackMessages(w http.ResponseWriter, r *http.Request, ad
 	var row feedbackEntry
 	rows := []feedbackMessage{}
 	var next *string
+	var participant feedbackParticipant
+	var unread int64
 	err := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
 		// 鉴权、读取正文与撤回共享同一父行锁，避免凭据校验后读到已撤回正文。
 		if e := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id=?", id).First(&row).Error; e != nil {
 			return e
 		}
-		if !admin && !feedbackManagementAuthorized(row, in.ManagementToken) {
+		if account && !accountOwns(row, r) {
+			return gorm.ErrRecordNotFound
+		}
+		if !admin && !account && !feedbackManagementAuthorized(row, in.ManagementToken) {
 			return errFeedbackManagement
 		}
-		if row.ModerationStatus == "WITHDRAWN" || row.ModerationStatus == "WITHDRAWAL_REQUESTED" {
+		if feedbackHidden(row) {
+			row.Title, row.Description, row.Contact, row.SubmitterName = "", "", "", ""
+			participant = feedbackParticipant{"GUEST", "访客"}
 			return nil
+		}
+		var e error
+		participant, e = feedbackParticipantView(tx, row)
+		if e != nil {
+			return e
+		}
+		unread, e = feedbackUnread(tx, row, admin)
+		if e != nil {
+			return e
 		}
 		q := tx.Where("feedback_id=?", id)
 		if in.Cursor != "" {
@@ -115,8 +141,16 @@ func (s *Server) readFeedbackMessages(w http.ResponseWriter, r *http.Request, ad
 		return nil
 	})
 	if err != nil {
-		s.messageReadError(w, r, admin, err)
+		if account {
+			s.accountFeedbackError(w, r, err)
+		} else {
+			s.messageReadError(w, r, admin, err)
+		}
 		return
+	}
+	view := feedbackConversation{ID: row.ID, Title: row.Title, Description: row.Description, Status: row.Status, ModerationStatus: row.ModerationStatus, CanReply: canReplyFeedback(row), Messages: rows, Participant: &participant, SubmitterName: row.SubmitterName, CreatedAt: row.CreatedAt, UnreadCount: unread}
+	if admin {
+		view.Contact = &row.Contact
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(struct {
@@ -124,7 +158,7 @@ func (s *Server) readFeedbackMessages(w http.ResponseWriter, r *http.Request, ad
 		Meta struct {
 			NextCursor *string `json:"nextCursor"`
 		} `json:"meta"`
-	}{Data: feedbackConversation{row.ID, row.Title, row.Description, row.Status, row.ModerationStatus, canReplyFeedback(row), rows}, Meta: struct {
+	}{Data: view, Meta: struct {
 		NextCursor *string `json:"nextCursor"`
 	}{next}})
 }
@@ -139,4 +173,8 @@ func (s *Server) messageReadError(w http.ResponseWriter, r *http.Request, admin 
 	default:
 		s.feedbackFailure(w, r)
 	}
+}
+
+func (s *Server) accountFeedbackMessages(w http.ResponseWriter, r *http.Request) {
+	s.readFeedbackMessages(w, r, false)
 }
