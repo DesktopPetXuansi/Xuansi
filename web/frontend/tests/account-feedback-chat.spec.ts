@@ -129,8 +129,19 @@ for (const admin of [false, true]) {
       state.conversation.participant.displayName =
         state.threads[0].participant.displayName;
       state.conversation.messages[0].body = `https://example.invalid/${"longpath".repeat(90)}`;
+      state.threads[0].lastMessage = chatMessage(
+        state.conversation.messages[0].body,
+      );
       await page.setViewportSize({ width, height: 844 });
       await page.goto(path);
+      const list = page.getByRole("complementary", { name: "会话列表" });
+      await expect(list).toBeVisible();
+      // 同时检查列表内部；整页不横溢仍可能隐藏列表横向滚动和被裁掉的日期。
+      await expect
+        .poll(() =>
+          list.evaluate((element) => element.scrollWidth <= element.clientWidth),
+        )
+        .toBe(true);
       await page.getByRole("button", { name: /账号测试问题/ }).click();
       await expect(page.getByLabel("消息内容", { exact: true })).toBeVisible();
       expect(

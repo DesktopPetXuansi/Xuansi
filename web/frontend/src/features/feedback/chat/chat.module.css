@@ -56,6 +56,8 @@
 }
 .threadList {
   display: grid;
+  /* 摘要省略号需要可收缩的网格列，避免长链接撑宽列表内部。 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 .threadButton {
