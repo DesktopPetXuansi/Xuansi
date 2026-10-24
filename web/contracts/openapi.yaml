@@ -4838,6 +4838,656 @@
           }
         }
       }
+    },
+    "/api/v1/me/feedback": {
+      "get": {
+        "operationId": "accountFeedbackList",
+        "summary": "我的反馈会话",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/FeedbackStatus"
+            }
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackThreadPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAccountFeedback",
+        "summary": "以当前账号提交反馈并建立私有会话",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "同一次发送及重试复用；不同正文或管理员身份复用返回409。"
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackReceiptResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新反馈已提交；所有者来自网站会话。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackReceiptResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountFeedbackInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/feedback/{id}/messages": {
+      "get": {
+        "operationId": "accountFeedbackMessages",
+        "summary": "读取本人反馈聊天",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "sendAccountFeedbackMessage",
+        "summary": "以账号昵称发送消息并重开反馈",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "同一次发送及重试复用；不同正文或管理员身份复用返回409。"
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新消息已原子保存；重复发送返回200及当前反馈状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackMessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountFeedbackMessageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/feedback/{id}/read": {
+      "post": {
+        "operationId": "readAccountFeedback",
+        "summary": "确认实际看到的消息水位",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "已保存实际消息的单调读水位。"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackReadInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/feedback/{id}/read": {
+      "post": {
+        "operationId": "readAdminFeedback",
+        "summary": "确认实际看到的消息水位",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "已保存实际消息的单调读水位。"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackReadInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/feedback/{id}/withdrawal": {
+      "post": {
+        "operationId": "withdrawAccountFeedback",
+        "summary": "撤回本人反馈与私有对话",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackManagementResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "管理凭据无效或CSRF失败"
+          },
+          "429": {
+            "description": "请求过于频繁"
+          }
+        }
+      }
+    },
+    "/api/v1/me/feedback/{id}/claim": {
+      "post": {
+        "operationId": "claimFeedback",
+        "summary": "凭原管理权限主动关联旧反馈",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "精确 Origin 与双提交 Cookie 校验。"
+          },
+          {
+            "name": "X-Feedback-Account",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。"
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackThreadResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackClaimInput"
+              }
+            }
+          }
+        },
+        "description": "验证原凭据和网站会话后关联，原管理链接失效。旧匿名消息不回填账号昵称；同一所有者可重试，其他账号不能认领。"
+      }
+    },
+    "/api/v1/admin/feedback/conversations": {
+      "get": {
+        "operationId": "adminFeedbackConversations",
+        "summary": "管理员聊天与单次收件列表",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/FeedbackStatus"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackThreadPage"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7044,6 +7694,10 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "authorName": {
+            "type": "string",
+            "description": "发送时昵称；开发者使用公开称呼，旧匿名消息为空时仍显示访客。"
           }
         },
         "description": "私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。"
@@ -7085,6 +7739,24 @@
             "items": {
               "$ref": "#/components/schemas/FeedbackMessage"
             }
+          },
+          "participant": {
+            "$ref": "#/components/schemas/FeedbackParticipant"
+          },
+          "submitterName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contact": {
+            "type": "string",
+            "description": "仅管理员会话返回已主动提供的联系方式，用户消息响应不返回。"
           }
         }
       },
@@ -7203,6 +7875,257 @@
             "$ref": "#/components/schemas/FeedbackMessageReceipt"
           }
         }
+      },
+      "FeedbackParticipant": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT",
+              "GUEST"
+            ],
+            "x-enum-varnames": [
+              "FeedbackParticipantAccount",
+              "FeedbackParticipantGuest"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "displayName"
+        ]
+      },
+      "FeedbackThread": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeedbackStatus"
+          },
+          "moderationStatus": {
+            "$ref": "#/components/schemas/FeedbackModerationStatus"
+          },
+          "participant": {
+            "$ref": "#/components/schemas/FeedbackParticipant"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "canReply": {
+            "type": "boolean"
+          },
+          "lastMessage": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "authorRole",
+              "body",
+              "createdAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "authorRole": {
+                "type": "string",
+                "enum": [
+                  "ADMIN",
+                  "USER"
+                ],
+                "x-enum-varnames": [
+                  "FeedbackThreadMessageAdmin",
+                  "FeedbackThreadMessageUser"
+                ]
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "authorName": {
+                "type": "string",
+                "description": "发送时昵称；开发者使用公开称呼，旧匿名消息为空时仍显示访客。"
+              }
+            },
+            "description": "私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "preview",
+          "status",
+          "moderationStatus",
+          "participant",
+          "createdAt",
+          "updatedAt",
+          "unreadCount",
+          "canReply",
+          "lastMessage"
+        ]
+      },
+      "FeedbackThreadPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackThread"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "nextCursor"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "FeedbackThreadResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackThread"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AccountFeedbackInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "title",
+          "description"
+        ],
+        "properties": {
+          "publicConsent": {
+            "type": "boolean",
+            "description": "用户同意审核通过后公开到项目GitHub；缺省未同意。联系方式始终私有，提交不会立即公开。"
+          },
+          "category": {
+            "$ref": "#/components/schemas/FeedbackCategory"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1
+          },
+          "contact": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "diagnostics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeedbackDiagnostics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "网站会话确定所有者，不接受用户编号或匿名管理凭据。"
+      },
+      "AccountFeedbackMessageInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "FeedbackReadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "messageId"
+        ],
+        "description": "实际看到的该会话消息；初始问题使用反馈本身编号。水位只前进，不使用服务器当前时间标记未来消息。"
+      },
+      "FeedbackClaimInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "managementToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "managementToken"
+        ]
       }
     },
     "securitySchemes": {

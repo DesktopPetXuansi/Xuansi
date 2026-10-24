@@ -8,7 +8,7 @@ import { Suspense } from "react";
 const groups = [
   { title: "我的桌宠", links: [["/dashboard", "我的桌宠"], ["/dashboard/history", "使用历史"], ["/dashboard/library", "收藏"]] },
   { title: "上传管理", links: [["/dashboard/resources", "我的作品"], ["/dashboard/uploads", "上传队列"]] },
-  { title: "账号", links: [["/dashboard/account", "账号设置"], ["/dashboard/sessions", "会话与授权"]] },
+  { title: "账号", links: [["/dashboard/feedback", "我的反馈"], ["/dashboard/account", "账号设置"], ["/dashboard/sessions", "会话与授权"]] },
 ];
 export function Workspace({
   children,
@@ -48,7 +48,8 @@ export function Workspace({
         ["/admin/users", "用户"],
         ["/admin/resources", "资源发布"],
         ["/admin/releases", "客户端版本"],
-        ["/admin/feedback", "反馈中心"],
+        ["/admin/feedback/chat", "反馈对话"],
+        ["/admin/feedback", "收件与审核"],
         ["/admin/jobs", "后台任务"],
         ["/admin/audit", "审计日志"],
       ]
@@ -56,8 +57,8 @@ export function Workspace({
   return (
     <div className="container">
       <div className="workspace">
-        <aside className="sidebar" aria-label={admin ? "管理后台导航" : "个人空间导航"}>
-          {(admin ? [{ title: "管理后台", links: items }] : groups).map(group => <div className="sidebar-group" key={group.title}>
+        <aside className="sidebar" aria-label={admin ? "管理后台导航" : "个人空间导航"} data-feedback-chat={!admin && path === "/dashboard/feedback" ? "true" : undefined}>
+          {(admin ? [{ title: "管理后台", links: items }] : groups).map(group => <div className="sidebar-group" key={group.title} data-feedback-primary={group.title === "账号" ? "true" : undefined}>
             <p className="sidebar-label">{group.title}</p>
             {group.links.map(([href, label]) => <Link href={href} key={href} aria-current={path === href || (href === "/dashboard/resources" && path.startsWith(href + "/")) ? "page" : undefined}>{label}</Link>)}
           </div>)}

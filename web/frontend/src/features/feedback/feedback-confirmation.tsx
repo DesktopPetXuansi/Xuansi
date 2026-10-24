@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { CircleCheck } from "lucide-react";
-import { Button, Notice } from "@/components/ui";
-import { FeedbackManagementPanel } from "./feedback-management";
-import type { FeedbackCredentials } from "./management-storage";
+import { Button } from "@/components/ui";
+import type { FeedbackReceipt } from "@/lib/types";
 import styles from "./public-feedback.module.css";
 
 // 成功确认由提交事件挂载，聚焦标题让键盘及读屏用户明确知道操作已完成。
@@ -11,12 +10,12 @@ function focusConfirmation(element: HTMLHeadingElement | null) {
 }
 
 export function FeedbackConfirmation({
-  credentials,
-  storageWarning,
+  receipt,
+  account,
   onStartAgain,
 }: {
-  credentials: FeedbackCredentials;
-  storageWarning: boolean;
+  receipt: FeedbackReceipt;
+  account: boolean;
   onStartAgain: () => void;
 }) {
   return (
@@ -28,28 +27,26 @@ export function FeedbackConfirmation({
             反馈已收到
           </h3>
           <p>已提交给开发者，感谢你帮助玄司改进。</p>
-          {!storageWarning && (
-            <small>可在本浏览器查看回复、补充说明或撤回。</small>
-          )}
+          <small>
+            {account
+              ? "已保存到你的账号，可在“我的反馈”继续沟通。"
+              : "这次匿名提交不建立聊天，也不在本浏览器保存反馈历史。"}
+          </small>
         </div>
       </div>
       <div className="actions">
         <Button type="button" className="secondary" onClick={onStartAgain}>
           再写一条
         </Button>
-        <Link className="quiet-link" href="/feedback/manage">
-          查看回复、补充或撤回 →
-        </Link>
+        {account && (
+          <Link
+            className="quiet-link"
+            href={`/dashboard/feedback?id=${receipt.id}`}
+          >
+            打开反馈会话 →
+          </Link>
+        )}
       </div>
-      {/* 存储失败时保留完整管理链接，避免简化展示后丢失独立撤回权限。 */}
-      {storageWarning && (
-        <>
-          <Notice>
-            浏览器未能保存这条反馈。请复制下方管理链接，以便日后查看回复、补充说明或撤回。
-          </Notice>
-          <FeedbackManagementPanel credentials={credentials} />
-        </>
-      )}
     </>
   );
 }

@@ -89,6 +89,7 @@ func feedbackDecodeError(w http.ResponseWriter, r *http.Request, e error) {
 	invalid(w, r, "反馈格式无效")
 }
 func (s *Server) feedbackRoutes(r chi.Router) {
+	s.accountFeedbackRoutes(r)
 	r.Post("/feedback", s.createFeedback)
 	r.Post("/feedback/{id}/messages/query", s.queryFeedbackMessages)
 	r.Post("/feedback/{id}/messages", s.sendUserFeedbackMessage)

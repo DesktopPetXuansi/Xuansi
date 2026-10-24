@@ -28,30 +28,70 @@ func validFeedbackToken(token string) bool {
 }
 
 func (s *Server) createFeedback(w http.ResponseWriter, r *http.Request) {
+	s.createFeedbackFor(w, r, false)
+}
+
+func (s *Server) createAccountFeedback(w http.ResponseWriter, r *http.Request) {
+	s.createFeedbackFor(w, r, true)
+}
+
+func (s *Server) createFeedbackFor(w http.ResponseWriter, r *http.Request, account bool) {
 	key := r.Header.Get("Idempotency-Key")
 	if !canonicalFeedbackID(key) {
 		invalid(w, r, "请求编号必须为标准UUID")
 		return
 	}
 	var in feedbackInput
-	if !decodeFeedback(w, r, &in) {
+	if account {
+		var v struct {
+			Category      string               `json:"category"`
+			Title         string               `json:"title"`
+			Description   string               `json:"description"`
+			Contact       string               `json:"contact"`
+			Diagnostics   *feedbackDiagnostics `json:"diagnostics"`
+			PublicConsent bool                 `json:"publicConsent,omitempty"`
+		}
+		if !decodeFeedback(w, r, &v) {
+			return
+		}
+		in = feedbackInput{Category: v.Category, Title: v.Title, Description: v.Description, Contact: v.Contact, Diagnostics: v.Diagnostics, PublicConsent: v.PublicConsent}
+	} else if !decodeFeedback(w, r, &in) {
 		return
 	}
 	if !in.normalize() {
 		invalid(w, r, "请检查反馈类型及内容长度")
 		return
 	}
+	if account && in.ManagementToken != "" {
+		invalid(w, r, "账号反馈无需管理凭据")
+		return
+	}
 	body, _ := json.Marshal(in)
+	if account {
+		body, _ = json.Marshal(struct {
+			Input feedbackInput
+			Actor string
+		}{in, who(r).User.ID})
+	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	// 带密钥摘要代替持久保存原始 IP；生产沿用现有 OAuth 服务密钥。
 	mac := hmac.New(sha256.New, []byte(s.Config.OAuthSecret))
-	mac.Write([]byte(s.clientIP(r)))
+	if account {
+		mac.Write([]byte("feedback-account:" + who(r).User.ID))
+	} else {
+		mac.Write([]byte(s.clientIP(r)))
+	}
 	content, _ := json.Marshal([]string{in.Category, in.Title, in.Description})
 	row := feedbackEntry{ID: key, IdempotencyKey: key, RequestHash: feedbackDigest(body),
 		Category: in.Category, Title: in.Title, Description: in.Description, Contact: in.Contact,
 		Diagnostics: in.Diagnostics, PublicConsent: in.PublicConsent, ModerationStatus: "PENDING",
 		Status: "NEW", CreatedAt: now, UpdatedAt: now, ClientHash: hex.EncodeToString(mac.Sum(nil)),
 		ContentHash: feedbackDigest(content)}
+	if account {
+		uid := who(r).User.ID
+		row.OwnerUserID = &uid
+		row.SubmitterName = who(r).User.DisplayName
+	}
 	if in.ManagementToken != "" {
 		row.ManagementTokenHash = feedbackDigest([]byte(in.ManagementToken))
 	}
@@ -69,7 +109,7 @@ func (s *Server) createFeedback(w http.ResponseWriter, r *http.Request) {
 			if err := tx.Where("idempotency_key=?", key).First(&old).Error; err != nil {
 				return err
 			}
-			if old.RequestHash != row.RequestHash {
+			if old.RequestHash != row.RequestHash || (account && (old.OwnerUserID == nil || *old.OwnerUserID != who(r).User.ID)) || (!account && old.OwnerUserID != nil) {
 				return errFeedbackConflict
 			}
 			row, status = old, http.StatusOK
@@ -112,11 +152,20 @@ func (e *feedbackQuotaError) Error() string { return "反馈提交频率超过�
 
 // 条件 UPSERT 对每个来源的额度串行化，多进程与并发请求共享同一限制。
 func reserveFeedbackQuota(tx *gorm.DB, clientHash string, now time.Time) error {
+	return reserveFeedbackQuotaWithLimits(tx, clientHash, now, 5, 20)
+}
+
+// 账号聊天独立于投稿额度，支持连续对话，仍由数据库在多进程间限频。
+func reserveFeedbackChatQuota(tx *gorm.DB, clientHash string, now time.Time) error {
+	return reserveFeedbackQuotaWithLimits(tx, clientHash, now, 30, 300)
+}
+
+func reserveFeedbackQuotaWithLimits(tx *gorm.DB, clientHash string, now time.Time, minuteLimit, hourLimit int) error {
 	for _, window := range []struct {
 		kind     string
 		limit    int
 		duration time.Duration
-	}{{"MINUTE", 5, time.Minute}, {"HOUR", 20, time.Hour}} {
+	}{{"MINUTE", minuteLimit, time.Minute}, {"HOUR", hourLimit, time.Hour}} {
 		var result struct{ Submissions int }
 		query := tx.Raw(`INSERT INTO feedback_submission_limits(client_hash,window_kind,submissions,resets_at)
 		 VALUES(?,?,1,?) ON CONFLICT(client_hash,window_kind) DO UPDATE SET

@@ -195,6 +195,24 @@ func (e FeedbackModerationStatus) Valid() bool {
 	}
 }
 
+// Defines values for FeedbackParticipantKind.
+const (
+	FeedbackParticipantAccount FeedbackParticipantKind = "ACCOUNT"
+	FeedbackParticipantGuest   FeedbackParticipantKind = "GUEST"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackParticipantKind enum.
+func (e FeedbackParticipantKind) Valid() bool {
+	switch e {
+	case FeedbackParticipantAccount:
+		return true
+	case FeedbackParticipantGuest:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FeedbackStatus.
 const (
 	INPROGRESS FeedbackStatus = "IN_PROGRESS"
@@ -210,6 +228,24 @@ func (e FeedbackStatus) Valid() bool {
 	case NEW:
 		return true
 	case RESOLVED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedbackThreadLastMessageAuthorRole.
+const (
+	FeedbackThreadMessageAdmin FeedbackThreadLastMessageAuthorRole = "ADMIN"
+	FeedbackThreadMessageUser  FeedbackThreadLastMessageAuthorRole = "USER"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackThreadLastMessageAuthorRole enum.
+func (e FeedbackThreadLastMessageAuthorRole) Valid() bool {
+	switch e {
+	case FeedbackThreadMessageAdmin:
+		return true
+	case FeedbackThreadMessageUser:
 		return true
 	default:
 		return false
@@ -597,6 +633,23 @@ func (e PostOauthAuthorizeFormdataBodyConsent) Valid() bool {
 	}
 }
 
+// AccountFeedbackInput 网站会话确定所有者，不接受用户编号或匿名管理凭据。
+type AccountFeedbackInput struct {
+	Category    FeedbackCategory     `json:"category"`
+	Contact     *string              `json:"contact,omitempty"`
+	Description string               `json:"description"`
+	Diagnostics *FeedbackDiagnostics `json:"diagnostics,omitempty"`
+
+	// PublicConsent 用户同意审核通过后公开到项目GitHub；缺省未同意。联系方式始终私有，提交不会立即公开。
+	PublicConsent *bool  `json:"publicConsent,omitempty"`
+	Title         string `json:"title"`
+}
+
+// AccountFeedbackMessageInput defines model for AccountFeedbackMessageInput.
+type AccountFeedbackMessageInput struct {
+	Body string `json:"body"`
+}
+
 // AppearanceHistoryInput defines model for AppearanceHistoryInput.
 type AppearanceHistoryInput struct {
 	AppearanceKind    AppearanceHistoryInputAppearanceKind `json:"appearanceKind"`
@@ -781,15 +834,27 @@ type FeedbackAdminMessageInput struct {
 // FeedbackCategory defines model for FeedbackCategory.
 type FeedbackCategory string
 
+// FeedbackClaimInput defines model for FeedbackClaimInput.
+type FeedbackClaimInput struct {
+	ManagementToken string `json:"managementToken"`
+}
+
 // FeedbackConversation defines model for FeedbackConversation.
 type FeedbackConversation struct {
-	CanReply         bool                     `json:"canReply"`
+	CanReply bool `json:"canReply"`
+
+	// Contact 仅管理员会话返回已主动提供的联系方式，用户消息响应不返回。
+	Contact          *string                  `json:"contact,omitempty"`
+	CreatedAt        *time.Time               `json:"createdAt,omitempty"`
 	Description      string                   `json:"description"`
 	Id               openapi_types.UUID       `json:"id"`
 	Messages         []FeedbackMessage        `json:"messages"`
 	ModerationStatus FeedbackModerationStatus `json:"moderationStatus"`
+	Participant      *FeedbackParticipant     `json:"participant,omitempty"`
 	Status           FeedbackStatus           `json:"status"`
+	SubmitterName    *string                  `json:"submitterName,omitempty"`
 	Title            string                   `json:"title"`
+	UnreadCount      *int                     `json:"unreadCount,omitempty"`
 }
 
 // FeedbackConversationResponse 默认最新20条，每页内部升序；游标绑定反馈编号并加载更早的消息。
@@ -855,6 +920,8 @@ type FeedbackManagementResponse struct {
 
 // FeedbackMessage 私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。
 type FeedbackMessage struct {
+	// AuthorName 发送时昵称；开发者使用公开称呼，旧匿名消息为空时仍显示访客。
+	AuthorName *string                   `json:"authorName,omitempty"`
 	AuthorRole FeedbackMessageAuthorRole `json:"authorRole"`
 	Body       string                    `json:"body"`
 	CreatedAt  time.Time                 `json:"createdAt"`
@@ -896,6 +963,20 @@ type FeedbackModerationInputDecision string
 // FeedbackModerationStatus defines model for FeedbackModerationStatus.
 type FeedbackModerationStatus string
 
+// FeedbackParticipant defines model for FeedbackParticipant.
+type FeedbackParticipant struct {
+	DisplayName string                  `json:"displayName"`
+	Kind        FeedbackParticipantKind `json:"kind"`
+}
+
+// FeedbackParticipantKind defines model for FeedbackParticipant.Kind.
+type FeedbackParticipantKind string
+
+// FeedbackReadInput 实际看到的该会话消息；初始问题使用反馈本身编号。水位只前进，不使用服务器当前时间标记未来消息。
+type FeedbackReadInput struct {
+	MessageId openapi_types.UUID `json:"messageId"`
+}
+
 // FeedbackReceipt 不包含反馈正文、联系方式或诊断；重试仍返回最初NEW收据。
 type FeedbackReceipt struct {
 	CreatedAt time.Time          `json:"createdAt"`
@@ -921,6 +1002,46 @@ type FeedbackStatus string
 // FeedbackStatusInput defines model for FeedbackStatusInput.
 type FeedbackStatusInput struct {
 	Status FeedbackStatus `json:"status"`
+}
+
+// FeedbackThread defines model for FeedbackThread.
+type FeedbackThread struct {
+	CanReply  bool               `json:"canReply"`
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// LastMessage 私有对话消息；不返回管理员姓名、邮箱或账号编号，不进入 GitHub 投递。
+	LastMessage *struct {
+		// AuthorName 发送时昵称；开发者使用公开称呼，旧匿名消息为空时仍显示访客。
+		AuthorName *string                             `json:"authorName,omitempty"`
+		AuthorRole FeedbackThreadLastMessageAuthorRole `json:"authorRole"`
+		Body       string                              `json:"body"`
+		CreatedAt  time.Time                           `json:"createdAt"`
+		Id         openapi_types.UUID                  `json:"id"`
+	} `json:"lastMessage"`
+	ModerationStatus FeedbackModerationStatus `json:"moderationStatus"`
+	Participant      FeedbackParticipant      `json:"participant"`
+	Preview          string                   `json:"preview"`
+	Status           FeedbackStatus           `json:"status"`
+	Title            string                   `json:"title"`
+	UnreadCount      int                      `json:"unreadCount"`
+	UpdatedAt        time.Time                `json:"updatedAt"`
+}
+
+// FeedbackThreadLastMessageAuthorRole defines model for FeedbackThread.LastMessage.AuthorRole.
+type FeedbackThreadLastMessageAuthorRole string
+
+// FeedbackThreadPage defines model for FeedbackThreadPage.
+type FeedbackThreadPage struct {
+	Data []FeedbackThread `json:"data"`
+	Meta struct {
+		NextCursor *string `json:"nextCursor"`
+	} `json:"meta"`
+}
+
+// FeedbackThreadResponse defines model for FeedbackThreadResponse.
+type FeedbackThreadResponse struct {
+	Data FeedbackThread `json:"data"`
 }
 
 // FeedbackUserMessageInput defines model for FeedbackUserMessageInput.
@@ -1420,6 +1541,13 @@ type GetApiV1AdminFeedbackParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// AdminFeedbackConversationsParams defines parameters for AdminFeedbackConversations.
+type AdminFeedbackConversationsParams struct {
+	Cursor *string         `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+	Status *FeedbackStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
 // PatchApiV1AdminFeedbackIdParams defines parameters for PatchApiV1AdminFeedbackId.
 type PatchApiV1AdminFeedbackIdParams struct {
 	// XCSRFToken 精确Origin与双提交Cookie校验；反馈禁止资源Bearer。
@@ -1439,6 +1567,12 @@ type AdminReplyFeedbackParams struct {
 
 	// IdempotencyKey 同一次发送及重试复用；不同正文或管理员身份复用返回409。
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// ReadAdminFeedbackParams defines parameters for ReadAdminFeedback.
+type ReadAdminFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
 // GetApiV1AdminJobsParams defines parameters for GetApiV1AdminJobs.
@@ -1649,6 +1783,76 @@ type GetApiV1MeClientGrantsParams struct {
 type DeleteApiV1MeClientGrantsIdParams struct {
 	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
 	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// AccountFeedbackListParams defines parameters for AccountFeedbackList.
+type AccountFeedbackListParams struct {
+	Cursor *string         `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+	Status *FeedbackStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// CreateAccountFeedbackParams defines parameters for CreateAccountFeedback.
+type CreateAccountFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// IdempotencyKey 同一次发送及重试复用；不同正文或管理员身份复用返回409。
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// ClaimFeedbackParams defines parameters for ClaimFeedback.
+type ClaimFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// AccountFeedbackMessagesParams defines parameters for AccountFeedbackMessages.
+type AccountFeedbackMessagesParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// SendAccountFeedbackMessageParams defines parameters for SendAccountFeedbackMessage.
+type SendAccountFeedbackMessageParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// IdempotencyKey 同一次发送及重试复用；不同正文或管理员身份复用返回409。
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// ReadAccountFeedbackParams defines parameters for ReadAccountFeedback.
+type ReadAccountFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
+}
+
+// WithdrawAccountFeedbackParams defines parameters for WithdrawAccountFeedback.
+type WithdrawAccountFeedbackParams struct {
+	// XCSRFToken 精确 Origin 与双提交 Cookie 校验。
+	XCSRFToken string `json:"X-CSRF-Token"`
+
+	// XFeedbackAccount 可选的当前账号匹配护栏；与实际网站会话不符409 ACCOUNT_CHANGED，不能用于授权或指定所有者。
+	XFeedbackAccount *openapi_types.UUID `json:"X-Feedback-Account,omitempty"`
 }
 
 // ClearPersonalHistoryParams defines parameters for ClearPersonalHistory.
@@ -1937,6 +2141,9 @@ type AdminReplyFeedbackJSONRequestBody = FeedbackAdminMessageInput
 // PostApiV1AdminFeedbackIdModerationJSONRequestBody defines body for PostApiV1AdminFeedbackIdModeration for application/json ContentType.
 type PostApiV1AdminFeedbackIdModerationJSONRequestBody = FeedbackModerationInput
 
+// ReadAdminFeedbackJSONRequestBody defines body for ReadAdminFeedback for application/json ContentType.
+type ReadAdminFeedbackJSONRequestBody = FeedbackReadInput
+
 // PatchApiV1AdminResourcesIdJSONRequestBody defines body for PatchApiV1AdminResourcesId for application/json ContentType.
 type PatchApiV1AdminResourcesIdJSONRequestBody PatchApiV1AdminResourcesIdJSONBody
 
@@ -1987,6 +2194,18 @@ type PostApiV1FeedbackIdWithdrawalJSONRequestBody = FeedbackManagementInput
 
 // PatchApiV1MeJSONRequestBody defines body for PatchApiV1Me for application/json ContentType.
 type PatchApiV1MeJSONRequestBody PatchApiV1MeJSONBody
+
+// CreateAccountFeedbackJSONRequestBody defines body for CreateAccountFeedback for application/json ContentType.
+type CreateAccountFeedbackJSONRequestBody = AccountFeedbackInput
+
+// ClaimFeedbackJSONRequestBody defines body for ClaimFeedback for application/json ContentType.
+type ClaimFeedbackJSONRequestBody = FeedbackClaimInput
+
+// SendAccountFeedbackMessageJSONRequestBody defines body for SendAccountFeedbackMessage for application/json ContentType.
+type SendAccountFeedbackMessageJSONRequestBody = AccountFeedbackMessageInput
+
+// ReadAccountFeedbackJSONRequestBody defines body for ReadAccountFeedback for application/json ContentType.
+type ReadAccountFeedbackJSONRequestBody = FeedbackReadInput
 
 // PutPersonalHistoryItemJSONRequestBody defines body for PutPersonalHistoryItem for application/json ContentType.
 type PutPersonalHistoryItemJSONRequestBody = AppearanceHistoryInput

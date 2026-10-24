@@ -40,6 +40,7 @@ func (s *Server) sendUserFeedbackMessage(w http.ResponseWriter, r *http.Request)
 
 // 发送意图绑定真实管理员编号，仅摘要持久化；对用户视图永不返回身份。
 func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, admin bool) {
+	account := strings.HasPrefix(r.URL.Path, "/api/v1/me/feedback/")
 	id := chi.URLParam(r, "id")
 	key := r.Header.Get("Idempotency-Key")
 	var body, token, actor string
@@ -52,6 +53,15 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 		}
 		body, resolve = in.Body, in.Resolve
 		role, actor = "ADMIN", who(r).User.ID
+	} else if account {
+		var in struct {
+			Body string `json:"body"`
+		}
+		if !decodeFeedback(w, r, &in) {
+			return
+		}
+		body = in.Body
+		actor = who(r).User.ID
 	} else {
 		var in userMessageInput
 		if !decodeFeedback(w, r, &in) {
@@ -59,8 +69,13 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 		}
 		body, token = in.Body, in.ManagementToken
 	}
-	if !canonicalFeedbackID(id) || (!admin && !validFeedbackToken(token)) {
-		s.messageReadError(w, r, admin, errFeedbackManagement)
+
+	if !canonicalFeedbackID(id) || (!admin && !account && !validFeedbackToken(token)) {
+		if account {
+			s.accountFeedbackError(w, r, gorm.ErrRecordNotFound)
+		} else {
+			s.messageReadError(w, r, admin, errFeedbackManagement)
+		}
 		return
 	}
 	body = strings.TrimSpace(body)
@@ -76,6 +91,11 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 	hash := feedbackDigest(intent)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	message := feedbackMessage{ID: uuid.NewString(), FeedbackID: id, AuthorRole: role, Body: body, CreatedAt: now, IdempotencyKey: key, RequestHash: hash}
+	if admin {
+		message.AuthorName = "玄司开发者"
+	} else if account {
+		message.AuthorName = who(r).User.DisplayName
+	}
 	status := http.StatusCreated
 	var feedbackStatus string
 	err := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
@@ -84,7 +104,10 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=?", id).First(&parent).Error; e != nil {
 			return e
 		}
-		if !admin && !feedbackManagementAuthorized(parent, token) {
+		if account && !accountOwns(parent, r) {
+			return gorm.ErrRecordNotFound
+		}
+		if !admin && !account && !feedbackManagementAuthorized(parent, token) {
 			return errFeedbackManagement
 		}
 		if !canReplyFeedback(parent) {
@@ -105,14 +128,25 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
+		// 在父锁内确定消息时序，避免较早开始但较晚提交的消息落在已读水位之前。
+		now = time.Now().UTC().Truncate(time.Microsecond)
+		if !now.After(parent.UpdatedAt) {
+			now = parent.UpdatedAt.Add(time.Microsecond)
+		}
+		message.CreatedAt = now
 		// 独立带密钥来源摘要复用持久化额度，不占用初始反馈的额度。
 		mac := hmac.New(sha256.New, []byte(s.Config.OAuthSecret))
 		source := s.clientIP(r)
-		if admin {
+		if admin || account {
 			source = actor
 		}
-		mac.Write([]byte("feedback-message:" + role + ":" + source))
-		if e := reserveFeedbackQuota(tx, hex.EncodeToString(mac.Sum(nil)), now); e != nil {
+		namespace := "feedback-message:"
+		reserve := reserveFeedbackQuota
+		if parent.OwnerUserID != nil {
+			namespace, reserve = "feedback-chat:", reserveFeedbackChatQuota
+		}
+		mac.Write([]byte(namespace + role + ":" + source))
+		if e := reserve(tx, hex.EncodeToString(mac.Sum(nil)), now); e != nil {
 			return e
 		}
 		next := parent.Status
@@ -131,7 +165,7 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 			return e
 		}
 		// 匿名消息无可伪造的用户编号，审计允许 NULL actor；原文与凭据不进审计。
-		if admin {
+		if admin || account {
 			return s.audit(r.Context(), tx, actor, "feedback.message."+role, message.ID)
 		}
 		return tx.Create(&platform.AuditLog{ID: uuid.NewString(), Action: "feedback.message.USER", TargetID: message.ID, Details: json.RawMessage(`{}`), CreatedAt: now}).Error
@@ -146,9 +180,17 @@ func (s *Server) sendFeedbackMessage(w http.ResponseWriter, r *http.Request, adm
 	case errors.Is(err, errFeedbackTransition):
 		problem(w, r, 409, "INVALID_FEEDBACK_TRANSITION", "当前反馈已关闭对话，不能继续回复")
 	case err != nil:
-		s.messageReadError(w, r, admin, err)
+		if account {
+			s.accountFeedbackError(w, r, err)
+		} else {
+			s.messageReadError(w, r, admin, err)
+		}
 	default:
 		s.Log.Info("反馈私有消息已确认", "feedbackId", id, "messageId", message.ID, "role", role)
 		reply(w, status, messageReceipt{message, feedbackStatus})
 	}
+}
+
+func (s *Server) sendAccountFeedbackMessage(w http.ResponseWriter, r *http.Request) {
+	s.sendFeedbackMessage(w, r, false)
 }
