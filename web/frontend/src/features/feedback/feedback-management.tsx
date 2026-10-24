@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Notice } from "@/components/ui";
-import { api, safeUrl } from "@/lib/api";
+import { api, ApiError, safeUrl } from "@/lib/api";
 import type { FeedbackManagement } from "@/lib/types";
 import { useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -13,6 +13,7 @@ import {
 } from "./management-storage";
 import styles from "./public-feedback.module.css";
 import { ManagementStatus } from "./management-status";
+import { FeedbackConversationPanel } from "./feedback-conversation";
 
 const subscribe = (listener: () => void) => {
   window.addEventListener("hashchange", listener);
@@ -63,12 +64,32 @@ function BrowserManagementPanel({
   });
   const { saved, warning: storageWarning } = storage;
   const lock = useRef(false);
+  const accessEpoch = useRef(0);
+  const [conversationVersion, setConversationVersion] = useState(0);
+  const [denied, setDenied] = useState(false);
+  function beginConversation() {
+    if (lock.current) return false;
+    lock.current = true;
+    setBusy(true);
+    return true;
+  }
+  function endConversation() {
+    lock.current = false;
+    setBusy(false);
+  }
+  function denyConversation(failure: ApiError) {
+    accessEpoch.current += 1;
+    setView(undefined);
+    setDenied(true);
+    setError(failure);
+  }
 
   async function perform(withdraw = false) {
     if (!credentials?.id || lock.current) return;
     lock.current = true;
     setBusy(true);
     setError(undefined);
+    const startedAccessEpoch = accessEpoch.current;
     // 管理链接在用户操作时保存，避免渲染过程写浏览器存储。
     const persisted = saveCredentials(credentials);
     setStorage((previous) => ({ ...previous, warning: !persisted }));
@@ -78,12 +99,22 @@ function BrowserManagementPanel({
         "POST",
         { managementToken: credentials.managementToken },
       );
+      // 更早的成功读取不能解除后来出现的凭据失效护栏。
+      if (accessEpoch.current !== startedAccessEpoch) return;
       setView(result);
+      setDenied(false);
+      if (withdraw) setConversationVersion((previous) => previous + 1);
       console.debug(
         withdraw ? "[公众反馈] 撤回结果已确认" : "[公众反馈] 管理状态已更新",
       );
     } catch (failure) {
       setError(failure);
+      if (failure instanceof ApiError && [401, 403].includes(failure.status)) {
+        accessEpoch.current += 1;
+        setView(undefined);
+        setDenied(true);
+        setConversationVersion((previous) => previous + 1);
+      }
       console.warn("[公众反馈] 管理操作失败，可重新尝试");
     } finally {
       lock.current = false;
@@ -114,6 +145,7 @@ function BrowserManagementPanel({
                 setCredentials(selected);
                 setLink(managementLink(selected));
                 setView(undefined);
+                setDenied(false);
                 setError(undefined);
                 console.debug("[公众反馈] 切换已保存反馈");
               }
@@ -130,7 +162,9 @@ function BrowserManagementPanel({
       )}
       {credentials.id ? (
         <>
-          <p>已保存这条反馈的管理权限。可查看最新状态或申请撤回。</p>
+          <p>
+            已保存这条反馈的管理权限。可查看开发者回复、补充说明或申请撤回。
+          </p>
           <div className="actions">
             <Button
               className="secondary"
@@ -158,6 +192,23 @@ function BrowserManagementPanel({
         </Notice>
       )}
       {view && <ManagementStatus view={view} />}
+      {credentials.id &&
+        !denied &&
+        view?.moderationStatus !== "WITHDRAWN" &&
+        view?.moderationStatus !== "WITHDRAWAL_REQUESTED" && (
+          <FeedbackConversationPanel
+            key={`${credentials.id}:${conversationVersion}`}
+            id={credentials.id}
+            managementToken={credentials.managementToken}
+            busy={busy}
+            begin={beginConversation}
+            end={endConversation}
+            onDenied={denyConversation}
+            onSent={() => {
+              console.debug("[公众反馈] 补充说明已发送");
+            }}
+          />
+        )}
       {view?.githubIssueUrl && (
         <a href={safeUrl(view.githubIssueUrl)} target="_blank" rel="noreferrer">
           查看公开问题 ↗
@@ -172,7 +223,9 @@ function BrowserManagementPanel({
       {link && (
         <>
           <label className="field">
-            <span>专属管理链接（请勿分享，持有者可撤回反馈）</span>
+            <span>
+              专属管理链接（请勿分享，持有者可查看对话、补充及撤回反馈）
+            </span>
             <input
               readOnly
               value={link}

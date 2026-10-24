@@ -28,7 +28,7 @@ func setupFeedbackGitHub(t *testing.T) (*Server, *testClient, *resource.Worker) 
 	t.Helper()
 	s, c, worker := setup(t)
 	// 合成 Issue 编号会重复使用，必须同时清空收件和渠道，避免跨测试唯一键冲突。
-	if err := s.DB.Exec("TRUNCATE feedback,feedback_github_channels").Error; err != nil {
+	if err := s.DB.Exec("TRUNCATE feedback,feedback_github_channels CASCADE").Error; err != nil {
 		t.Fatal(err)
 	}
 	return s, c, worker

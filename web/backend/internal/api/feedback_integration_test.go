@@ -30,7 +30,7 @@ func feedbackCall(t *testing.T, c *testClient, key string, input interface{}, ex
 }
 func TestPostgresFeedbackPrivateIdempotencyAndPagination(t *testing.T) {
 	s, c, _ := setup(t)
-	if e := s.DB.Exec("TRUNCATE feedback").Error; e != nil {
+	if e := s.DB.Exec("TRUNCATE feedback CASCADE").Error; e != nil {
 		t.Fatal(e)
 	}
 	input := feedbackInput{Category: "BUG", Title: "  出错了  ", Description: "复现步骤", Contact: " mail@example.test ", Diagnostics: &feedbackDiagnostics{AppVersion: "0.8.0", System: "Windows"}}

@@ -12,7 +12,7 @@ export default function ManageFeedbackPage() {
   return (
     <div className="container">
       <Heading title="管理我的反馈">
-        无需登录。管理链接相当于这条反馈的钥匙，请妥善保管。
+        查看回复、补充说明或撤回反馈，无需登录。管理链接相当于这条反馈的钥匙，请妥善保管。
       </Heading>
       <FeedbackManagementPanel />
     </div>

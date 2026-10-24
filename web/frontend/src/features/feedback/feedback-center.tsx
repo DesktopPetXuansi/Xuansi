@@ -18,7 +18,7 @@ export function FeedbackCenter() {
   return (
     <>
       <Heading title="反馈中心">
-        直接查看并处理反馈。公开到 GitHub 需单独审核，标记状态不会自动回复用户。
+        直接查看并回复反馈。私有对话不会公开到 GitHub；只标记状态不会发送回复。
       </Heading>
       <div className={styles.toolbar}>
         <div className={styles.filters} role="group" aria-label="处理状态">
@@ -100,6 +100,86 @@ function FeedbackList({
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+  function beginConversation(id: string) {
+    if (saving.current || query.isFetching || accessError) return false;
+    saving.current = true;
+    setPendingId(id);
+    onWorkingChange(true);
+    setActionError(undefined);
+    setSaved("");
+    return true;
+  }
+  function endConversation() {
+    saving.current = false;
+    setPendingId(undefined);
+    onWorkingChange(false);
+  }
+  async function denyConversation(error: ApiError) {
+    onAccessError(error);
+    await cache.cancelQueries({ queryKey: ["admin-feedback"] });
+    cache.setQueriesData<typeof query.data>(
+      { queryKey: ["admin-feedback"] },
+      (previous) =>
+        previous && {
+          ...previous,
+          pages: previous.pages.map((page) => ({ ...page, data: [] })),
+        },
+    );
+    void cache.invalidateQueries({
+      queryKey: ["admin-feedback"],
+      refetchType: "none",
+    });
+  }
+  async function conversationWithdrawn(id: string) {
+    // 先取消较早的列表快照，防止迟到响应重新覆盖已撤回内容。
+    await cache.cancelQueries({ queryKey: ["admin-feedback"] });
+    // 已确认撤回即清理全部筛选的旧正文，不能等待下次列表刷新。
+    cache.setQueriesData<typeof query.data>(
+      { queryKey: ["admin-feedback"] },
+      (previous) =>
+        previous && {
+          ...previous,
+          pages: previous.pages.map((page) => ({
+            ...page,
+            data: page.data.map((row) =>
+              row.id === id
+                ? {
+                    ...row,
+                    title: "",
+                    description: "",
+                    contact: "",
+                    diagnostics: null,
+                    moderationStatus: "WITHDRAWN",
+                  }
+                : row,
+            ),
+          })),
+        },
+    );
+    listHeading.current?.focus();
+    console.debug("[反馈中心] 已清理已撤回反馈的旧内容缓存");
+  }
+  function conversationSent(id: string, status: Feedback["status"]) {
+    cache.setQueryData<typeof query.data>(
+      queryKey,
+      (previous) =>
+        previous && {
+          ...previous,
+          pages: previous.pages.map((page) => ({
+            ...page,
+            data: page.data
+              .map((row) => (row.id === id ? { ...row, status } : row))
+              .filter((row) => filter === "ALL" || row.status === filter),
+          })),
+        },
+    );
+    void cache.invalidateQueries({
+      queryKey: ["admin-feedback"],
+      refetchType: "none",
+    });
+    setSaved(`回复已发送，反馈${feedbackStatuses[status]}。`);
+    if (filter !== "ALL" && status !== filter) listHeading.current?.focus();
+  }
   async function change(
     item: Feedback,
     update: { status: Feedback["status"] } | FeedbackModerationInput,
@@ -125,7 +205,17 @@ function FeedbackList({
             pages: previous.pages.map((page) => ({
               ...page,
               data: page.data
-                .map((row) => (row.id === updated.id ? updated : row))
+                .map((row) => {
+                  if (row.id !== updated.id) return row;
+                  // 已确认撤回是终态；迟到的完整写响应只能更新处理进度。
+                  return row.moderationStatus === "WITHDRAWN"
+                    ? {
+                        ...row,
+                        status: updated.status,
+                        updatedAt: updated.updatedAt,
+                      }
+                    : updated;
+                })
                 .filter((row) => filter === "ALL" || row.status === filter),
             })),
           },
@@ -243,6 +333,18 @@ function FeedbackList({
                 ? actionError.error
                 : undefined
             }
+            conversation={{
+              begin: () => beginConversation(item.id),
+              onWithdrawn: () => {
+                void conversationWithdrawn(item.id);
+              },
+              end: endConversation,
+              onDenied: (error) => {
+                void denyConversation(error);
+              },
+              onSent: (receipt) =>
+                conversationSent(item.id, receipt.feedbackStatus),
+            }}
             onChange={(status) => {
               void change(item, { status });
             }}
