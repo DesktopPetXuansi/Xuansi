@@ -121,6 +121,10 @@ test("用户从原管理链接查看私有回复并补充说明", async ({ page 
   await expect(page.getByText("重启后仍能复现", { exact: true })).toBeVisible();
   await expect(page.getByLabel("补充说明", { exact: true })).toBeFocused();
   await expect(page.getByText("补充已发送。", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "刷新对话", exact: true }).click();
+  await expect(page.getByLabel("补充说明", { exact: true })).toBeEnabled();
+  // 发送后的焦点只恢复一次，后续刷新不能再次抢回输入焦点。
+  await expect(page.getByLabel("补充说明", { exact: true })).not.toBeFocused();
 });
 
 test("回复保存期间锁定筛选刷新进度及撤回，成功更新状态和焦点", async ({
@@ -355,6 +359,7 @@ test("用户发送失败可重试同意图，改写须显式创建新消息，�
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[0]).toEqual(requests[1]);
   await page.getByRole("button", { name: "改写为新消息", exact: true }).click();
+  await expect(page.getByLabel("补充说明", { exact: true })).toBeFocused();
   await page.getByLabel("补充说明", { exact: true }).fill("补充新的说明");
   await page.getByRole("button", { name: "发送补充", exact: true }).click();
   await expect.poll(() => requests.length).toBe(3);

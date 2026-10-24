@@ -744,11 +744,37 @@ code {
 .consent-permissions { padding-left: 24px; }
 .consent-permissions li { margin-bottom: 12px; }
 @media (max-width: 640px) {
-  .nav-account { max-width: calc(100% - 110px); gap: 5px; }
+  /* 为品牌与菜单保留宽度，长昵称不再把菜单挤到第二行。 */
+  .nav-account { max-width: calc(100% - 170px); min-width: 0; gap: 5px; }
   .nav-nickname { max-width: 5em; }
   .sidebar { display: flex; flex-wrap: wrap; overflow-x: visible; white-space: normal; gap: 12px 20px; }
   .sidebar-group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; }
   .sidebar-label { flex-basis: 100%; margin: 0 8px; }
   .sidebar a { padding: 8px; }
   .history-row .actions { width: 100%; justify-content: flex-start; }
+  /* 后台导航允许左右滑动，把首屏空间留给反馈与回复；个人空间保持分组。 */
+  .sidebar[aria-label="管理后台导航"] {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .sidebar[aria-label="管理后台导航"] .sidebar-group {
+    display: contents;
+  }
+  .sidebar[aria-label="管理后台导航"] .sidebar-label {
+    display: none;
+  }
+  .sidebar[aria-label="管理后台导航"] a {
+    flex-shrink: 0;
+    min-height: 44px;
+  }
+}
+@media (max-width: 900px) {
+  /* iOS 文本输入低于 16px 会自动放大视口；只调整编辑控件，不改正文层级。 */
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

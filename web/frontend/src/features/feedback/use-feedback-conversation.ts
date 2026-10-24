@@ -44,7 +44,16 @@ export function useFeedbackConversation({
   const controller = useRef<AbortController | undefined>(undefined);
   const sendLock = useRef(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const focusAfterEdit = useRef(false);
   useEffect(() => () => controller.current?.abort(), []);
+  // 焦点同步必须等输入框实际解除禁用；动画帧可能早于生产构建的 DOM 提交。
+  // sent 也作为提交标记，覆盖开始与结束状态恰好被合并的快速响应。
+  useEffect(() => {
+    if (!focusAfterEdit.current || busy || loading || intent) return;
+    focusAfterEdit.current = false;
+    // 筛选移除卡片时 ref 为空，保留父级列表的焦点恢复。
+    textarea.current?.focus();
+  }, [busy, loading, intent, sent]);
 
   async function load(earlier = false) {
     if (busy || loading || sendLock.current) return;
@@ -169,8 +178,7 @@ export function useFeedbackConversation({
       setDraft("");
       setIntent(undefined);
       setSent(true);
-      // 保存锁解除并恢复输入框后再归还焦点；筛选移除卡片时ref为空。
-      requestAnimationFrame(() => textarea.current?.focus());
+      focusAfterEdit.current = true;
       onSent(receipt);
       console.debug("[私有对话] 消息已发送");
     } catch (failure) {
@@ -197,7 +205,7 @@ export function useFeedbackConversation({
   function rewrite() {
     setIntent(undefined);
     setError(undefined);
-    requestAnimationFrame(() => textarea.current?.focus());
+    focusAfterEdit.current = true;
   }
   return {
     admin,
