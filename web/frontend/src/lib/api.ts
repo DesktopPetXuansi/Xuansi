@@ -89,7 +89,10 @@ export async function api<T>(
     .object({
       data: z.unknown(),
       meta: z
-        .object({ nextCursor: z.string().nullable().optional() })
+        .object({
+          nextCursor: z.string().nullable().optional(),
+          total: z.number().int().nonnegative().optional(),
+        })
         .optional(),
     })
     .safeParse(payload);
@@ -100,13 +103,10 @@ export function apiPage<T>(
   path: string,
   options?: Pick<RequestOptions, "signal">,
 ) {
-  return api<{ data: T[]; meta?: { nextCursor?: string | null } }>(
-    path,
-    "GET",
-    undefined,
-    true,
-    options,
-  );
+  return api<{
+    data: T[];
+    meta?: { nextCursor?: string | null; total?: number };
+  }>(path, "GET", undefined, true, options);
 }
 export function message(error: unknown) {
   return error instanceof Error ? error.message : "操作失败，请重试。";
