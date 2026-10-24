@@ -93,6 +93,17 @@ func (s *Server) listResources(mine bool) http.HandlerFunc {
 		} else {
 			q = q.Where("visibility='PUBLIC' AND status='ACTIVE'")
 		}
+		// 官网挑选形象先按用途分组，再分页；旧客户端未传group时仍浏览全部资源。
+		switch group := r.URL.Query().Get("group"); group {
+		case "":
+		case "APPEARANCE":
+			q = q.Where("kind IN ?", []string{"MODEL", "IMAGE", "ANIMATION"})
+		case "ADDON":
+			q = q.Where("kind IN ?", []string{"MOTION", "EXPRESSION"})
+		default:
+			invalid(w, r, "资源分组无效")
+			return
+		}
 		if cursor != "" {
 			q = q.Where("id > ?", cursor)
 		}

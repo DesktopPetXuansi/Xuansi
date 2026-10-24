@@ -1,0 +1,190 @@
+.description {
+  color: var(--muted);
+  margin: -12px 0 24px;
+  font-size: 14px;
+}
+.filters {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1.6fr) repeat(2, minmax(110px, 1fr))
+    auto auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.filters label {
+  min-width: 0;
+  margin: 0;
+}
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 16px;
+  border-top: 1px solid var(--line);
+}
+.summary p {
+  margin: 0;
+}
+.count {
+  font-weight: 600;
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.table th:first-child {
+  width: 36%;
+}
+.table th:last-child {
+  width: 24%;
+}
+.table strong {
+  font-size: 14px;
+}
+.email,
+.verification {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status {
+  font-size: 13px;
+}
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.rowActions button {
+  font-size: 12px;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.confirmNote {
+  margin: 0 0 4px;
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.pagination span {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+.empty {
+  border-block: 1px solid var(--line);
+  padding: 32px 0;
+}
+.empty h2 {
+  margin-top: 0;
+  font-size: 22px;
+}
+.empty p {
+  color: var(--muted);
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  /* 小屏用块布局承载账号卡片，避免表格匿名列的最小宽度撑开外层。 */
+  .table {
+    display: block;
+  }
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters label:first-child {
+    grid-column: 1 / -1;
+  }
+  .summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .table tbody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .table td {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+    border: 0;
+    padding: 8px 0;
+    min-width: 0;
+  }
+  .table td::before {
+    content: attr(data-label);
+    grid-column: 1;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .table td > * {
+    grid-column: 2;
+    min-width: 0;
+  }
+  .table td > .email,
+  .table td > .verification {
+    margin-top: 0;
+  }
+  .pagination {
+    gap: 8px;
+  }
+  .pagination span {
+    flex-basis: 100%;
+  }
+}

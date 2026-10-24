@@ -399,6 +399,24 @@ func (e ResourceVisibility) Valid() bool {
 	}
 }
 
+// Defines values for ResourceGroup.
+const (
+	ResourceGroupAddon      ResourceGroup = "ADDON"
+	ResourceGroupAppearance ResourceGroup = "APPEARANCE"
+)
+
+// Valid indicates whether the value is a known member of the ResourceGroup enum.
+func (e ResourceGroup) Valid() bool {
+	switch e {
+	case ResourceGroupAddon:
+		return true
+	case ResourceGroupAppearance:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourcePatchStatus.
 const (
 	ResourcePatchStatusACTIVE   ResourcePatchStatus = "ACTIVE"
@@ -561,6 +579,42 @@ func (e PostApiV1AdminClientReleasesJSONBodyChannel) Valid() bool {
 	case PostApiV1AdminClientReleasesJSONBodyChannelBETA:
 		return true
 	case PostApiV1AdminClientReleasesJSONBodyChannelSTABLE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1AdminUsersParamsRole.
+const (
+	AdminUsersRoleAdmin GetApiV1AdminUsersParamsRole = "ADMIN"
+	AdminUsersRoleUser  GetApiV1AdminUsersParamsRole = "USER"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1AdminUsersParamsRole enum.
+func (e GetApiV1AdminUsersParamsRole) Valid() bool {
+	switch e {
+	case AdminUsersRoleAdmin:
+		return true
+	case AdminUsersRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1AdminUsersParamsStatus.
+const (
+	AdminUsersStatusActive   GetApiV1AdminUsersParamsStatus = "ACTIVE"
+	AdminUsersStatusDisabled GetApiV1AdminUsersParamsStatus = "DISABLED"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1AdminUsersParamsStatus enum.
+func (e GetApiV1AdminUsersParamsStatus) Valid() bool {
+	switch e {
+	case AdminUsersStatusActive:
+		return true
+	case AdminUsersStatusDisabled:
 		return true
 	default:
 		return false
@@ -1299,6 +1353,9 @@ type ResourceStatus string
 // ResourceVisibility defines model for Resource.Visibility.
 type ResourceVisibility string
 
+// ResourceGroup APPEARANCE为MODEL/IMAGE/ANIMATION，ADDON为MOTION/EXPRESSION。
+type ResourceGroup string
+
 // ResourceList defines model for ResourceList.
 type ResourceList struct {
 	Data []Resource `json:"data"`
@@ -1449,9 +1506,12 @@ type UserStatus string
 // UserList defines model for UserList.
 type UserList struct {
 	Data []User `json:"data"`
-	Meta *struct {
-		NextCursor *string `json:"nextCursor,omitempty"`
-	} `json:"meta,omitempty"`
+	Meta struct {
+		NextCursor string `json:"nextCursor"`
+
+		// Total 全部匹配账号数量，不受游标影响。
+		Total int64 `json:"total"`
+	} `json:"meta"`
 }
 
 // UserResponse defines model for UserResponse.
@@ -1623,15 +1683,21 @@ type PostApiV1AdminResourcesIdPublicationsParams struct {
 
 // GetApiV1AdminUsersParams defines parameters for GetApiV1AdminUsers.
 type GetApiV1AdminUsersParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	// Cursor 按注册时间与ID稳定翻页的不透明游标，不包含邮箱或搜索词。
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search 昵称或邮箱，忽略大小写的字面子串，最多120个Unicode码点。
+	Search *string                         `form:"search,omitempty" json:"search,omitempty"`
+	Role   *GetApiV1AdminUsersParamsRole   `form:"role,omitempty" json:"role,omitempty"`
+	Status *GetApiV1AdminUsersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 }
+
+// GetApiV1AdminUsersParamsRole defines parameters for GetApiV1AdminUsers.
+type GetApiV1AdminUsersParamsRole string
+
+// GetApiV1AdminUsersParamsStatus defines parameters for GetApiV1AdminUsers.
+type GetApiV1AdminUsersParamsStatus string
 
 // PatchApiV1AdminUsersIdJSONBody defines parameters for PatchApiV1AdminUsersId.
 type PatchApiV1AdminUsersIdJSONBody struct {
@@ -1941,6 +2007,9 @@ type GetApiV1MeResourcesParams struct {
 	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
 	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
 	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Group 可选用途分组，先筛选再分页；不传时保留原全资源范围。
+	Group *ResourceGroup `form:"group,omitempty" json:"group,omitempty"`
 }
 
 // GetApiV1MeSessionsParams defines parameters for GetApiV1MeSessions.
@@ -1983,6 +2052,9 @@ type GetApiV1ResourcesParams struct {
 	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
 	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
 	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Group 可选用途分组，先筛选再分页；不传时保留原全资源范围。
+	Group *ResourceGroup `form:"group,omitempty" json:"group,omitempty"`
 }
 
 // PostApiV1ResourcesParams defines parameters for PostApiV1Resources.

@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { api, ApiError } from "../src/lib/api.ts";
+import { api, apiPage, ApiError } from "../src/lib/api.ts";
 import { QueryClient } from "@tanstack/react-query";
 import { redactChatCaches } from "../src/features/feedback/chat/chat-cache.ts";
+
+// 全局账号数量属于分页响应，不能被通用信封校验静默丢弃。
+test("分页读取保留全局匹配数量和下一页游标", async (context) => {
+  context.mock.method(globalThis, "fetch", async () =>
+    Response.json({ data: [], meta: { total: 28, nextCursor: "next-page" } }),
+  );
+  const result = await apiPage("/admin/users");
+  assert.deepEqual(result.meta, { total: 28, nextCursor: "next-page" });
+});
 
 // 请求不返回时，列表必须退出加载状态；这里使用短时限验证真实取消语义。
 test("公开读取超时返回可重试错误", { timeout: 1000 }, async (context) => {
