@@ -319,10 +319,11 @@ test("登录用户提交绑定账号并通过个人会话入口继续沟通", as
     .getByRole("textbox", { name: "问题或建议", exact: true })
     .fill("登录后提交的问题可以继续聊天。");
   await section.getByRole("button", { name: "提交反馈", exact: true }).click();
+  // click只确认事件已触发，须等实际POST处理后再读取回执编号作为预期地址。
+  await expect.poll(() => requests.length).toBe(1);
   await expect(
     section.getByRole("link", { name: /打开反馈会话/ }),
   ).toHaveAttribute("href", `/dashboard/feedback?id=${submittedId}`);
-  expect(requests).toHaveLength(1);
   expect(requests[0]).not.toHaveProperty("managementToken");
   expect(requests[0]).not.toHaveProperty("userId");
   await section.getByRole("link", { name: /打开反馈会话/ }).click();
