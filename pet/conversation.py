@@ -2,10 +2,12 @@
 
 import asyncio
 import logging
+from pathlib import Path
 
 import sounddevice as sd
-from mss.exception import ScreenShotError
 
+from .config import MODELS
+from .conversation_issues import ConversationIssue, failure_issue
 from .desktop import capture_screen, observation_current
 from .streaming_speech import SpeechStream
 from .tool_dialogue import run_dialogue
@@ -17,8 +19,12 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
     keep_status = False
     try:
         runtime.microphone.muted.set()
+        if epoch != runtime.epoch or not observation_current(observation):
+            return
+        # 资源目录初始化也属于本轮任务，失败必须恢复界面和麦克风生命周期。
+        await asyncio.to_thread(runtime.audio.configure_root, Path(settings.ai.model_dir) if settings.ai.model_dir else MODELS)
         if kind == "preview":
-            await runtime._speak(epoch, settings, text, observation, kind=kind)
+            keep_status = await runtime._speak(epoch, settings, text, observation, kind=kind)
             return
         if samples is not None:
             runtime.state.emit(epoch, "正在识别你的话…")
@@ -40,23 +46,19 @@ async def converse(runtime, epoch, settings, text, kind, position, samples, obse
         if epoch != runtime.epoch or not observation_current(observation):
             return
         runtime.state.emit(epoch, "正在看画面并思考…" if images else "正在思考…")
-        await generate_reply(runtime, epoch, settings, text, images, kind, observation, position)
+        keep_status = await generate_reply(runtime, epoch, settings, text, images, kind, observation, position)
     except asyncio.CancelledError:
         sd.stop()
         raise
     except Exception as exc:
         keep_status = True
         LOG.warning("对话失败 type=%s", type(exc).__name__)
-        message = (
-            str(exc)
-            if isinstance(exc, (RuntimeError, ValueError))
-            else "本地服务未能完成请求，请重试或休眠后唤醒。"
-        )
-        if isinstance(exc, ScreenShotError):
-            message = "当前桌面暂不可读取，请解锁或唤醒屏幕后再试。"
-        runtime.state.emit(epoch, message)
-        if kind != "observation" and epoch == runtime.epoch:
-            runtime.failed.emit(epoch, message)
+        issue = failure_issue(exc, kind)
+        if epoch == runtime.epoch and observation_current(observation):
+            runtime.state.emit(epoch, issue.message)
+            if kind != "observation":
+                runtime.failed.emit(epoch, issue.message)
+                runtime.request_issue.emit(epoch, issue)
     finally:
         if epoch == runtime.epoch:
             if runtime.listening:
@@ -74,18 +76,28 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
     result = await run_dialogue(runtime, epoch, settings, text, images, kind, position, observation)
     if result.content is None or epoch != runtime.epoch or not observation_current(observation):
         return
+    if kind == "chat" and result.content.strip():
+        runtime.chat_succeeded.emit(epoch)
+        LOG.info("最终文字对话成功 epoch=%s", epoch)
     if not runtime.should_speak(settings, kind):
         return
 
     def current():
         return epoch == runtime.epoch and observation_current(observation) and runtime.should_speak(settings, kind)
 
+    speech_failed = False
+
     def speech_state(message):
+        nonlocal speech_failed
         if current():
             runtime.state.emit(epoch, message)
             # 合成和播放失败留下可检查的通知，不改变已经交付的原始正文。
             if message.startswith(("语音合成失败", "语音播放失败")):
+                speech_failed = True
                 runtime.failed.emit(epoch, message)
+                runtime.request_issue.emit(epoch, ConversationIssue(
+                    message + "。请检查语音组件与输出设备，文字回复仍可查看。", "preferences", "检查语音设置",
+                ))
 
     # 原生响应完整后才开始朗读，工具过程文字不进入音频流水线。
     async with SpeechStream(
@@ -97,3 +109,4 @@ async def generate_reply(runtime, epoch, settings, text, images, kind, observati
     ) as speech:
         await speech.feed(result.content)
         await speech.finish()
+    return speech_failed

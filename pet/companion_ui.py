@@ -160,6 +160,10 @@ class CompanionUI:
             self.owner.panel.model_page.credentials_saved(self.credential_snapshot)
         self.credential_snapshot = None
         self.owner.panel.form.complete(error)
+        # 凭据快照确认与表单保存全部成功后，才重新检查已生效的首次聊天配置。
+        first_chat = getattr(self.owner, 'first_chat', None)
+        if not error and first_chat is not None:
+            first_chat.refresh()
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
             self.appearance.saved(error)

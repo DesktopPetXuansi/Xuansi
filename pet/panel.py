@@ -40,6 +40,7 @@ class Panel(QWidget):
     stop_requested = Signal()
     speech_requested = Signal(bool)
     feedback_requested = Signal()
+    configuration_required = Signal()
 
     def __init__(self, settings: Settings, *, window_state_path: Path | None = None):
         super().__init__()
@@ -108,6 +109,21 @@ class Panel(QWidget):
     def _send(self):
         text = self.input.text().strip()
         if text:
+            # 不把模型或 Key 草稿误当成已生效；保留文字，复用原来的保存事务。
+            try:
+                pending = (self.model_page.credential_changed()
+                           or self.model_page.apply(self.settings) != self.settings)
+            except ValueError:
+                pending = True
+            if self.form.saving or pending:
+                note = '模型设置正在保存，请稍后回来发送。' if self.form.saving else '模型设置有未保存的修改。请先保存，再回到对话；输入内容已保留。'
+                self.first_chat.set_note(note)
+                self.first_chat.show()
+                self.first_chat.toggle.setChecked(True)
+                self.configuration_required.emit()
+                self.open_section('model')
+                LOG.info('发送前等待模型配置保存，已保留输入草稿')
+                return
             self.input.clear()
             self.send_requested.emit(text, self.with_screen.isChecked())
 

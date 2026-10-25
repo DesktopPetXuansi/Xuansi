@@ -27,6 +27,8 @@ QLabel#hint { color: $muted; font-size: 9.5pt; }
 QLabel#status { color: $muted; font-size: 9.5pt; }
 QFrame#panelHeader { border-bottom: 1px solid $border; }
 QFrame#panelFooter { border-top: 1px solid $border; }
+QFrame#firstChatCard { background: $surface; border: 1px solid $border; border-radius: 8px; }
+QWidget#firstChatBody, QFrame#firstChatCard QLabel { background: transparent; }
 QFrame#browserTabStrip { background: $tabs; border-bottom: 1px solid $border; }
 QTabBar#controlTabs { background: transparent; }
 QTabBar#controlTabs::tab { background: $tabs; color: $muted; border: 0;
