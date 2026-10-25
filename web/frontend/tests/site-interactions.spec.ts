@@ -54,7 +54,7 @@ test("平台记录失败可恢复，当前正式版始终可读", async ({ page 
   await page.goto("/changelog");
   await expect(
     page.getByRole("heading", {
-      name: `玄司 ${clientRelease.version} · 选中形象，直接使用。`,
+      name: `玄司 ${clientRelease.version} · 先聊上第一句，遇到问题有指引。`,
     }),
   ).toBeVisible();
   const retry = page.getByRole("button", { name: "重新读取平台记录" });

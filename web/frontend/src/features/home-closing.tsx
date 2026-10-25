@@ -12,11 +12,11 @@ export function HomeClosing() {
             最近一次正式更新 · {clientRelease.publishedAt}
           </p>
           <h2 id="home-update-title">
-            v{clientRelease.version}，换形象更直接。
+            v{clientRelease.version}，先聊上第一句。
           </h2>
           <p>
-            选中后直接使用，自动完成下载与检查；预览可选，本机形象和 AI
-            配置历史可以回选。
+            对话页帮你检查 AI 配置，未保存的模型或密钥草稿会先提醒保存。
+            先收到文字回复，再按需要设置语音和形象；遇到问题有对应的处理入口。
           </p>
         </div>
         <Link className="quiet-link" href="/changelog">

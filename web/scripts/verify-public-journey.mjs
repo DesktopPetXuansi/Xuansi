@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const origin = process.env.WEB_URL ?? 'http://localhost:3100';
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname), '仅允许本机测试');
-const output = path.join(root, 'data/verification/public-site-2026-10-19');
+const output = path.join(root, 'data/verification/public-site-2026-10-25-release-0.9.0');
 await mkdir(output, { recursive: true });
 const { chromium, expect } = await import(pathToFileURL(path.join(root, 'web/frontend/node_modules/@playwright/test/index.mjs')).href);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -24,7 +24,7 @@ try {
   await page.locator('.hero').getByRole('link', { name: '下载 Windows 客户端' }).click();
   await expect(page).toHaveURL(`${origin}/download`);
   const download = page.locator('main').getByRole('link', { name: '下载 Windows 安装包', exact: true });
-  await expect(download).toHaveAttribute('href', 'https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.8.0/Xuansi-0.8.0-windows-x64-setup.exe');
+  await expect(download).toHaveAttribute('href', 'https://github.com/DesktopPetXuansi/Xuansi/releases/download/v0.9.0/Xuansi-0.9.0-windows-x64-setup.exe');
   await expect(page.locator('main')).not.toContainText('0.5.6');
   await expect(page.locator('main')).toContainText('不要求 D 盘');
   await expect(page.locator('main')).toContainText('Windows 10 1809');

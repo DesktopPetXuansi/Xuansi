@@ -11,7 +11,7 @@ export function CurrentRelease() {
     >
       <p className="eyebrow">当前正式版 · {clientRelease.publishedAt}</p>
       <h2 id="current-release-title">
-        玄司 {clientRelease.version} · 选中形象，直接使用。
+        玄司 {clientRelease.version} · 先聊上第一句，遇到问题有指引。
       </h2>
       <ul>
         {clientRelease.highlights.map((highlight) => (
@@ -19,7 +19,7 @@ export function CurrentRelease() {
         ))}
       </ul>
       <p className="legal-note">
-        形象历史同步还需要用户主动开启、独立授权及网站支持。客户端更新不代表服务器已更新。
+        语音和形象可以稍后配置。聊天不要求网站账号，在线 AI 的调用费用由所选服务商收取。
       </p>
       <div className="actions">
         <Link className="button-link" href="/download">
