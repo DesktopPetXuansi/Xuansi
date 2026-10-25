@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .first_chat_card import FirstChatCard
 from .log_viewer import LogViewer
 from .model_page import ModelPage
 from .panel_style import STYLE
@@ -23,12 +24,14 @@ def chat_content(panel):
     layout = QVBoxLayout(page)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(8)
+    panel.first_chat = FirstChatCard()
+    layout.addWidget(panel.first_chat)
     panel.chat = QPlainTextEdit()
     panel.chat.setReadOnly(True)
     panel.chat.setMinimumHeight(64)
     panel.chat.setAccessibleName("对话记录")
     panel.chat.setMaximumBlockCount(250)
-    panel.chat.setPlaceholderText("聊点什么，或者开启连续对话。\n想让我长期记住什么，可以明确告诉我。")
+    panel.chat.setPlaceholderText("先发一句话，语音和形象可以稍后设置。\n想让我长期记住什么，可以明确告诉我。")
     # 只让记录区滚动并使用剩余高度，输入不会随外层内容移出视口。
     layout.addWidget(panel.chat, 1)
     layout.addWidget(panel.live_transcript)

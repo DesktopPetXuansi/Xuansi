@@ -17,6 +17,7 @@ from .audio_activity import AudioActivity
 from .audio_models import AudioModels
 from .config import MODELS, Settings, save_settings
 from .conversation import converse
+from .conversation_issues import ConversationIssue, preview_issue
 from .desktop import observation_current
 from .live_dialogue import LiveDialogue
 from .memory import MemoryStore, durable_io
@@ -33,6 +34,9 @@ class Runtime(QObject):
     state = Signal(int, str)
     finished = Signal(int)
     failed = Signal(int, str)
+    # 最终文字与朗读独立：工具过程、试听和失败不能完成首次文字对话。
+    chat_succeeded = Signal(int)
+    request_issue = Signal(int, object)
     microphone_state = Signal(int, str)
     segment = Signal(int, object)
     voice_update = Signal(int, object)
@@ -102,18 +106,30 @@ class Runtime(QObject):
                 )
 
     async def _conversation(self, epoch, settings, text, kind, position, samples, observation=None):
-        await asyncio.to_thread(self.audio.configure_root, Path(settings.ai.model_dir) if settings.ai.model_dir else MODELS)
         await converse(self, epoch, settings, text, kind, position, samples, observation)
 
     async def _speak(self, epoch, settings, answer, observation, kind="chat", *, selected_engine=None):
         # 试听与对话沿用同一朗读门控；自动观察回退必须使用自己的偏好。
+        def current():
+            return epoch == self.epoch and observation_current(observation)
+
+        def notify(issue):
+            self.state.emit(epoch, issue.message)
+            self.request_issue.emit(epoch, issue)
+            LOG.info("试听未完成 action=%s", issue.action)
+            return True
+
+        if not current():
+            return False
+        if kind == "preview" and (issue := preview_issue(self, settings)):
+            return notify(issue)
         if not self.should_speak(settings, kind) or self.audio_activity.blocked:
-            return
+            return False
         if selected_engine is None:
             selected_engine = settings.tts_engine
         if epoch != self.epoch or not self.should_speak(settings, kind) or not observation_current(observation):
             return
-        await speak(
+        played = await speak(
             self.audio_activity,
             lambda: self.audio.synthesize_selected(
                 answer, settings.speaker, settings.speed, settings.tts_engine, selected_engine,
@@ -122,6 +138,12 @@ class Runtime(QObject):
             lambda text: self.state.emit(epoch, text),
             self.mouth_level.emit,
         )
+        if kind == "preview" and current() and not played:
+            return notify(preview_issue(self, settings) or ConversationIssue(
+                "试听未完整播放。请检查朗读开关、声音回避与系统输出设备后再次试听；文字聊天仍可使用。",
+                "preferences", "检查语音设置",
+            ))
+        return False
 
     def should_speak(self, settings, kind="chat"):
         if 'tts' not in settings.ai.voice_components:

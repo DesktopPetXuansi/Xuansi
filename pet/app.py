@@ -13,6 +13,7 @@ from .companion_ui import CompanionUI
 from .config import DATA, Settings, load_settings
 from .desktop import cursor_position, desktop_state, point_is_own_window
 from .events import MouseEvent, ObservationGate
+from .first_chat import FirstChatFlow
 from .idle_action import IdleActionTimer
 from .mouse_monitor import MouseMonitor
 from .panel import Panel
@@ -53,6 +54,7 @@ class DesktopPet(QObject):
         self.monitor = MouseMonitor()
         self._connect()
         self.ui = CompanionUI(self)
+        self.first_chat = FirstChatFlow(self, path=DATA / 'first-chat.json')
         self.ui.platform.shutdown_done.connect(self._platform_shutdown_finished)
         self.tray = self.ui.tray
         self.monitor.start()
@@ -478,6 +480,7 @@ class DesktopPet(QObject):
         self._quitting = True
         self.resource_timer.stop()
         self.monitor.stop()
+        self.first_chat.close()
         self.ui.close()
         self.tray.hide()
         self.avatar.hide()
