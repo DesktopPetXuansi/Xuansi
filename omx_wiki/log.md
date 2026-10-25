@@ -327,3 +327,22 @@
 ## [2026-10-25T00:39:24.292Z] lint
 - **Pages:** none
 - **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
+## [2026-10-25T06:25:54.925Z] ingest
+- **Pages:** 安装与发行验收-0-9-0-2026-10-25.md
+- **Summary:** Created new page "安装与发行验收-0-9-0-2026-10-25"
+
+## [2026-10-25T06:25:54.968Z] add
+- **Pages:** 安装与发行验收-0-9-0-2026-10-25.md
+- **Summary:** Created wiki page 安装与发行验收-0-9-0-2026-10-25.md
+
+## [2026-10-25T06:25:56.054Z] ingest
+- **Pages:** 客户端首次文字聊天引导-2026-10-25.md
+- **Summary:** Updated "客户端首次文字聊天引导-2026-10-25" with new content
+
+## [2026-10-25T06:25:57.219Z] add
+- **Pages:** README.md, 原生工具对话与9b发布验收-2026-10-17.md, 安装与发行验收-0-7-0-2026-10-18.md, 安装与发行验收-0-7-1-2026-10-19.md, 安装与发行验收-0-9-0-2026-10-25.md, 安装前适配与多模型接入约定.md, 客户端-live2d-直接上传验收-2026-10-15.md, 客户端界面优化验收-2026-10-16.md, 客户端首次文字聊天引导-2026-10-25.md, 形象更换与保存约定.md, 控制中心单页与生命周期约定.md, 文档目录与维护约定.md, 本地运行与邮件测试约定.md, 设置文案与高级参数约定.md
+- **Summary:** Refreshed wiki index and derived metadata surfaces
+
+## [2026-10-25T06:25:58.705Z] lint
+- **Pages:** none
+- **Summary:** Lint: 0 issues (0 orphan, 0 stale, 0 broken, 0 contradictions)
