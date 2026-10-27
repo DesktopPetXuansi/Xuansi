@@ -1,20 +1,20 @@
-/* 帮助以任务和步骤为主，沿用全站颜色和尺度，不建立第二套视觉变量。 */
+/* 帮助中心以任务入口、阅读正文和就近目录分层，沿用公共颜色和字号体系。 */
 .center,
 .article,
 .questionPage {
-  padding-bottom: 8px;
+  padding-bottom: 24px;
 }
 .start {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 32px;
-  padding: 28px 32px;
+  padding: 36px 40px;
   background: var(--green-soft);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 .start h2 {
-  font-size: 26px;
+  font-size: 30px;
   margin-bottom: 12px;
 }
 .start p {
@@ -30,24 +30,26 @@
 .topics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 48px;
-  margin-top: 20px;
+  gap: 0 64px;
+  margin-top: 32px;
 }
 .topics > a {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  padding: 26px 0;
+  padding: 32px 0;
   border-bottom: 1px solid var(--line);
 }
 .topics h2 {
-  font-size: 21px;
-  margin-bottom: 6px;
+  font-size: 23px;
+  margin-bottom: 8px;
 }
 .topics p {
   margin: 0;
   color: var(--muted);
+  max-width: 31em;
+  line-height: 1.85;
 }
 .topics svg {
   flex-shrink: 0;
@@ -58,7 +60,7 @@
   text-underline-offset: 5px;
 }
 .faq {
-  margin-top: 48px;
+  margin-top: 64px;
 }
 .sectionHeading {
   display: flex;
@@ -68,23 +70,26 @@
 }
 .sectionHeading h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
 }
 .questions {
-  margin-top: 12px;
+  margin-top: 20px;
 }
 .questions details {
   border-bottom: 1px solid var(--line);
 }
+.questions details[open] {
+  background: var(--white);
+}
 .questions summary {
-  padding: 18px 0;
+  padding: 22px 0;
   cursor: pointer;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 17px;
 }
 .questions details > div {
-  padding: 0 24px 16px;
-  max-width: 860px;
+  padding: 0 24px 24px;
+  max-width: 48em;
 }
 .questions p {
   color: var(--muted);
@@ -95,13 +100,13 @@
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-top: 40px;
-  padding-top: 24px;
+  margin-top: 64px;
+  padding-top: 32px;
   border-top: 1px solid var(--line);
 }
 .feedback h2 {
-  font-size: 18px;
-  margin-bottom: 4px;
+  font-size: 21px;
+  margin-bottom: 8px;
 }
 .feedback p {
   color: var(--muted);
@@ -112,16 +117,17 @@
 }
 .article,
 .questionPage {
-  padding-top: 24px;
+  padding-top: 16px;
 }
 .article :global(.page-heading),
 .questionPage :global(.page-heading) {
-  padding-top: 20px;
+  padding-top: 28px;
+  padding-bottom: 40px;
 }
 .articleLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 64px;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 80px;
   align-items: start;
 }
 .steps {
@@ -133,7 +139,7 @@
   display: flex;
   align-items: flex-start;
   gap: 20px;
-  padding: 24px 0;
+  padding: 28px 0;
   border-top: 1px solid var(--line);
   scroll-margin-top: 24px;
 }
@@ -141,15 +147,15 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: var(--green-soft);
   color: var(--green);
   border-radius: 50%;
   font-weight: 600;
 }
 .steps h2 {
-  font-size: 21px;
+  font-size: 23px;
   margin-bottom: 12px;
 }
 .steps p {
@@ -159,24 +165,29 @@
 .note {
   color: var(--muted);
   background: var(--green-soft);
-  padding: 20px;
-  border-radius: 6px;
-  margin: 8px 0 0;
+  padding: 24px;
+  border-radius: 12px;
+  margin: 16px 0 0;
 }
 .aside {
-  border-left: 1px solid var(--line);
-  padding-left: 24px;
+  position: sticky;
+  top: 32px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
 }
 .aside h2 {
   font-size: 15px;
   margin: 0 0 12px;
 }
 .aside nav + nav {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 .aside a {
   display: block;
-  padding: 8px 0;
+  padding: 10px 0;
+  min-height: 44px;
   color: var(--muted);
 }
 .aside a:hover {
@@ -192,8 +203,11 @@
     gap: 32px;
   }
   .aside {
-    border-left: 0;
+    position: static;
+    border: 0;
     border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
     padding: 24px 0 0;
   }
   .aside nav:first-child {
@@ -215,13 +229,13 @@
   }
   .topics {
     grid-template-columns: minmax(0, 1fr);
-    margin-top: 12px;
+    margin-top: 24px;
   }
   .topics > a {
     padding: 20px 0;
   }
   .topics h2 {
-    font-size: 20px;
+    font-size: 21px;
   }
   .sectionHeading {
     align-items: flex-start;
@@ -240,6 +254,6 @@
     gap: 12px;
   }
   .steps h2 {
-    font-size: 20px;
+    font-size: 21px;
   }
 }

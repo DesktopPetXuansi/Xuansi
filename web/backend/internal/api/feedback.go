@@ -106,9 +106,18 @@ type feedbackCursor struct {
 	CreatedAt time.Time `json:"createdAt"`
 	ID        string    `json:"id"`
 	Status    string    `json:"status"`
+	Folder    string    `json:"folder,omitempty"`
 }
 
 func (s *Server) listFeedback(w http.ResponseWriter, r *http.Request) {
+	folder := r.URL.Query().Get("folder")
+	if folder == "inbox" {
+		folder = ""
+	}
+	if folder != "" && folder != "spam" {
+		invalid(w, r, "收件目录无效")
+		return
+	}
 	status := r.URL.Query().Get("status")
 	if status != "" && !feedbackStatus(status) {
 		invalid(w, r, "反馈状态无效")
@@ -124,14 +133,20 @@ func (s *Server) listFeedback(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 	q := gorm.G[feedbackEntry](s.DB)
-	query := q.Where("1=1")
+	// 垃圾审核独立于处理进度，所有普通进度筛选都应排除垃圾与已清空骨架。
+	query := q.Where("cleared_at IS NULL")
+	if folder == "spam" {
+		query = query.Where("moderation_status='SPAM'")
+	} else {
+		query = query.Where("moderation_status<>'SPAM'")
+	}
 	if status != "" {
 		query = query.Where("status=?", status)
 	}
 	if raw := r.URL.Query().Get("cursor"); raw != "" {
 		b, e := base64.RawURLEncoding.DecodeString(raw)
 		var c feedbackCursor
-		if len(raw) > 1024 || e != nil || json.Unmarshal(b, &c) != nil || c.CreatedAt.IsZero() || !canonicalFeedbackID(c.ID) || c.Status != status {
+		if len(raw) > 1024 || e != nil || json.Unmarshal(b, &c) != nil || c.CreatedAt.IsZero() || !canonicalFeedbackID(c.ID) || c.Status != status || c.Folder != folder {
 			invalid(w, r, "游标无效")
 			return
 		}
@@ -146,7 +161,7 @@ func (s *Server) listFeedback(w http.ResponseWriter, r *http.Request) {
 	if len(rows) > limit {
 		rows = rows[:limit]
 		last := rows[len(rows)-1]
-		b, _ := json.Marshal(feedbackCursor{last.CreatedAt, last.ID, status})
+		b, _ := json.Marshal(feedbackCursor{CreatedAt: last.CreatedAt, ID: last.ID, Status: status, Folder: folder})
 		v := base64.RawURLEncoding.EncodeToString(b)
 		next = &v
 	}

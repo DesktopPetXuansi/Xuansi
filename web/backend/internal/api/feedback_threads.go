@@ -117,7 +117,7 @@ func (s *Server) feedbackThreads(w http.ResponseWriter, r *http.Request, admin b
 	var cursor feedbackCursor
 	if raw != "" {
 		b, e := base64.RawURLEncoding.DecodeString(raw)
-		if len(raw) > 1024 || e != nil || json.Unmarshal(b, &cursor) != nil || cursor.CreatedAt.IsZero() || !canonicalFeedbackID(cursor.ID) || cursor.Status != status {
+		if len(raw) > 1024 || e != nil || json.Unmarshal(b, &cursor) != nil || cursor.CreatedAt.IsZero() || !canonicalFeedbackID(cursor.ID) || cursor.Status != status || cursor.Folder != "" {
 			invalid(w, r, "游标无效")
 			return
 		}
@@ -125,8 +125,11 @@ func (s *Server) feedbackThreads(w http.ResponseWriter, r *http.Request, admin b
 	out := []feedbackThread{}
 	var next *string
 	err := s.DB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		q := tx.Clauses(clause.Locking{Strength: "SHARE"})
-		if !admin {
+		q := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("cleared_at IS NULL")
+		if admin {
+			// 对话待处理列表和收件箱遵循相同的垃圾隔离规则。
+			q = q.Where("moderation_status<>'SPAM'")
+		} else {
 			q = q.Where("owner_user_id=?", who(r).User.ID)
 		}
 		if status != "" {
@@ -142,7 +145,7 @@ func (s *Server) feedbackThreads(w http.ResponseWriter, r *http.Request, admin b
 		if len(rows) > limit {
 			rows = rows[:limit]
 			last := rows[len(rows)-1]
-			b, _ := json.Marshal(feedbackCursor{last.UpdatedAt, last.ID, status})
+			b, _ := json.Marshal(feedbackCursor{CreatedAt: last.UpdatedAt, ID: last.ID, Status: status})
 			v := base64.RawURLEncoding.EncodeToString(b)
 			next = &v
 		}

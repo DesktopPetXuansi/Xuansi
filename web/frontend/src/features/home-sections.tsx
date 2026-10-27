@@ -5,14 +5,14 @@ import { AiModes } from "@/features/ai-modes";
 const moments = [
   {
     icon: Monitor,
-    label: "01 / 观察",
+    label: "看屏幕",
     title: "一起看看你的屏幕。",
     description:
       "开启看屏幕后，玄司能结合画面回应。使用在线 AI 时，截图会发送给你选择的服务商；开启前请确认屏幕内容。",
   },
   {
     icon: Moon,
-    label: "02 / 安静陪伴",
+    label: "安静陪伴",
     title: "专注的时候，就让她休息。",
     description:
       "随时让桌宠休眠，再按需要唤醒。朗读、连续对话与看屏幕分别设置，按自己的节奏使用。",
@@ -52,7 +52,6 @@ export function HomeSections() {
     <div className="container">
       <section className="home-section" aria-labelledby="everyday-title">
         <header className="section-top">
-          <p className="eyebrow">她能做什么</p>
           <h2 id="everyday-title">想聊就聊，想安静也可以。</h2>
           <p className="muted">从一句闲聊开始，按你的节奏慢慢熟悉。</p>
           <Link className="quiet-link" href="/features">
@@ -66,7 +65,7 @@ export function HomeSections() {
                 <Icon size={22} strokeWidth={1.5} />
               </div>
               <div>
-                <span className="feature-number">{label}</span>
+                <span className="feature-label">{label}</span>
                 <h3>{title}</h3>
                 <p>{description}</p>
               </div>
@@ -77,7 +76,6 @@ export function HomeSections() {
       <AiModes />
       <section className="library-promo" aria-labelledby="library-title">
         <div>
-          <p className="eyebrow">桌宠长什么样，由你来选</p>
           <h2 id="library-title">
             今天，想和谁一起？
             <br />

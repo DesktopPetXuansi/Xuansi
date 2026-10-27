@@ -24,6 +24,7 @@ type FeedbackEntry struct {
 	AdminReadID          *string              `json:"-"`
 	OwnerReadAt          *time.Time           `json:"-"`
 	OwnerReadID          *string              `json:"-"`
+	ClearedAt            *time.Time           `json:"-"`
 	ID                   string               `json:"id"`
 	IdempotencyKey       string               `json:"-"`
 	RequestHash          string               `json:"-"`

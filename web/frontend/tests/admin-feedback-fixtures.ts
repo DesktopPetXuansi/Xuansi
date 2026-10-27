@@ -58,8 +58,11 @@ export async function adminVisitor(
     listRequests.push(url.search);
     const filtered = items.filter(
       (item) =>
-        !url.searchParams.has("status") ||
-        item.status === url.searchParams.get("status"),
+        (url.searchParams.get("folder") === "spam"
+          ? item.moderationStatus === "SPAM"
+          : item.moderationStatus !== "SPAM") &&
+        (!url.searchParams.has("status") ||
+          item.status === url.searchParams.get("status")),
     );
     const offset = Number(url.searchParams.get("cursor") ?? "0");
     const size = options.pageSize ?? 20;

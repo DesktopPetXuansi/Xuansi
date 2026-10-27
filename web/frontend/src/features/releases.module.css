@@ -1,40 +1,55 @@
-/* 下载动作与设备说明分开，窄屏仍按首次使用的顺序阅读。 */
+/* 主安装包集中呈现真实版本与下载动作；设备条件独立排版，窄屏按原顺序阅读。 */
 .downloadLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 64px;
   align-items: start;
 }
+.package {
+  min-width: 0;
+  padding: 36px;
+  border-top: 3px solid var(--green);
+  border-radius: 12px;
+}
 .package h2 {
-  font-size: 32px;
-  margin-bottom: 8px;
+  font-size: 36px;
+  margin-bottom: 12px;
 }
 .package > a {
   margin-top: 12px;
 }
+.package > :global(.button-link) {
+  width: 100%;
+  min-height: 52px;
+}
 .downloadHint {
   color: var(--muted);
   font-size: 14px;
-  margin: 20px 0;
+  line-height: 1.8;
+  margin: 16px 0 20px;
 }
 .packageLinks {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: 0;
 }
 .requirements {
-  padding-top: 16px;
+  min-width: 0;
+  padding: 28px 0 0 32px;
+  border-left: 1px solid var(--line);
 }
 .requirements h2 {
-  font-size: 22px;
+  font-size: 26px;
+  margin-bottom: 24px;
 }
 .requirements ul {
   padding-left: 20px;
   color: var(--muted);
 }
 .requirements li {
-  margin: 12px 0;
+  margin: 16px 0;
+  line-height: 1.85;
 }
 .details {
   margin-top: 24px;
@@ -45,7 +60,9 @@
 .details summary {
   cursor: pointer;
   color: var(--green);
-  padding: 8px 0;
+  padding: 10px 0;
+  min-height: 44px;
+  font-weight: 600;
 }
 .details p {
   margin-top: 12px;
@@ -57,9 +74,12 @@
 .upgrade {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 32px;
-  margin-top: 32px;
+  margin-top: 48px;
+  padding: 28px 32px;
+  background: var(--green-soft);
+  border-radius: 12px;
 }
 .upgrade > div {
   max-width: 50em;
@@ -72,9 +92,10 @@
 }
 .upgrade p {
   color: var(--muted);
+  margin-bottom: 0;
 }
 .history {
-  margin-top: 48px;
+  margin-top: 64px;
 }
 .notes {
   white-space: pre-wrap;
@@ -85,14 +106,16 @@
 /* 摘要和命令可在窄屏换行，不撑开下载卡片。 */
 .packageFacts {
   display: grid;
-  gap: 12px;
-  margin: 24px 0;
+  gap: 0;
+  margin: 28px 0;
   font-size: 14px;
 }
 .packageFacts > div {
   display: grid;
   grid-template-columns: 5em minmax(0, 1fr);
-  gap: 12px;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 .packageFacts dt {
   color: var(--muted);
@@ -125,7 +148,9 @@
   overflow-wrap: anywhere;
 }
 .currentRelease {
-  margin-bottom: 24px;
+  padding: 32px;
+  margin-bottom: 32px;
+  border-radius: 12px;
 }
 .currentRelease h2 {
   font-size: clamp(22px, 3vw, 30px);
@@ -136,19 +161,41 @@
 .currentRelease li {
   margin: 12px 0;
 }
+@media (max-width: 900px) {
+  .downloadLayout {
+    gap: 32px;
+  }
+  .package {
+    padding: 28px;
+  }
+  .requirements {
+    padding-left: 24px;
+  }
+  .requirements h2 {
+    font-size: 23px;
+  }
+}
 @media (max-width: 640px) {
   .downloadLayout {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
   .requirements {
-    padding-top: 0;
+    padding: 24px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .package,
+  .currentRelease {
+    padding: 24px 20px;
   }
   .package h2 {
     font-size: 28px;
   }
   .upgrade {
     flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
+    padding: 24px;
   }
 }

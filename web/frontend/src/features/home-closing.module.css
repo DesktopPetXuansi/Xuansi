@@ -6,8 +6,8 @@
   gap: 40px;
 }
 .update {
-  padding-block: 32px;
-  margin-top: 40px;
+  padding-block: 40px;
+  margin-top: 64px;
   border-block: 1px solid var(--line);
 }
 .update h2 {
@@ -26,17 +26,34 @@
   margin-bottom: 0;
 }
 .download {
-  padding: 40px;
-  margin-top: 40px;
-  border-radius: 8px;
-  background: var(--green-soft);
+  padding: 48px;
+  margin-top: 48px;
+  border-radius: 16px;
+  background: var(--green);
+  color: var(--white);
 }
 .download h2 {
   margin-bottom: 12px;
-  font-size: clamp(26px, 2.6vw, 32px);
+  font-size: clamp(28px, 3vw, 36px);
 }
 .download p {
-  color: var(--muted);
+  color: var(--white);
+}
+/* 只在下载邀请中反转按钮，原有下载路由与事件保持不变。 */
+.download :global(.button-link) {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--green);
+}
+.download :global(.button-link:hover) {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--green-hover);
+}
+.download a:hover {
+  color: var(--white);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .download > div:last-child {
   flex-shrink: 0;
@@ -54,7 +71,7 @@
     gap: 20px;
   }
   .download {
-    padding: 24px;
+    padding: 32px 24px;
   }
   .download .note {
     text-align: left;

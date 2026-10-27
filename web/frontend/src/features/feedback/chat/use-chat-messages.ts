@@ -273,8 +273,10 @@ export function useChatMessages({
     setError(undefined);
     onBusy(true);
     try {
+      // 撤回仅属于账号本人；管理员已在入口退出，不从共用会话前缀派生接口。
+      console.debug("[反馈聊天] 撤回本人反馈");
       const result = await api<FeedbackManagement>(
-        `${base}/withdrawal`,
+        `/me/feedback/${id}/withdrawal`,
         "POST",
         {},
         false,

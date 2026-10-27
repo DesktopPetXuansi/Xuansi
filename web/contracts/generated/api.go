@@ -585,6 +585,24 @@ func (e PostApiV1AdminClientReleasesJSONBodyChannel) Valid() bool {
 	}
 }
 
+// Defines values for GetApiV1AdminFeedbackParamsFolder.
+const (
+	Inbox GetApiV1AdminFeedbackParamsFolder = "inbox"
+	Spam  GetApiV1AdminFeedbackParamsFolder = "spam"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1AdminFeedbackParamsFolder enum.
+func (e GetApiV1AdminFeedbackParamsFolder) Valid() bool {
+	switch e {
+	case Inbox:
+		return true
+	case Spam:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1AdminUsersParamsRole.
 const (
 	AdminUsersRoleAdmin GetApiV1AdminUsersParamsRole = "ADMIN"
@@ -1048,6 +1066,17 @@ type FeedbackReceiptResponse struct {
 type FeedbackResponse struct {
 	// Data 仅网站管理员可读的完整反馈条目。
 	Data Feedback `json:"data"`
+}
+
+// FeedbackSpamClearReceipt defines model for FeedbackSpamClearReceipt.
+type FeedbackSpamClearReceipt struct {
+	// ClearedCount 本次实际清空的垃圾反馈数，包含未加载的分页；重复清空空箱时为 0。
+	ClearedCount int64 `json:"clearedCount"`
+}
+
+// FeedbackSpamClearResponse defines model for FeedbackSpamClearResponse.
+type FeedbackSpamClearResponse struct {
+	Data FeedbackSpamClearReceipt `json:"data"`
 }
 
 // FeedbackStatus defines model for FeedbackStatus.
@@ -1522,30 +1551,6 @@ type UserResponse struct {
 	} `json:"meta,omitempty"`
 }
 
-// GetApiV1AdminAuditLogsParams defines parameters for GetApiV1AdminAuditLogs.
-type GetApiV1AdminAuditLogsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// GetApiV1AdminClientReleasesParams defines parameters for GetApiV1AdminClientReleases.
-type GetApiV1AdminClientReleasesParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
 // PostApiV1AdminClientReleasesJSONBody defines parameters for PostApiV1AdminClientReleases.
 type PostApiV1AdminClientReleasesJSONBody struct {
 	Artifacts []struct {
@@ -1594,18 +1599,29 @@ type PostApiV1AdminClientReleasesIdPublicationsParams struct {
 
 // GetApiV1AdminFeedbackParams defines parameters for GetApiV1AdminFeedback.
 type GetApiV1AdminFeedbackParams struct {
-	Status *FeedbackStatus `form:"status,omitempty" json:"status,omitempty"`
-	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+	// Folder 收件分区；省略时为 inbox。垃圾邮件菜单使用 spam 查看全部处理状态的垃圾反馈。
+	Folder *GetApiV1AdminFeedbackParamsFolder `form:"folder,omitempty" json:"folder,omitempty"`
+	Status *FeedbackStatus                    `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int                               `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// Cursor 绑定status筛选的不透明base64url游标，按createdAt/id降序。
+	// Cursor 绑定 status 和 folder 的不透明 base64url 游标，按 createdAt/id 倒序；不同分区不能复用。
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// GetApiV1AdminFeedbackParamsFolder defines parameters for GetApiV1AdminFeedback.
+type GetApiV1AdminFeedbackParamsFolder string
 
 // AdminFeedbackConversationsParams defines parameters for AdminFeedbackConversations.
 type AdminFeedbackConversationsParams struct {
 	Cursor *string         `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
 	Status *FeedbackStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ClearFeedbackSpamParams defines parameters for ClearFeedbackSpam.
+type ClearFeedbackSpamParams struct {
+	// XCSRFToken 管理员网站会话写操作，必须携带同源 Origin、双提交 Cookie 和有效 CSRF 令牌。
+	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
 // PatchApiV1AdminFeedbackIdParams defines parameters for PatchApiV1AdminFeedbackId.
@@ -1635,28 +1651,9 @@ type ReadAdminFeedbackParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
-// GetApiV1AdminJobsParams defines parameters for GetApiV1AdminJobs.
-type GetApiV1AdminJobsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
 // GetApiV1AdminResourcesParams defines parameters for GetApiV1AdminResources.
 type GetApiV1AdminResourcesParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // PatchApiV1AdminResourcesIdJSONBody defines parameters for PatchApiV1AdminResourcesId.
@@ -1788,14 +1785,23 @@ type PostApiV1AuthRegistrationsParams struct {
 
 // GetApiV1ClientReleasesParams defines parameters for GetApiV1ClientReleases.
 type GetApiV1ClientReleasesParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
 	Os      *string `form:"os,omitempty" json:"os,omitempty"`
 	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
 	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetApiV1ClientReleasesLatestParams defines parameters for GetApiV1ClientReleasesLatest.
+type GetApiV1ClientReleasesLatestParams struct {
+	Os      *string `form:"os,omitempty" json:"os,omitempty"`
+	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
+	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
+}
+
+// GetApiV1ClientReleasesIdParams defines parameters for GetApiV1ClientReleasesId.
+type GetApiV1ClientReleasesIdParams struct {
+	Os      *string `form:"os,omitempty" json:"os,omitempty"`
+	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
+	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
 }
 
 // PostApiV1FeedbackParams defines parameters for PostApiV1Feedback.
@@ -1831,18 +1837,6 @@ type PatchApiV1MeJSONBody struct {
 type PatchApiV1MeParams struct {
 	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
 	XCSRFToken string `json:"X-CSRF-Token"`
-}
-
-// GetApiV1MeClientGrantsParams defines parameters for GetApiV1MeClientGrants.
-type GetApiV1MeClientGrantsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // DeleteApiV1MeClientGrantsIdParams defines parameters for DeleteApiV1MeClientGrantsId.
@@ -1925,7 +1919,7 @@ type WithdrawAccountFeedbackParams struct {
 type ClearPersonalHistoryParams struct {
 	Kind *ClearPersonalHistoryParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
 
-	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
@@ -1944,26 +1938,14 @@ type ListPersonalHistoryParamsKind string
 
 // DeletePersonalHistoryItemParams defines parameters for DeletePersonalHistoryItem.
 type DeletePersonalHistoryItemParams struct {
-	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // PutPersonalHistoryItemParams defines parameters for PutPersonalHistoryItem.
 type PutPersonalHistoryItemParams struct {
-	// XCSRFToken 浏览器写请求必需；具有独立history权限的Bearer请求可省略。
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
-}
-
-// GetApiV1MeLibraryParams defines parameters for GetApiV1MeLibrary.
-type GetApiV1MeLibraryParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // DeleteApiV1MeLibraryIdParams defines parameters for DeleteApiV1MeLibraryId.
@@ -1979,8 +1961,8 @@ type PutApiV1MeLibraryIdJSONBody struct {
 
 // PutApiV1MeLibraryIdParams defines parameters for PutApiV1MeLibraryId.
 type PutApiV1MeLibraryIdParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // PutApiV1MePasswordJSONBody defines parameters for PutApiV1MePassword.
@@ -1999,29 +1981,14 @@ type PutApiV1MePasswordParams struct {
 
 // GetApiV1MeResourcesParams defines parameters for GetApiV1MeResources.
 type GetApiV1MeResourcesParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Kind   *string `form:"kind,omitempty" json:"kind,omitempty"`
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+	Tag    *string `form:"tag,omitempty" json:"tag,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Group 可选用途分组，先筛选再分页；不传时保留原全资源范围。
 	Group *ResourceGroup `form:"group,omitempty" json:"group,omitempty"`
-}
-
-// GetApiV1MeSessionsParams defines parameters for GetApiV1MeSessions.
-type GetApiV1MeSessionsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // DeleteApiV1MeSessionsIdParams defines parameters for DeleteApiV1MeSessionsId.
@@ -2030,28 +1997,13 @@ type DeleteApiV1MeSessionsIdParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
-// GetApiV1MeUploadsParams defines parameters for GetApiV1MeUploads.
-type GetApiV1MeUploadsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
 // GetApiV1ResourcesParams defines parameters for GetApiV1Resources.
 type GetApiV1ResourcesParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Kind   *string `form:"kind,omitempty" json:"kind,omitempty"`
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+	Tag    *string `form:"tag,omitempty" json:"tag,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Group 可选用途分组，先筛选再分页；不传时保留原全资源范围。
 	Group *ResourceGroup `form:"group,omitempty" json:"group,omitempty"`
@@ -2059,8 +2011,8 @@ type GetApiV1ResourcesParams struct {
 
 // PostApiV1ResourcesParams defines parameters for PostApiV1Resources.
 type PostApiV1ResourcesParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // DeleteApiV1ResourcesIdParams defines parameters for DeleteApiV1ResourcesId.
@@ -2071,26 +2023,14 @@ type DeleteApiV1ResourcesIdParams struct {
 
 // PatchApiV1ResourcesIdParams defines parameters for PatchApiV1ResourcesId.
 type PatchApiV1ResourcesIdParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
-}
-
-// GetApiV1ResourcesIdVersionsParams defines parameters for GetApiV1ResourcesIdVersions.
-type GetApiV1ResourcesIdVersionsParams struct {
-	Cursor  *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Kind    *string `form:"kind,omitempty" json:"kind,omitempty"`
-	Search  *string `form:"search,omitempty" json:"search,omitempty"`
-	Tag     *string `form:"tag,omitempty" json:"tag,omitempty"`
-	Os      *string `form:"os,omitempty" json:"os,omitempty"`
-	Arch    *string `form:"arch,omitempty" json:"arch,omitempty"`
-	Channel *string `form:"channel,omitempty" json:"channel,omitempty"`
-	Limit   *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // PostApiV1ResourcesIdVersionsParams defines parameters for PostApiV1ResourcesIdVersions.
 type PostApiV1ResourcesIdVersionsParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizationsJSONBody defines parameters for PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizations.
@@ -2098,7 +2038,7 @@ type PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizationsJSONBody = map[s
 
 // PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizationsParams defines parameters for PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizations.
 type PostApiV1ResourcesIdVersionsVersionIdDownloadAuthorizationsParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
 	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
@@ -2110,8 +2050,8 @@ type PostApiV1UploadsParams struct {
 
 // DeleteApiV1UploadsIdParams defines parameters for DeleteApiV1UploadsId.
 type DeleteApiV1UploadsIdParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // PostApiV1UploadsIdCompletionJSONBody defines parameters for PostApiV1UploadsIdCompletion.
@@ -2119,8 +2059,8 @@ type PostApiV1UploadsIdCompletionJSONBody = map[string]interface{}
 
 // PostApiV1UploadsIdCompletionParams defines parameters for PostApiV1UploadsIdCompletion.
 type PostApiV1UploadsIdCompletionParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 
 	// IdempotencyKey 同一上传完成意图重试复用此键，跨上传复用返回409
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -2128,8 +2068,8 @@ type PostApiV1UploadsIdCompletionParams struct {
 
 // PutApiV1UploadsIdContentParams defines parameters for PutApiV1UploadsIdContent.
 type PutApiV1UploadsIdContentParams struct {
-	// XCSRFToken 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// XCSRFToken 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。
+	XCSRFToken *string `json:"X-CSRF-Token,omitempty"`
 }
 
 // GetOauthAuthorizeParams defines parameters for GetOauthAuthorize.

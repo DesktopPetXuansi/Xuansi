@@ -629,67 +629,6 @@
           {
             "cookieAuth": []
           }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          }
         ]
       }
     },
@@ -773,67 +712,6 @@
         "security": [
           {
             "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       }
@@ -954,27 +832,6 @@
             }
           },
           {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -1044,11 +901,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "x-required-scopes": [
@@ -1119,27 +976,6 @@
           },
           {
             "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
             "in": "query",
             "schema": {
               "type": "string"
@@ -1273,11 +1109,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "x-required-scopes": [
@@ -1379,65 +1215,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       },
@@ -1499,11 +1276,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "x-required-scopes": [
@@ -1703,7 +1480,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ]
       }
@@ -1859,11 +1636,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "x-required-scopes": [
@@ -1905,67 +1682,6 @@
         "security": [
           {
             "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       }
@@ -2031,11 +1747,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           },
           {
             "name": "Idempotency-Key",
@@ -2098,11 +1814,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "requestBody": {
@@ -2158,67 +1874,6 @@
           },
           {
             "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       }
@@ -2282,11 +1937,11 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "x-required-scopes": [
@@ -2382,34 +2037,6 @@
         ],
         "parameters": [
           {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "os",
             "in": "query",
             "schema": {
@@ -2429,18 +2056,9 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
-        ]
+        ],
+        "description": "按 channel 筛选发行版本、按 os/arch 筛选安装包；最多返回 100 个已发布且包含匹配安装包的版本，不提供游标分页。"
       }
     },
     "/api/v1/client/releases/latest": {
@@ -2480,7 +2098,31 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "os",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "arch",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "按 channel 筛选发行版本、按 os/arch 筛选安装包，返回最新的匹配版本；无匹配版本或安装包时返回 404。"
       }
     },
     "/api/v1/client/releases/{id}": {
@@ -2529,8 +2171,30 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "os",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "arch",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
-        ]
+        ],
+        "description": "按编号读取已发布版本；可用 channel 进一步约束版本、用 os/arch 筛选安装包，无匹配版本或安装包时返回 404。"
       }
     },
     "/api/v1/admin/users": {
@@ -2665,55 +2329,6 @@
         ],
         "parameters": [
           {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -2758,67 +2373,6 @@
         "security": [
           {
             "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       },
@@ -2980,67 +2534,6 @@
           {
             "cookieAuth": []
           }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          }
         ]
       }
     },
@@ -3076,67 +2569,6 @@
         "security": [
           {
             "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "os",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "arch",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channel",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
           }
         ]
       }
@@ -3970,7 +3402,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "responses": {
@@ -4022,7 +3454,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "responses": {
@@ -4085,7 +3517,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "浏览器写请求必需；具有独立history权限的Bearer请求可省略。"
+            "description": "使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。"
           }
         ],
         "responses": {
@@ -4215,6 +3647,19 @@
         ],
         "parameters": [
           {
+            "name": "folder",
+            "in": "query",
+            "description": "收件分区；省略时为 inbox。垃圾邮件菜单使用 spam 查看全部处理状态的垃圾反馈。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inbox",
+                "spam"
+              ],
+              "default": "inbox"
+            }
+          },
+          {
             "name": "status",
             "in": "query",
             "schema": {
@@ -4237,9 +3682,10 @@
             "schema": {
               "type": "string"
             },
-            "description": "绑定status筛选的不透明base64url游标，按createdAt/id降序。"
+            "description": "绑定 status 和 folder 的不透明 base64url 游标，按 createdAt/id 倒序；不同分区不能复用。"
           }
-        ]
+        ],
+        "description": "普通收件默认排除垃圾反馈和已清空条目；folder=spam 仅返回未清空的垃圾反馈。清空前仍可分页查看，status 继续表示独立的处理进度。"
       }
     },
     "/api/v1/admin/feedback/{id}": {
@@ -5497,6 +4943,168 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FeedbackThreadPage"
+                }
+              }
+            }
+          }
+        },
+        "description": "管理员对话列表排除垃圾反馈及已清空条目，处理进度和原有撤回展示保持不变。"
+      }
+    },
+    "/api/v1/resources/{id}/cover": {
+      "get": {
+        "operationId": "get__api_v1_resources_id_cover",
+        "summary": "读取资源封面原图",
+        "tags": [
+          "resources"
+        ],
+        "description": "与资源详情复用公开、所有者或管理员读取权限；无封面或不可读取的资源返回 404。成功返回 PNG 原始字节，不使用 JSON envelope。",
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG 封面原始字节",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/{ticket}": {
+      "get": {
+        "operationId": "get__api_v1_downloads_ticket",
+        "summary": "使用短期票据下载资源包",
+        "tags": [
+          "downloads"
+        ],
+        "description": "使用下载授权接口返回的五分钟票据，不额外要求 Cookie 或 Bearer。每次请求重新检查资源状态、票据账号与客户端授权撤销状态；成功返回 ZIP 原始字节，不使用 JSON envelope。",
+        "security": [],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "description": "下载授权回执 URL 中的短期不透明票据。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP 资源包原始字节",
+            "headers": {
+              "Content-Length": {
+                "description": "已发布资源包的字节数。",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "Content-Disposition": {
+                "description": "以 resource.zip 附件下载。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/feedback/spam": {
+      "delete": {
+        "operationId": "clearFeedbackSpam",
+        "summary": "管理员清空垃圾邮件",
+        "description": "仅清空操作时仍处于 SPAM 的全部垃圾反馈；移除原文、联系方式、诊断及私信内容，保留不可恢复的幂等骨架避免旧请求重建。正常反馈和公开投递记录不受影响。",
+        "tags": [
+          "feedback"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "管理员网站会话写操作，必须携带同源 Origin、双提交 Cookie 和有效 CSRF 令牌。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "已清空；空箱重复操作成功并返回 0",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackSpamClearResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一业务错误；未登录 401、非管理员或 CSRF 失败 403。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -8164,6 +7772,32 @@
           "ResourceGroupAddon"
         ],
         "description": "APPEARANCE为MODEL/IMAGE/ANIMATION，ADDON为MOTION/EXPRESSION。"
+      },
+      "FeedbackSpamClearReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clearedCount"
+        ],
+        "properties": {
+          "clearedCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "本次实际清空的垃圾反馈数，包含未加载的分页；重复清空空箱时为 0。"
+          }
+        }
+      },
+      "FeedbackSpamClearResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedbackSpamClearReceipt"
+          }
+        }
       }
     },
     "securitySchemes": {

@@ -27,7 +27,7 @@ type feedbackManagement struct {
 var errFeedbackManagement = errors.New("反馈管理凭据无效")
 
 func feedbackManagementView(row feedbackEntry) feedbackManagement {
-	canWithdraw := row.ModerationStatus != "WITHDRAWN" && row.ModerationStatus != "WITHDRAWAL_REQUESTED" && row.PublicationStartedAt == nil && row.GitHubIssueNumber == 0
+	canWithdraw := row.ClearedAt == nil && row.ModerationStatus != "WITHDRAWN" && row.ModerationStatus != "WITHDRAWAL_REQUESTED" && row.PublicationStartedAt == nil && row.GitHubIssueNumber == 0
 	return feedbackManagement{row.ID, row.CreatedAt, row.Status, row.ModerationStatus, row.GitHubIssueURL, canWithdraw}
 }
 

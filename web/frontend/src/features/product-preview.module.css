@@ -1,7 +1,7 @@
 /* 原生截图保留完整比例，外壳只负责说明与切换，不仿造客户端控件。 */
 .section {
   max-width: var(--content-width);
-  margin: 56px auto 0;
+  margin: 80px auto 0;
   padding: 0 var(--gutter);
   scroll-margin-top: 24px;
 }
@@ -10,12 +10,12 @@
   justify-content: space-between;
   align-items: end;
   gap: 32px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 .heading h2 {
   max-width: 18em;
   margin-bottom: 0;
-  font-size: clamp(24px, 2.6vw, 32px);
+  font-size: clamp(28px, 3vw, 36px);
 }
 .heading > p {
   flex-shrink: 0;
@@ -25,9 +25,12 @@
 }
 .tabs {
   display: flex;
-  gap: 8px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  width: fit-content;
+  gap: 4px;
+  padding: 5px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 .tabs button {
   display: inline-flex;
@@ -35,34 +38,35 @@
   justify-content: center;
   gap: 12px;
   min-height: 44px;
-  padding: 8px 20px;
+  padding: 10px 24px;
   color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .tabs button > span {
-  font-size: 12px;
+  /* 三个界面是可选视图，视觉上不再把它们标成操作步骤。 */
+  display: none;
 }
 .tabs button:hover {
   color: var(--green);
   background: var(--green-soft);
 }
 .tabs button[aria-selected="true"] {
-  color: var(--green);
-  background: var(--green-soft);
-  border-color: var(--line);
+  color: var(--white);
+  background: var(--green);
+  border-color: var(--green);
   font-weight: 600;
 }
 .panel {
-  padding-top: 24px;
+  padding-top: 28px;
 }
 .copy {
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 32px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .description {
   max-width: 32em;
@@ -89,7 +93,7 @@
 .imageLink {
   display: block;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--white);
   cursor: zoom-in;
@@ -146,7 +150,7 @@
 }
 @media (max-width: 640px) {
   .section {
-    margin-top: 40px;
+    margin-top: 56px;
   }
   .heading {
     display: block;
@@ -158,6 +162,7 @@
     display: none;
   }
   .tabs {
+    width: 100%;
     gap: 4px;
   }
   .tabs button {

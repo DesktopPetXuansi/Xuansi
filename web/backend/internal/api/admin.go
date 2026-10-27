@@ -18,6 +18,7 @@ func (s *Server) adminRoutes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(admin)
 		r.Get("/feedback", s.listFeedback)
+		r.Delete("/feedback/spam", s.clearFeedbackSpam)
 		r.Get("/feedback/conversations", s.adminFeedbackThreads)
 		r.Post("/feedback/{id}/read", s.adminReadFeedback)
 		r.Get("/feedback/{id}/messages", s.adminFeedbackMessages)
