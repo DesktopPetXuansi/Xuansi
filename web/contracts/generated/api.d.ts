@@ -518,7 +518,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** /api/v1/client/releases */
+        /**
+         * /api/v1/client/releases
+         * @description 按 channel 筛选发行版本、按 os/arch 筛选安装包；最多返回 100 个已发布且包含匹配安装包的版本，不提供游标分页。
+         */
         get: operations["get__api_v1_client_releases"];
         put?: never;
         post?: never;
@@ -535,7 +538,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** /api/v1/client/releases/latest */
+        /**
+         * /api/v1/client/releases/latest
+         * @description 按 channel 筛选发行版本、按 os/arch 筛选安装包，返回最新的匹配版本；无匹配版本或安装包时返回 404。
+         */
         get: operations["get__api_v1_client_releases_latest"];
         put?: never;
         post?: never;
@@ -552,7 +558,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** /api/v1/client/releases/{id} */
+        /**
+         * /api/v1/client/releases/{id}
+         * @description 按编号读取已发布版本；可用 channel 进一步约束版本、用 os/arch 筛选安装包，无匹配版本或安装包时返回 404。
+         */
         get: operations["get__api_v1_client_releases_id"];
         put?: never;
         post?: never;
@@ -899,7 +908,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员反馈收件箱 */
+        /**
+         * 管理员反馈收件箱
+         * @description 普通收件默认排除垃圾反馈和已清空条目；folder=spam 仅返回未清空的垃圾反馈。清空前仍可分页查看，status 继续表示独立的处理进度。
+         */
         get: operations["get__api_v1_admin_feedback"];
         put?: never;
         post?: never;
@@ -1177,11 +1189,74 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 管理员聊天与单次收件列表 */
+        /**
+         * 管理员聊天与单次收件列表
+         * @description 管理员对话列表排除垃圾反馈及已清空条目，处理进度和原有撤回展示保持不变。
+         */
         get: operations["adminFeedbackConversations"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/{id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取资源封面原图
+         * @description 与资源详情复用公开、所有者或管理员读取权限；无封面或不可读取的资源返回 404。成功返回 PNG 原始字节，不使用 JSON envelope。
+         */
+        get: operations["get__api_v1_resources_id_cover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/downloads/{ticket}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 使用短期票据下载资源包
+         * @description 使用下载授权接口返回的五分钟票据，不额外要求 Cookie 或 Bearer。每次请求重新检查资源状态、票据账号与客户端授权撤销状态；成功返回 ZIP 原始字节，不使用 JSON envelope。
+         */
+        get: operations["get__api_v1_downloads_ticket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/feedback/spam": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 管理员清空垃圾邮件
+         * @description 仅清空操作时仍处于 SPAM 的全部垃圾反馈；移除原文、联系方式、诊断及私信内容，保留不可恢复的幂等骨架避免旧请求重建。正常反馈和公开投递记录不受影响。
+         */
+        delete: operations["clearFeedbackSpam"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1909,6 +1984,16 @@ export interface components {
          * @enum {string}
          */
         ResourceGroup: "APPEARANCE" | "ADDON";
+        FeedbackSpamClearReceipt: {
+            /**
+             * Format: int64
+             * @description 本次实际清空的垃圾反馈数，包含未加载的分页；重复清空空箱时为 0。
+             */
+            clearedCount: number;
+        };
+        FeedbackSpamClearResponse: {
+            data: components["schemas"]["FeedbackSpamClearReceipt"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2308,16 +2393,7 @@ export interface operations {
     };
     get__api_v1_me_sessions: {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -2378,16 +2454,7 @@ export interface operations {
     };
     "get__api_v1_me_client-grants": {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -2453,9 +2520,6 @@ export interface operations {
                 kind?: string;
                 search?: string;
                 tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
                 limit?: number;
                 /** @description 可选用途分组，先筛选再分页；不传时保留原全资源范围。 */
                 group?: components["schemas"]["ResourceGroup"];
@@ -2489,9 +2553,9 @@ export interface operations {
     post__api_v1_resources: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path?: never;
             cookie?: never;
@@ -2529,9 +2593,6 @@ export interface operations {
                 kind?: string;
                 search?: string;
                 tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
                 limit?: number;
                 /** @description 可选用途分组，先筛选再分页；不传时保留原全资源范围。 */
                 group?: components["schemas"]["ResourceGroup"];
@@ -2628,9 +2689,9 @@ export interface operations {
     patch__api_v1_resources_id: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2665,16 +2726,7 @@ export interface operations {
     };
     get__api_v1_resources_id_versions: {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -2706,9 +2758,9 @@ export interface operations {
     post__api_v1_resources_id_versions: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2809,7 +2861,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
                 "X-CSRF-Token"?: string;
             };
             path: {
@@ -2914,9 +2966,9 @@ export interface operations {
     delete__api_v1_uploads_id: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -2945,16 +2997,7 @@ export interface operations {
     };
     get__api_v1_me_uploads: {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -2985,8 +3028,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
                 /** @description 同一上传完成意图重试复用此键，跨上传复用返回409 */
                 "Idempotency-Key": string;
             };
@@ -3024,9 +3067,9 @@ export interface operations {
     put__api_v1_uploads_id_content: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -3059,16 +3102,7 @@ export interface operations {
     };
     get__api_v1_me_library: {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3098,9 +3132,9 @@ export interface operations {
     put__api_v1_me_library_id: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 浏览器写请求需要同源Origin、双提交Cookie与此令牌；只读授权的下载票据请求可省略 */
-                "X-CSRF-Token": string;
+            header?: {
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
+                "X-CSRF-Token"?: string;
             };
             path: {
                 id: string;
@@ -3169,14 +3203,9 @@ export interface operations {
     get__api_v1_client_releases: {
         parameters: {
             query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
                 os?: string;
                 arch?: string;
                 channel?: string;
-                limit?: number;
             };
             header?: never;
             path?: never;
@@ -3206,7 +3235,11 @@ export interface operations {
     };
     get__api_v1_client_releases_latest: {
         parameters: {
-            query?: never;
+            query?: {
+                os?: string;
+                arch?: string;
+                channel?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3235,7 +3268,11 @@ export interface operations {
     };
     get__api_v1_client_releases_id: {
         parameters: {
-            query?: never;
+            query?: {
+                os?: string;
+                arch?: string;
+                channel?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -3304,13 +3341,6 @@ export interface operations {
     get__api_v1_admin_resources: {
         parameters: {
             query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
                 limit?: number;
             };
             header?: never;
@@ -3341,16 +3371,7 @@ export interface operations {
     };
     "get__api_v1_admin_client-releases": {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3432,16 +3453,7 @@ export interface operations {
     };
     get__api_v1_admin_jobs: {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3470,16 +3482,7 @@ export interface operations {
     };
     "get__api_v1_admin_audit-logs": {
         parameters: {
-            query?: {
-                cursor?: string;
-                kind?: string;
-                search?: string;
-                tag?: string;
-                os?: string;
-                arch?: string;
-                channel?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3978,7 +3981,7 @@ export interface operations {
                 kind?: "APPEARANCE" | "DOWNLOAD";
             };
             header?: {
-                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
                 "X-CSRF-Token"?: string;
             };
             path?: never;
@@ -4008,7 +4011,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
                 "X-CSRF-Token"?: string;
             };
             path: {
@@ -4051,7 +4054,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 浏览器写请求必需；具有独立history权限的Bearer请求可省略。 */
+                /** @description 使用 Cookie 的浏览器写请求必须携带精确同源 Origin、双提交 Cookie 和此令牌；通过身份与 scope 校验的有效 Bearer 请求豁免 CSRF，不要求此头。 */
                 "X-CSRF-Token"?: string;
             };
             path: {
@@ -4129,9 +4132,11 @@ export interface operations {
     get__api_v1_admin_feedback: {
         parameters: {
             query?: {
+                /** @description 收件分区；省略时为 inbox。垃圾邮件菜单使用 spam 查看全部处理状态的垃圾反馈。 */
+                folder?: "inbox" | "spam";
                 status?: components["schemas"]["FeedbackStatus"];
                 limit?: number;
-                /** @description 绑定status筛选的不透明base64url游标，按createdAt/id降序。 */
+                /** @description 绑定 status 和 folder 的不透明 base64url 游标，按 createdAt/id 倒序；不同分区不能复用。 */
                 cursor?: string;
             };
             header?: never;
@@ -4918,6 +4923,105 @@ export interface operations {
                 };
             };
             /** @description 统一业务错误；账号所有权不符与不存在均404，未登录401，OAuth授权403。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get__api_v1_resources_id_cover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PNG 封面原始字节 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get__api_v1_downloads_ticket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 下载授权回执 URL 中的短期不透明票据。 */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP 资源包原始字节 */
+            200: {
+                headers: {
+                    /** @description 已发布资源包的字节数。 */
+                    "Content-Length"?: number;
+                    /** @description 以 resource.zip 附件下载。 */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clearFeedbackSpam: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 管理员网站会话写操作，必须携带同源 Origin、双提交 Cookie 和有效 CSRF 令牌。 */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清空；空箱重复操作成功并返回 0 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackSpamClearResponse"];
+                };
+            };
+            /** @description 统一业务错误；未登录 401、非管理员或 CSRF 失败 403。 */
             default: {
                 headers: {
                     [name: string]: unknown;

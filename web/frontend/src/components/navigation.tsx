@@ -80,7 +80,7 @@ export function Navigation() {
         <Link href="/" className="brand" aria-label="玄司首页">
           <Image src="/brand/icon.png" width={38} height={38} alt="" />
           <span>
-            玄司<span className="brand-en">XUANSI</span>
+            玄司<span className="brand-en">Xuansi</span>
           </span>
         </Link>
         {/* 两个断点入口交替显示，让视觉顺序与键盘顺序始终一致。 */}
@@ -123,7 +123,7 @@ export function Footer() {
     <footer className="site-footer">
       <div>
         <Link className="brand" href="/">
-          玄司 <span className="brand-en">XUANSI</span>
+          玄司 <span className="brand-en">Xuansi</span>
         </Link>
         <p>一个在你桌面上，认真陪伴的伙伴。</p>
         <small>形象、聊天方式与分享，由你选择。</small>

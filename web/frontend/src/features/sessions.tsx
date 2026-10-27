@@ -1,7 +1,7 @@
 "use client";
 import { Button, Heading, Notice } from "@/components/ui";
 import { api } from "@/lib/api";
-import { type Session } from "@/lib/types";
+import { type Grant, type Session } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 export function Sessions() {
@@ -15,11 +15,17 @@ export function Sessions() {
     </>
   );
 }
-function SessionList({ endpoint, title }: { endpoint: string; title: string }) {
+function SessionList({
+  endpoint,
+  title,
+}: {
+  endpoint: "/me/sessions" | "/me/client-grants";
+  title: string;
+}) {
   const cache = useQueryClient();
   const query = useQuery({
     queryKey: [endpoint],
-    queryFn: () => api<Session[]>(endpoint),
+    queryFn: () => api<(Session | Grant)[]>(endpoint),
   });
   const [error, setError] = useState<unknown>();
   async function revoke(id: string) {
@@ -44,7 +50,11 @@ function SessionList({ endpoint, title }: { endpoint: string; title: string }) {
         <article className="row" key={item.id}>
           <div className="row-body">
             <h3>
-              {item.isCurrent ? "当前会话" : (item.deviceLabel ?? "网站会话")}
+              {"isCurrent" in item && item.isCurrent
+                ? "当前会话"
+                : "deviceLabel" in item
+                  ? item.deviceLabel
+                  : "网站会话"}
             </h3>
             <p>创建于 {new Date(item.createdAt).toLocaleString("zh-CN")}</p>
           </div>

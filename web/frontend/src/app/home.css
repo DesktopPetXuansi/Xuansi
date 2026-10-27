@@ -1,34 +1,34 @@
-/* 首页只定义布局与插画，颜色和控件继续复用全局设计变量。 */
+/* 首页以完整角色和真实界面作为重点；颜色、控件与业务页共用全局变量。 */
 .hero {
   max-width: var(--content-width);
   margin: auto;
-  padding: 48px var(--gutter) 0;
+  padding: 32px var(--gutter) 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
-  gap: 64px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 56px;
   align-items: center;
 }
 .hero-copy {
-  padding: 24px 0;
+  padding: 32px 0;
 }
-.hero-copy .eyebrow {
-  margin-bottom: 24px;
+.hero-kicker {
+  margin-bottom: 20px;
+  color: var(--green);
+  font-size: 15px;
+  font-weight: 500;
 }
 .hero h1 {
-  font-size: clamp(40px, 4.3vw, 60px);
-  line-height: 1.28;
-  letter-spacing: -2px;
   margin-bottom: 24px;
-}
-.hero h1 em {
-  color: var(--green);
-  font-style: normal;
+  font-size: clamp(44px, 4.8vw, 66px);
+  line-height: 1.3;
+  letter-spacing: -0.045em;
+  font-weight: 600;
 }
 .hero-description {
-  max-width: 440px;
-  margin-bottom: 24px;
+  max-width: 32em;
+  margin-bottom: 28px;
   color: var(--muted);
-  line-height: 1.9;
+  line-height: 1.95;
   font-size: 16px;
 }
 .hero-description span {
@@ -37,188 +37,215 @@
 .hero-actions {
   gap: 24px;
 }
+.hero-actions .button-link {
+  min-height: 52px;
+  padding-inline: 24px;
+}
 .hero-access {
   margin: 12px 0 0;
-  color: var(--green);
-  font-size: 14px;
-  font-weight: 600;
-}
-.hero-project {
-  margin: 20px 0 0;
   color: var(--muted);
   font-size: 13px;
 }
-.hero-project > span {
-  margin-inline: 8px;
-}
 .hero-note {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 24px 0 8px;
+  gap: 12px;
+  margin: 28px 0 8px;
   color: var(--muted);
   font-size: 12px;
 }
 .hero-version {
   padding: 2px 8px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 5px;
+  background: var(--white);
   color: var(--green);
 }
 .hero-requirements {
+  max-width: 36em;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
-  margin: 0;
+  line-height: 1.8;
 }
+.hero-project {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hero-project a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+/* 不仿造客户端窗口：完整角色站在浅色背景上，实拍留给下方展示区。 */
 .hero-art {
-  height: 456px;
   position: relative;
+  min-width: 0;
+  height: 568px;
   margin: 0;
-  overflow: hidden;
-  background: var(--art-background);
-  border: 1px solid var(--art-border);
-  border-radius: 96px 8px 8px 8px;
 }
-.hero-art::before {
-  content: "";
+.art-backdrop {
   position: absolute;
-  inset: 48px 64px 80px;
-  border: 1px solid var(--art-outline);
-  border-radius: 200px 200px 0 0;
+  inset: 80px 0 64px 24px;
+  border-radius: 50%;
+  background: var(--green-soft);
 }
 .art-portrait {
   position: absolute;
-  inset: 16px 32px 64px;
+  inset: -8px 8px 88px;
 }
 .art-portrait img {
   object-fit: contain;
   object-position: center bottom;
 }
-.art-label {
-  position: absolute;
-  top: 32px;
-  right: 20px;
-  writing-mode: vertical-rl;
-  color: var(--art-gold);
-  letter-spacing: 4px;
-  font-size: 10px;
-}
 .art-bottom {
   position: absolute;
-  inset: auto 24px 16px;
+  inset: auto 0 0;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--art-border);
-  color: var(--art-text);
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+.art-bottom > span {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.art-bottom strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.art-bottom span span {
+  color: var(--muted);
   font-size: 12px;
 }
-.art-bottom span {
-  color: var(--art-gold);
-  font-size: 10px;
-  letter-spacing: 3px;
+.art-bottom a {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  gap: 6px;
+  color: var(--green);
+  font-size: 13px;
 }
 .home-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-  gap: 64px;
-  padding: 56px 0 0;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 80px;
+  padding: 80px 0 0;
 }
 .section-top h2 {
   max-width: 12em;
-  font-size: 30px;
   margin-bottom: 16px;
+  font-size: clamp(28px, 3vw, 36px);
   text-wrap: balance;
 }
 .section-top > .muted {
-  font-size: 14px;
-  margin-bottom: 24px;
+  max-width: 28em;
+  margin-bottom: 20px;
+  font-size: 15px;
 }
 .feature-list article {
   display: flex;
   gap: 20px;
-  padding: 24px 0;
+  padding: 28px 0;
   border-bottom: 1px solid var(--line);
 }
 .feature-list article:first-child {
   padding-top: 0;
 }
 .feature-list article:last-child {
-  border-bottom: 0;
   padding-bottom: 0;
+  border-bottom: 0;
 }
 .feature-icon {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--green-soft);
   color: var(--green);
 }
-.feature-number {
+.feature-label {
   display: block;
-  font-size: 12px;
-  color: var(--muted);
   margin-bottom: 8px;
+  color: var(--green);
+  font-size: 12px;
 }
 .feature-list h3 {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  font-size: 21px;
 }
 .feature-list p {
-  font-size: 14px;
-  color: var(--muted);
   margin-bottom: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.9;
 }
 .library-promo {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: center;
-  gap: 48px;
-  padding: 40px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  gap: 64px;
+  margin-top: 64px;
+  padding: 48px;
+  border-radius: 16px;
   background: var(--green-soft);
-  margin-top: 48px;
 }
 .library-promo h2 {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  font-size: clamp(28px, 3vw, 36px);
 }
 .library-description {
   max-width: 34em;
-  color: var(--muted);
-  font-size: 14px;
   margin-bottom: 24px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.library-promo .button-link {
+  background: var(--white);
 }
 .library-kind {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 4px 12px;
   padding: 20px 0;
   border-bottom: 1px solid var(--line);
   color: var(--green);
 }
 .library-kind strong {
-  font-size: 14px;
   color: var(--ink);
+  font-size: 17px;
   font-weight: 500;
 }
 .library-kind span {
-  margin-left: auto;
-  font-size: 12px;
+  grid-column: 2;
   color: var(--muted);
+  font-size: 13px;
 }
 .library-types .legal-note .quiet-link {
-  display: block;
+  display: flex;
+  width: fit-content;
   margin-top: 8px;
 }
-/* 首次使用按动作排列，帮助链接始终紧邻对应步骤。 */
+/* 只有实际的首次使用流程保留顺序编号，功能介绍不再伪装成步骤。 */
 .start-section {
-  padding-top: 64px;
+  padding-top: 80px;
 }
 .start-section .section-top h2 {
   max-width: none;
@@ -226,102 +253,141 @@
 .start-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
+  gap: 40px;
   list-style: none;
-  margin: 32px 0 24px;
+  margin: 40px 0 24px;
   padding: 0;
 }
 .start-steps li {
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  border-top: 2px solid var(--line);
 }
 .step-index {
-  display: block;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--green-soft);
   color: var(--green);
-  font-size: 12px;
-  margin-bottom: 16px;
+  font-size: 13px;
 }
 .start-steps h3 {
-  font-size: 18px;
   margin-bottom: 12px;
+  font-size: 20px;
 }
-.start-steps p {
-  font-size: 14px;
-  color: var(--muted);
-}
+.start-steps p,
 .start-help {
-  font-size: 14px;
   color: var(--muted);
+  font-size: 14px;
 }
 @media (max-width: 900px) {
-  .hero,
-  .home-section {
-    gap: 32px;
+  .hero {
+    gap: 24px;
   }
   .hero-art {
-    height: 480px;
+    height: 500px;
   }
   .hero-actions {
     gap: 12px;
   }
+  .hero-actions .quiet-link {
+    font-size: 14px;
+  }
+  .art-bottom {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .art-bottom > span {
+    display: grid;
+    gap: 0;
+  }
+  .home-section,
+  .library-promo {
+    gap: 40px;
+  }
   .library-promo {
     padding: 32px;
-    gap: 32px;
   }
 }
 @media (max-width: 640px) {
-  .start-section {
-    padding-top: 40px;
-  }
-  .start-steps {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-    margin-top: 24px;
-  }
   .hero {
     grid-template-columns: minmax(0, 1fr);
-    padding-top: 32px;
-    gap: 32px;
+    gap: 24px;
+    padding-top: 24px;
   }
   .hero-copy {
-    padding: 0;
+    padding: 8px 0 0;
   }
-  .hero h1 {
-    font-size: clamp(36px, 10.3vw, 48px);
-    letter-spacing: -1px;
-  }
-  .hero-description {
+  .hero-kicker {
+    margin-bottom: 16px;
     font-size: 14px;
   }
-  .hero-art {
-    height: 400px;
-    border-top-left-radius: 80px;
+  .hero h1 {
+    font-size: clamp(36px, 10.5vw, 52px);
+    letter-spacing: -0.05em;
   }
-  .hero-art::before {
-    inset-inline: 48px;
+  .hero-description {
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .hero-actions {
+    gap: 8px 12px;
+  }
+  .hero-actions .button-link {
+    padding-inline: 18px;
+    font-size: 14px;
+  }
+  .hero-note {
+    margin-top: 16px;
+  }
+  .hero-project {
+    margin-top: 8px;
+  }
+  .hero-art {
+    height: 456px;
+  }
+  .art-backdrop {
+    inset: 64px 0 60px;
+  }
+  .art-portrait {
+    inset: 0 8px 84px;
+  }
+  .art-bottom {
+    align-items: center;
   }
   .home-section {
     grid-template-columns: minmax(0, 1fr);
-    padding-top: 40px;
+    padding-top: 56px;
     gap: 32px;
   }
   .section-top h2 {
-    font-size: 26px;
     max-width: none;
-  }
-  .section-top > .muted {
-    margin-bottom: 12px;
+    font-size: 28px;
   }
   .feature-list article {
     gap: 16px;
   }
+  .feature-list h3 {
+    font-size: 20px;
+  }
   .library-promo {
     grid-template-columns: minmax(0, 1fr);
-    padding: 24px;
+    margin-top: 48px;
+    padding: 28px 24px;
     gap: 24px;
   }
-  .library-kind {
-    flex-wrap: wrap;
-    gap: 8px;
+  .library-promo h2 {
+    font-size: 27px;
+  }
+  .start-section {
+    padding-top: 56px;
+  }
+  .start-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    margin-top: 28px;
   }
 }

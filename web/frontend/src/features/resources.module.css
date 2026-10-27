@@ -1,12 +1,12 @@
-/* 自带形象与社区目录分开：先看清真实角色，再决定下一步。 */
+/* 形象展示留出独立空间；筛选与社区目录按实际任务分层，不改资源状态。 */
 .builtin {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   align-items: center;
-  gap: 48px;
-  margin-bottom: 64px;
-  border-block: 1px solid var(--line);
-  padding-block: 32px;
+  gap: 80px;
+  margin-bottom: 72px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 48px;
 }
 .builtinStage {
   position: relative;
@@ -14,27 +14,26 @@
   place-items: center;
   min-width: 0;
   background: var(--green-soft);
-  border-radius: 8px;
-  padding: 40px 24px 24px;
+  border-radius: 12px;
+  padding: 48px 32px 24px;
 }
 .builtinStage img {
   display: block;
-  width: 260px;
+  width: 300px;
   max-width: 100%;
-  height: 360px;
+  height: 400px;
   object-fit: contain;
 }
 .stageLabel {
   position: absolute;
-  top: 20px;
-  left: 24px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  top: 24px;
+  left: 32px;
+  font-size: 12px;
   color: var(--muted);
 }
 .stageCaption {
-  margin-top: 12px;
-  font-size: 12px;
+  margin-top: 20px;
+  font-size: 13px;
   color: var(--green);
 }
 .builtinCopy {
@@ -47,12 +46,12 @@
   color: var(--green);
 }
 .builtinCopy h2 {
-  font-size: 52px;
+  font-size: clamp(44px, 4.5vw, 64px);
   line-height: 1.2;
-  margin: 12px 0 20px;
+  margin: 12px 0 24px;
 }
 .builtinDescription {
-  font-size: 21px;
+  font-size: 22px;
   line-height: 1.7;
   margin: 0 0 16px;
   max-width: 25em;
@@ -60,7 +59,7 @@
 .builtinNote {
   color: var(--muted);
   line-height: 1.8;
-  margin: 0 0 24px;
+  margin: 0 0 32px;
   max-width: 32em;
 }
 .downloadNote {
@@ -72,15 +71,16 @@
   min-width: 0;
 }
 .filterForm {
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 24px;
+  border-radius: 12px;
+  background: var(--white);
+  margin-bottom: 32px;
 }
 .search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(160px, 0.6fr) auto;
-  gap: 12px;
+  gap: 16px;
   align-items: end;
   margin-bottom: 16px;
 }
@@ -101,7 +101,7 @@
 }
 .advanced summary {
   cursor: pointer;
-  padding: 8px 0;
+  padding: 10px 0;
 }
 .advanced label {
   max-width: 340px;
@@ -110,14 +110,14 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 28px;
 }
 .card {
   display: flex;
   flex-direction: column;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--white);
 }
@@ -140,10 +140,10 @@
 }
 .preview {
   width: 100%;
-  height: 280px;
+  height: 300px;
   object-fit: contain;
   background: var(--green-soft);
-  padding: 16px;
+  padding: 24px;
 }
 .previewFallback {
   display: grid;
@@ -161,7 +161,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding: 20px;
+  padding: 24px;
   overflow-wrap: anywhere;
 }
 .cardBody :is(h2, h3) {
@@ -194,7 +194,7 @@
   color: var(--green);
   font-size: 14px;
   font-weight: 600;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 .browseHeading {
   display: flex;
@@ -202,7 +202,7 @@
   gap: 16px;
   align-items: center;
   flex-wrap: wrap;
-  margin: 24px 0 16px;
+  margin: 24px 0;
 }
 .browseHeading h2 {
   margin: 0;
@@ -213,30 +213,41 @@
   font-size: 14px;
 }
 .groups {
-  display: flex;
-  gap: 20px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 20px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  margin-bottom: 24px;
 }
 .groups button {
-  border: 0;
-  border-radius: 0;
-  border-bottom: 3px solid transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
-  padding: 12px 4px;
+  min-height: 44px;
+  padding: 8px 24px;
   color: var(--muted);
+}
+.groups button:hover {
+  color: var(--green);
 }
 .groups button[aria-pressed="true"] {
   color: var(--green);
-  border-bottom-color: var(--green);
-  font-weight: 700;
+  border-color: var(--line);
+  background: var(--white);
+  font-weight: 600;
 }
 .empty {
-  padding: 32px 0;
-  border-top: 1px solid var(--line);
+  padding: 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
 }
 .empty h3 {
   margin: 12px 0 8px;
+  font-size: 23px;
 }
 .empty p {
   color: var(--muted);
@@ -245,21 +256,21 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 24px;
+  margin-top: 32px;
 }
 .guide {
   border-top: 1px solid var(--line);
-  margin: 56px 0 24px;
-  padding-top: 32px;
+  margin: 64px 0 24px;
+  padding-top: 40px;
 }
 .guide h2 {
-  margin: 8px 0 28px;
-  font-size: 26px;
+  margin: 8px 0 32px;
+  font-size: 28px;
 }
 .guide ol {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 32px;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -294,11 +305,11 @@
 }
 .detailImage {
   width: 100%;
-  height: 300px;
+  height: 360px;
   object-fit: contain;
   background: var(--green-soft);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 24px;
   margin-bottom: 24px;
 }
 .instructions {
@@ -322,7 +333,20 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 900px) {
+  .builtin {
+    gap: 40px;
+  }
+  .builtinStage {
+    padding-inline: 24px;
+  }
+  .builtinStage img {
+    height: 360px;
+  }
+  .builtinDescription {
+    font-size: 19px;
+  }
   .grid {
+    gap: 24px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -331,7 +355,7 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
     margin-bottom: 40px;
-    padding-block: 24px;
+    padding-bottom: 32px;
   }
   .builtinStage {
     padding: 32px 20px 20px;
@@ -363,6 +387,12 @@
   }
   .preview {
     height: 260px;
+  }
+  .groups button {
+    padding-inline: 16px;
+  }
+  .empty {
+    padding: 24px;
   }
   .filterActions {
     gap: 8px;

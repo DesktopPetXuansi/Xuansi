@@ -101,6 +101,7 @@ class PreferencesPage(QWidget):
         self.speaker.setValue(settings.speaker)
         self.speaker.setEnabled(settings.tts_engine != "fast")
         self.speaker.setToolTip("快速朗读只有一种音色；更多音色可选 0–102，修改后点击试听。")
+        self._natural_speaker = settings.speaker if settings.tts_engine == "natural" else 46
         self.tts_engine.currentIndexChanged.connect(self._voice_engine_changed)
         self.speed = QDoubleSpinBox()
         self.speed.setRange(0.7, 1.5)
@@ -189,9 +190,13 @@ class PreferencesPage(QWidget):
 
     def _voice_engine_changed(self):
         natural = self.tts_engine.currentData() == "natural"
+        if not natural:
+            # 缩小范围会把控件值截成 0，先保留本次表单的自然音色草稿。
+            self._natural_speaker = self.speaker.value()
         self.speaker.setMaximum(102 if natural else 0)
         self.speaker.setEnabled(natural)
-        self.speaker.setValue(46 if natural else 0)
+        self.speaker.setValue(self._natural_speaker if natural else 0)
+        LOG.debug("朗读方式已切换 engine=%s speaker=%s", self.tts_engine.currentData(), self.speaker.value())
 
     def apply(self, settings):
         return replace(

@@ -18,8 +18,9 @@
   --art-outline: #5f634b;
   --art-gold: #c6b685;
   --art-text: #e2e5d8;
-  --content-width: 1200px;
-  --gutter: 32px;
+  --content-width: 1280px;
+  --gutter: 40px;
+  --font-heading: "DengXian", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 * {
   box-sizing: border-box;
@@ -33,8 +34,7 @@ body {
   flex-direction: column;
   background: var(--paper);
   color: var(--ink);
-  font-family:
-    "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   font-size: 15px;
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
@@ -80,13 +80,12 @@ button {
   cursor: pointer;
 }
 .site-header {
-  border-bottom: 1px solid var(--line);
   background: var(--paper);
 }
 .nav-inner {
   max-width: var(--content-width);
   margin: auto;
-  min-height: 80px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   gap: 32px;
@@ -105,33 +104,41 @@ button {
 .brand-en {
   display: block;
   font-size: 10px;
-  letter-spacing: 3px;
+  letter-spacing: 1.5px;
   font-weight: 500;
+}
+/* 品牌与导航像桌面的工具栏，当前页面仍由原有 aria-current 标记。 */
+.brand img {
+  border-radius: 12px;
 }
 .primary-navigation {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 4px;
   margin-left: auto;
   font-size: 14px;
+  padding: 4px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 .primary-navigation a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  border-bottom: 2px solid transparent;
-  padding: 8px 0 6px;
+  border-radius: 8px;
+  padding: 8px 18px;
 }
 .primary-navigation a[aria-current="page"] {
   color: var(--green);
-  border-bottom-color: var(--green);
+  background: var(--green-soft);
   font-weight: 600;
 }
 .primary-navigation a.nav-download,
 .primary-navigation a.nav-download[aria-current="page"] {
   padding: 9px 16px;
   border: 1px solid var(--green);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--green);
   color: white;
   font-weight: 600;
@@ -148,7 +155,7 @@ button {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   width: 44px;
   height: 44px;
   align-items: center;
@@ -160,8 +167,8 @@ button {
   gap: 8px;
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -176,12 +183,12 @@ button {
 .site-footer {
   width: 100%;
   max-width: var(--content-width);
-  margin: 64px auto 0;
-  padding: 32px var(--gutter) 40px;
+  margin: 88px auto 0;
+  padding: 40px var(--gutter);
   border-top: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  gap: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 48px;
 }
 .site-footer p {
   font-size: 13px;
@@ -199,7 +206,7 @@ button {
 .site-footer nav {
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: 13px;
 }
 .site-footer nav h2 {
   font-size: 13px;
@@ -216,14 +223,20 @@ button {
   padding: 0 var(--gutter);
 }
 .page-heading {
-  padding: 56px 0 32px;
+  padding: 64px 0 40px;
+}
+.page-heading h1 {
+  margin-bottom: 16px;
+}
+.page-heading .intro {
+  max-width: 42em;
+  margin-bottom: 0;
 }
 .eyebrow {
-  font-size: 12px;
-  letter-spacing: 2px;
+  font-size: 13px;
+  letter-spacing: 0.03em;
   color: var(--green);
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 h1,
 h2,
@@ -232,20 +245,25 @@ p {
   margin-top: 0;
 }
 h1 {
-  font-size: clamp(32px, 3.3vw, 44px);
-  line-height: 1.25;
+  font-size: clamp(34px, 3.8vw, 48px);
+  line-height: 1.3;
   font-weight: 600;
   letter-spacing: -1px;
   text-wrap: balance;
 }
 h2 {
-  font-size: 28px;
-  line-height: 1.4;
+  font-size: 30px;
+  line-height: 1.45;
   font-weight: 600;
 }
 h3 {
   font-size: 19px;
   font-weight: 600;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
 }
 .intro {
   max-width: 650px;
@@ -260,9 +278,9 @@ h3 {
   gap: 10px;
   background: var(--green);
   color: #fff;
-  padding: 10px 20px;
+  padding: 12px 22px;
   border: 1px solid var(--green);
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 600;
   line-height: 1.5;
   min-height: 44px;
@@ -308,8 +326,8 @@ h3 {
 .notice {
   padding: 16px 20px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #eeefe7;
+  border-radius: 10px;
+  background: var(--green-soft);
   color: var(--muted);
   margin: 18px 0;
 }
@@ -321,9 +339,9 @@ h3 {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin: 16px 0;
-  font-weight: 600;
+  font-weight: 500;
 }
 .field small {
   font-weight: 400;
@@ -332,9 +350,9 @@ h3 {
 input,
 textarea,
 select {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid #c5cabd;
-  border-radius: 5px;
+  border-radius: 8px;
   background: var(--white);
   color: var(--ink);
   max-width: 100%;
@@ -356,9 +374,9 @@ textarea {
   resize: vertical;
 }
 .panel {
-  padding: 26px;
+  padding: 32px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--white);
 }
 .narrow {
@@ -372,11 +390,11 @@ textarea {
   display: inline-block;
   padding: 2px 9px;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: 5px;
+  font-size: 12px;
   color: var(--green);
   margin-right: 6px;
-  background: #f0f2e9;
+  background: var(--green-soft);
 }
 .row {
   padding: 24px 0;
@@ -411,25 +429,29 @@ textarea {
   gap: 40px;
 }
 .sidebar {
-  border-right: 1px solid var(--line);
-  padding-right: 24px;
+  align-self: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .sidebar a {
-  padding: 8px 14px;
-  border-radius: 4px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
 }
 .sidebar a[aria-current="page"] {
-  background: #e7eadf;
+  background: var(--green-soft);
   color: var(--green);
   font-weight: 600;
 }
 .workspace {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 36px;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: 32px;
   padding-top: 40px;
 }
 .workspace .page-heading {
@@ -455,6 +477,7 @@ td {
 th {
   color: var(--muted);
   font-weight: 600;
+  background: var(--green-soft);
 }
 pre {
   white-space: pre-wrap;
@@ -536,9 +559,10 @@ code {
 }
 .version-row {
   border: 1px solid var(--line);
-  padding: 20px;
+  padding: 24px;
   margin-top: 14px;
-  border-radius: 6px;
+  border-radius: 12px;
+  background: var(--white);
 }
 .stat {
   font-size: 28px;
@@ -548,11 +572,11 @@ code {
 .filters {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 16px;
   align-items: end;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--white);
   margin-bottom: 24px;
 }
@@ -583,16 +607,23 @@ code {
 .selection {
   border-left: 3px solid var(--gold);
   padding: 16px 22px;
-  background: #f0eee4;
+  background: var(--green-soft);
+  border-radius: 0 8px 8px 0;
   margin: 24px 0;
 }
 /* 公共断点：首页的专用断点由 home.css 就近维护。 */
 @media (max-width: 900px) {
+  :root {
+    --gutter: 32px;
+  }
   .nav-inner {
-    gap: 24px;
+    gap: 16px;
   }
   .primary-navigation {
-    gap: 16px;
+    gap: 2px;
+  }
+  .primary-navigation a {
+    padding-inline: 12px;
   }
   .footer-groups {
     gap: 24px;
@@ -683,13 +714,15 @@ code {
     flex-direction: row;
     overflow-x: auto;
     padding: 0 0 12px;
-    border-right: 0;
+    border: 0;
     border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
     margin-bottom: 24px;
     white-space: nowrap;
   }
   .site-footer {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     margin-top: 40px;
   }
   .site-footer .brand {
@@ -728,33 +761,109 @@ code {
   }
 }
 
-
 /* 个人空间按任务分区，使用细线而非重复卡片；侧栏与内容各自可收缩。 */
-.nav-nickname { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-group { display: flex; flex-direction: column; gap: 4px; }
-.sidebar-label { margin: 12px 14px 4px; font-size: 12px; color: var(--muted); }
-.companion-current { padding: 28px 0 32px; border-block: 1px solid var(--line); }
-.companion-current h2 { font-size: 18px; margin: 0; }
-.companion-name { font-size: clamp(24px, 3vw, 36px); margin: 16px 0 8px; overflow-wrap: anywhere; }
-.companion-section { margin-top: 32px; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-heading h2 { margin: 0; font-size: 22px; }
-.companion-note { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 20px; }
-.history-tabs { margin-bottom: 24px; }
-.history-row { flex-wrap: wrap; }
-.history-row h3, .history-row p { overflow-wrap: anywhere; }
-.history-clear { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
-.consent-permissions { padding-left: 24px; }
-.consent-permissions li { margin-bottom: 12px; }
+.nav-nickname {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-label {
+  margin: 12px 14px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.companion-current {
+  padding: 28px 0 32px;
+  border-block: 1px solid var(--line);
+}
+.companion-current h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.companion-name {
+  font-size: clamp(24px, 3vw, 36px);
+  margin: 16px 0 8px;
+  overflow-wrap: anywhere;
+}
+.companion-section {
+  margin-top: 32px;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-heading h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.companion-note {
+  border-top: 1px solid var(--line);
+  margin-top: 32px;
+  padding-top: 20px;
+}
+.history-tabs {
+  margin-bottom: 24px;
+}
+.history-row {
+  flex-wrap: wrap;
+}
+.history-row h3,
+.history-row p {
+  overflow-wrap: anywhere;
+}
+.history-clear {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.consent-permissions {
+  padding-left: 24px;
+}
+.consent-permissions li {
+  margin-bottom: 12px;
+}
 @media (max-width: 640px) {
   /* 可收缩的账号列兼容不同系统字体，长昵称不再挤换菜单。 */
-  .nav-account { max-width: 100%; min-width: 0; justify-self: end; gap: 5px; }
-  .nav-nickname { max-width: 5em; }
-  .sidebar { display: flex; flex-wrap: wrap; overflow-x: visible; white-space: normal; gap: 12px 20px; }
-  .sidebar-group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; }
-  .sidebar-label { flex-basis: 100%; margin: 0 8px; }
-  .sidebar a { padding: 8px; }
-  .history-row .actions { width: 100%; justify-content: flex-start; }
+  .nav-account {
+    max-width: 100%;
+    min-width: 0;
+    justify-self: end;
+    gap: 5px;
+  }
+  .nav-nickname {
+    max-width: 5em;
+  }
+  .sidebar {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    white-space: normal;
+    gap: 12px 20px;
+  }
+  .sidebar-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .sidebar-label {
+    flex-basis: 100%;
+    margin: 0 8px;
+  }
+  .sidebar a {
+    padding: 8px;
+  }
+  .history-row .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
   /* 后台与反馈聊天优先留出首屏消息区域，普通个人空间继续保留分组。 */
   .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) {
     flex-wrap: nowrap;
@@ -762,17 +871,20 @@ code {
     gap: 8px;
     white-space: nowrap;
   }
-  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) .sidebar-group {
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"])
+    .sidebar-group {
     display: contents;
   }
-  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) .sidebar-label {
+  .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"])
+    .sidebar-label {
     display: none;
   }
   .sidebar:is([aria-label="管理后台导航"], [data-feedback-chat="true"]) a {
     flex-shrink: 0;
     min-height: 44px;
   }
-  .sidebar[data-feedback-chat="true"] .sidebar-group:not([data-feedback-primary="true"]) {
+  .sidebar[data-feedback-chat="true"]
+    .sidebar-group:not([data-feedback-primary="true"]) {
     display: none;
   }
 }

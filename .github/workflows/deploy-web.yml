@@ -46,7 +46,7 @@ jobs:
           pnpm --dir web/frontend typecheck
           pnpm --dir web/frontend lint
           pnpm --dir web/frontend audit --prod --audit-level=high
-      - name: 前端请求超时与取消回归
+      - name: 前端请求契约、超时与取消回归
         run: pnpm --dir web/frontend test:api
       - name: 校验生成契约
         run: |

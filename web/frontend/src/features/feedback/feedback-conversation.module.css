@@ -1,3 +1,4 @@
+/* 旧管理链接下的私有对话沿用真实消息次序，只用底色区分开发者回复。 */
 .conversation {
   margin-top: 20px;
   border-top: 1px solid var(--line);
@@ -37,10 +38,11 @@
   margin: 16px 0;
 }
 .messages li {
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border-left: 3px solid var(--line);
+  border-radius: 8px;
   padding: 16px;
   min-width: 0;
+  background: var(--paper);
 }
 .messages .developer {
   border-left: 3px solid var(--green);

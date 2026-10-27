@@ -50,6 +50,7 @@ export function Workspace({
         ["/admin/releases", "客户端版本"],
         ["/admin/feedback/chat", "反馈对话"],
         ["/admin/feedback", "收件与审核"],
+        ["/admin/feedback/spam", "垃圾邮件"],
         ["/admin/jobs", "后台任务"],
         ["/admin/audit", "审计日志"],
       ]

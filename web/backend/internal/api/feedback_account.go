@@ -39,7 +39,7 @@ func accountOwns(row feedbackEntry, r *http.Request) bool {
 	return row.OwnerUserID != nil && *row.OwnerUserID == who(r).User.ID
 }
 func feedbackHidden(row feedbackEntry) bool {
-	return row.ModerationStatus == "WITHDRAWN" || row.ModerationStatus == "WITHDRAWAL_REQUESTED"
+	return row.ClearedAt != nil || row.ModerationStatus == "WITHDRAWN" || row.ModerationStatus == "WITHDRAWAL_REQUESTED"
 }
 func (s *Server) accountFeedbackError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, errFeedbackManagement) {

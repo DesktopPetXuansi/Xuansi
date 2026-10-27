@@ -15,6 +15,9 @@ export type FeedbackReceipt = components["schemas"]["FeedbackReceipt"];
 export type FeedbackManagement = components["schemas"]["FeedbackManagement"];
 export type FeedbackModerationInput =
   components["schemas"]["FeedbackModerationInput"];
+// 垃圾邮件清空回执沿用生成契约，清空范围由服务端确定。
+export type FeedbackSpamClearReceipt =
+  components["schemas"]["FeedbackSpamClearReceipt"];
 export type FeedbackDiagnostics = components["schemas"]["FeedbackDiagnostics"];
 export type FeedbackParticipant = components["schemas"]["FeedbackParticipant"];
 export type FeedbackThread = components["schemas"]["FeedbackThread"];
@@ -28,13 +31,10 @@ export type FeedbackMessageReceipt =
   components["schemas"]["FeedbackMessageReceipt"];
 export type FeedbackAdminMessageInput =
   components["schemas"]["FeedbackAdminMessageInput"];
-export interface Session {
-  id: string;
-  createdAt: string;
-  lastSeenAt: string;
-  isCurrent?: boolean;
-  deviceLabel?: string;
-}
+// 会话与客户端授权分别沿用真实返回类型，不再混成缺少过期时间的手写 DTO。
+export type Session = components["schemas"]["Session"];
+export type Grant = components["schemas"]["Grant"];
+export type LibraryEntry = components["schemas"]["LibraryEntry"];
 export const kinds: Record<string, string> = {
   MODEL: "Live2D 模型",
   MOTION: "动作",

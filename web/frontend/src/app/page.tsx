@@ -4,7 +4,7 @@ import { ProductPreview } from "@/features/product-preview";
 import { HomeClosing } from "@/features/home-closing";
 import { clientRelease } from "@/lib/client-release";
 import { publicPageMetadata } from "@/lib/site-metadata";
-import { ArrowDown, Download } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import "./home.css";
@@ -44,16 +44,16 @@ export default function Home() {
       />
       <section className="hero" aria-labelledby="home-title">
         <div className="hero-copy">
-          <p className="eyebrow">玄司 · WINDOWS 桌面伙伴</p>
+          <p className="hero-kicker">一个在你桌面上的 AI 伙伴</p>
           <h1 id="home-title">
             把陪伴，
             <br />
-            留在你的<em>桌面。</em>
+            留在你的桌面。
           </h1>
           <p className="hero-description">
-            <span>能聊天、记事，也能换成你喜欢的样子。</span>
-            <span>选择本机模型，或连接自己的在线 AI 服务。</span>
-            <span>忙起来，就让玄司安静地陪着你。</span>
+            <span>聊几句，记住那些小事，换成你喜欢的样子。</span>
+            <span>选择本机模型，或连接自己的在线 AI。</span>
+            <span>你忙的时候，玄司就安静地待在一旁。</span>
           </p>
           <div className="actions hero-actions">
             <Link className="button-link" href="/download">
@@ -79,26 +79,29 @@ export default function Home() {
               target="_blank"
               rel="noreferrer"
             >
-              查看开源项目 ↗
+              查看开源项目 <ArrowUpRight size={14} aria-hidden />
             </a>
           </p>
         </div>
         <figure className="hero-art">
+          <div className="art-backdrop" aria-hidden />
           <div className="art-portrait">
             <Image
               src="/brand/front.png"
               alt="玄司角色：黑金服饰与长发的桌面伙伴"
               fill
               preload
-              sizes="(max-width: 640px) calc(100vw - 104px), (max-width: 900px) 40vw, 480px"
+              sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 900px) 44vw, 520px"
             />
           </div>
-          <span className="art-label" aria-hidden>
-            玄司 / YOUR DESKTOP COMPANION
-          </span>
           <figcaption className="art-bottom">
-            在场，而不打扰。
-            <span>XUANSI</span>
+            <span>
+              <strong>玄司</strong>
+              <span>安装后就能见到的伙伴</span>
+            </span>
+            <Link href="/resources">
+              挑选形象 <ArrowUpRight size={16} aria-hidden />
+            </Link>
           </figcaption>
         </figure>
       </section>

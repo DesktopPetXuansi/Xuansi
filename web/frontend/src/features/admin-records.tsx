@@ -2,7 +2,8 @@
 import { Notice } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-export function Records({ endpoint }: { endpoint: string }) {
+// 仅允许已有后台记录接口，新增用途必须先加入后端和共享契约。
+export function Records({ endpoint }: { endpoint: "jobs" | "audit-logs" }) {
   const query = useQuery({
     queryKey: ["admin", endpoint],
     queryFn: () => api<Record<string, unknown>[]>(`/admin/${endpoint}`),
