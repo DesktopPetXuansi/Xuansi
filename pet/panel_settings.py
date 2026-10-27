@@ -19,8 +19,9 @@ LOG = logging.getLogger(__name__)
 
 
 class PanelSettings:
-    def __init__(self, panel):
+    def __init__(self, panel, *, warning=""):
         self.panel = panel
+        self.warning = warning
         self.saving = False
         self.closing = False
         self.hint = QLabel()
@@ -62,10 +63,12 @@ class PanelSettings:
             changed = self.changed()
         except ValueError:
             changed = True
-        self.hint.setText(
+        message = (
             "有未保存的设置 · 收起时保存，并结束回复、关闭麦克风"
             if changed else "设置已保存"
         )
+        # 加载恢复提示保留到真正保存成功，不能被普通草稿刷新抹掉。
+        self.hint.setText("\n".join(filter(None, (self.warning, message))))
 
     def request(self):
         if self.saving:
@@ -85,6 +88,7 @@ class PanelSettings:
             self.panel.status.setText(error)
             LOG.warning("管理页配置保存未完成，保留草稿")
             return
+        self.warning = ""
         self.refresh()
         if closing:
             try:

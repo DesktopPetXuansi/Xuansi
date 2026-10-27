@@ -1,8 +1,6 @@
 """本地设置；只保存用户明确配置，不保存对话、音频或屏幕。"""
 
-import json
-import logging
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .ai.install_plan import default_model_dir
@@ -11,7 +9,6 @@ from .ai.settings import AISettings
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 MODELS = Path(default_model_dir())
-LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -100,23 +97,17 @@ class Settings:
 
 
 def load_settings(path: Path = DATA / "settings.json"):
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        allowed = {field.name for field in fields(Settings)}
-        if isinstance(raw, dict) and 'ai' in raw:
-            raw['ai'] = AISettings.from_dict(raw['ai'])
-        return Settings(**{key: value for key, value in raw.items() if key in allowed}).validate()
-    except FileNotFoundError:
-        return Settings()
-    except (ValueError, TypeError, AttributeError, OSError):
-        LOG.warning("设置无法读取，使用默认值并保留原文件")
-        return Settings()
+    return load_settings_result(path).settings
+
+
+def load_settings_result(path: Path = DATA / "settings.json"):
+    # 保留原有 Settings 入口；只有启动界面需要额外展示恢复诊断。
+    from .settings_storage import read_settings
+
+    return read_settings(path)
 
 
 def save_settings(settings: Settings, path: Path = DATA / "settings.json"):
-    settings.validate()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(asdict(settings), ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
-    LOG.info("设置已保存")
+    from .settings_storage import write_settings
+
+    write_settings(settings, path)

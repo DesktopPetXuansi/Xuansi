@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from .avatar import Avatar
 from .companion_ui import CompanionUI
-from .config import DATA, Settings, load_settings
+from .config import DATA, Settings, load_settings_result
 from .desktop import cursor_position, desktop_state, point_is_own_window
 from .events import MouseEvent, ObservationGate
 from .first_chat import FirstChatFlow
@@ -26,7 +26,13 @@ class DesktopPet(QObject):
     def __init__(self, application: QApplication, settings: Settings | None = None):
         super().__init__()
         self.application = application
-        self.settings = settings or load_settings()
+        settings_warning = ""
+        if settings is None:
+            loaded = load_settings_result()
+            self.settings = loaded.settings
+            settings_warning = loaded.warning
+        else:
+            self.settings = settings
         self.paused, self.busy, self.fullscreen = False, False, False
         self.pressure = False
         # 用户开关与实际收音分别记录；休眠只暂停设备，不清掉用户选择。
@@ -46,7 +52,8 @@ class DesktopPet(QObject):
         self.idle_action = IdleActionTimer()
         self.avatar = Avatar(self.settings.pet_size, self.settings.avatar_image)
         self.avatar.follow = self.settings.follow_mouse
-        self.panel = Panel(self.settings, window_state_path=DATA / 'panel-window.json')
+        self.panel = Panel(self.settings, window_state_path=DATA / 'panel-window.json',
+                           settings_warning=settings_warning)
         preference = ('首选在线 · ' + self.settings.ai.profile.model if self.settings.ai.policy == 'online_first'
                       else '首选本地 · ' + self.settings.ai.local_model)
         self.panel.footer.set_provider(preference + ' · 尚未连接')

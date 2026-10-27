@@ -53,9 +53,14 @@ class HistoryFile:
             temporary.unlink(missing_ok=True)
 
     def remove(self, identifier=None):
+        if identifier is not None and (not isinstance(identifier, str) or not identifier.strip()):
+            LOG.warning('拒绝无效的历史记录标识 type=%s', type(identifier).__name__)
+            raise ValueError('历史记录标识必须为非空字符串。')
         with self.lock:
             raw = self.read()
-            raw['entries'] = [item for item in raw['entries'] if identifier and item['id'] != identifier]
+            # 只有显式的 None 表示清空，其他合法标识只匹配一条记录。
+            raw['entries'] = ([] if identifier is None
+                              else [item for item in raw['entries'] if item['id'] != identifier])
             self.write(raw)
             LOG.info('本机历史已移除 clear=%s', identifier is None)
 

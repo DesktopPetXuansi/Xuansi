@@ -42,7 +42,7 @@ class Panel(QWidget):
     feedback_requested = Signal()
     configuration_required = Signal()
 
-    def __init__(self, settings: Settings, *, window_state_path: Path | None = None):
+    def __init__(self, settings: Settings, *, window_state_path: Path | None = None, settings_warning=""):
         super().__init__()
         configure_fonts(QApplication.instance())
         self.settings = settings
@@ -62,7 +62,7 @@ class Panel(QWidget):
         layout.addWidget(create_header(self))
         layout.addWidget(self.navigation.stack, 1)
         populate_sections(self)
-        self.form = PanelSettings(self)
+        self.form = PanelSettings(self, warning=settings_warning)
         layout.addWidget(create_footer(self))
         self.escape = QShortcut(QKeySequence("Esc"), self)
         self.escape.activated.connect(self.close)
