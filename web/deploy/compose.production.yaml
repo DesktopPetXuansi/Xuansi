@@ -44,6 +44,10 @@ services:
       FEEDBACK_GITHUB_REPOSITORY: ${FEEDBACK_GITHUB_REPOSITORY:-}
       FEEDBACK_GITHUB_PUBLIC: ${FEEDBACK_GITHUB_PUBLIC:-false}
       FEEDBACK_GITHUB_TOKEN: ${FEEDBACK_GITHUB_TOKEN:-}
+      UMAMI_PUBLIC_URL: ${UMAMI_PUBLIC_URL:-}
+      UMAMI_API_URL: ${UMAMI_API_URL:-}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+      UMAMI_API_KEY: ${UMAMI_API_KEY:-}
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/readyz']
       interval: 5s

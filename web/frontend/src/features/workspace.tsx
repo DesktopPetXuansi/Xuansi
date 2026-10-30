@@ -45,6 +45,7 @@ export function Workspace({
   }
   const items = admin
     ? [
+        ["/admin/analytics", "访问统计"],
         ["/admin/users", "用户"],
         ["/admin/resources", "资源发布"],
         ["/admin/releases", "客户端版本"],

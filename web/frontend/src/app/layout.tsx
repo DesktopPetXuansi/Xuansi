@@ -1,6 +1,7 @@
 import { Footer, Navigation } from "@/components/navigation";
 import { Providers } from "@/components/providers";
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "https://xuansi.kukude.top"),
@@ -52,6 +53,7 @@ export default function RootLayout({
           <main id="main">{children}</main>
           <Footer />
         </Providers>
+        <Script src="/analytics-loader.js" strategy="afterInteractive" />
       </body>
     </html>
   );

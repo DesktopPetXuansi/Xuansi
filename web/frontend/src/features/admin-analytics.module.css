@@ -1,0 +1,251 @@
+/* 统计沿用管理后台的草绿、细线与暖白，数值和来源说明保持相邻。 */
+.toolbar,
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.toolbar {
+  margin-bottom: 12px;
+}
+.ranges {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ranges legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ranges > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ranges button {
+  padding: 10px 16px;
+}
+.ranges button[aria-pressed="true"] {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+}
+.note {
+  margin: 12px 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sections {
+  display: grid;
+  gap: 32px;
+}
+.sections > section {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.sectionTitle {
+  margin: 0 0 20px;
+  font-size: 22px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.metrics > div {
+  min-width: 0;
+  padding: 20px 16px;
+}
+.metrics > div + div {
+  border-left: 1px solid var(--line);
+}
+.metrics dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.metrics dd {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.metrics strong {
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.metrics dd > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.metrics dd .unavailable {
+  font-size: 15px;
+  line-height: 1.75;
+}
+.trend {
+  margin: 24px 0 0;
+}
+.trend figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.trend h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.trend figcaption > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+  overflow: visible;
+}
+.gridLine {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.axisLabels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.trendLine {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trendPoint {
+  fill: var(--green);
+}
+.dailyData summary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  cursor: pointer;
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.dailyData summary::before {
+  content: "+";
+  margin-right: 8px;
+}
+.dailyData[open] summary::before {
+  content: "−";
+}
+.dailyTable,
+.downloadTable {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.dailyTable th,
+.dailyTable td,
+.downloadTable th,
+.downloadTable td {
+  overflow-wrap: anywhere;
+}
+.downloadTable thead th:first-child {
+  width: 18%;
+}
+.downloadTable thead th:last-child {
+  width: 100px;
+}
+.downloadTable tbody th,
+.dailyTable tbody th {
+  background: transparent;
+  color: var(--ink);
+  font-weight: 500;
+}
+.downloadTable td:last-child,
+.downloadTable th:last-child,
+.dailyTable td:last-child,
+.dailyTable th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sectionHeading .sectionTitle {
+  margin-bottom: 0;
+}
+.downloadTotal {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.downloadTotal strong {
+  margin-inline: 6px;
+  color: var(--green);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.empty {
+  padding: 24px 0;
+  margin: 0;
+  color: var(--muted);
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metrics > div:nth-child(3) {
+    border-left: 0;
+  }
+  .metrics > div:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}
+@media (max-width: 640px) {
+  .toolbar {
+    align-items: flex-end;
+  }
+  .ranges button {
+    padding: 10px 12px;
+  }
+  .metrics > div {
+    padding: 16px 12px;
+  }
+  .downloadTable thead th:first-child {
+    width: 22%;
+  }
+  .downloadTable thead th:last-child {
+    width: 68px;
+  }
+  .downloadTable th,
+  .downloadTable td {
+    padding: 12px 6px;
+    font-size: 12px;
+  }
+}

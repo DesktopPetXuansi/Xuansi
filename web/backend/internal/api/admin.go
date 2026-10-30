@@ -17,6 +17,7 @@ import (
 func (s *Server) adminRoutes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(admin)
+		r.Get("/analytics", s.adminAnalytics)
 		r.Get("/feedback", s.listFeedback)
 		r.Delete("/feedback/spam", s.clearFeedbackSpam)
 		r.Get("/feedback/conversations", s.adminFeedbackThreads)

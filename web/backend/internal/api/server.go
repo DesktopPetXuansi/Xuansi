@@ -18,11 +18,12 @@ import (
 )
 
 type Server struct {
-	DB      *gorm.DB
-	Config  platform.Config
-	Storage platform.ObjectStorage
-	Log     *slog.Logger
-	OAuth   OAuthService
+	DB        *gorm.DB
+	Config    platform.Config
+	Storage   platform.ObjectStorage
+	Log       *slog.Logger
+	OAuth     OAuthService
+	analytics *analyticsService
 }
 type OAuthService interface {
 	Authorize(http.ResponseWriter, *http.Request)
@@ -47,6 +48,9 @@ func CurrentUser(r *http.Request) *platform.User {
 
 func who(r *http.Request) *Identity { i, _ := r.Context().Value(identityKey{}).(*Identity); return i }
 func (s *Server) Router() http.Handler {
+	if s.analytics == nil {
+		s.analytics = newAnalyticsService(s.Config, s.Log)
+	}
 	r := chi.NewRouter()
 	r.Use(privateRequestID, middleware.Recoverer, s.headers, s.rateLimit, s.authentication, s.requestLog)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +72,7 @@ func (s *Server) Router() http.Handler {
 	})
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.csrf)
+		r.Get("/analytics/config", s.analyticsConfig)
 		s.accountRoutes(r)
 		s.resourceRoutes(r)
 		s.historyRoutes(r)

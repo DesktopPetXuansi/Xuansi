@@ -83,6 +83,7 @@ func TestContractQueryParameters(t *testing.T) {
 	contract := loadRouteContract(t)
 	// 仅列真实读取并生效的参数；其余操作默认不提供查询能力。
 	expectedQueries := map[string][]string{
+		"GET /api/v1/admin/analytics":              {"range"},
 		"GET /api/v1/resources":                    {"cursor", "group", "kind", "limit", "search", "tag"},
 		"GET /api/v1/me/resources":                 {"cursor", "group", "kind", "limit", "search", "tag"},
 		"GET /api/v1/client/releases":              {"arch", "channel", "os"},

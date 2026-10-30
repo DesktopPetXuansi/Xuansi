@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Config 集中验证启动配置，生产环境拒绝明文站点和缺失凭据。
@@ -20,6 +22,8 @@ type Config struct {
 	OAuthSecret                                                       string
 	FeedbackGitHubRepository                                          string
 	FeedbackGitHubToken                                               string `json:"-"`
+	UmamiPublicURL, UmamiAPIURL, UmamiWebsiteID                       string
+	UmamiAPIKey                                                       string `json:"-"`
 	FeedbackGitHubPublic                                              bool
 	MailDeliveryDisabled                                              bool
 	MaxUploadBytes, QuotaBytes                                        int64
@@ -36,6 +40,13 @@ func LoadConfig() (Config, error) {
 	c := Config{Address: env("HTTP_ADDRESS", "127.0.0.1:8080"), DatabaseURL: os.Getenv("DATABASE_URL"), AppURL: env("APP_URL", "http://localhost:3000"), Environment: env("APP_ENV", "development"), StorageDriver: env("STORAGE_DRIVER", "local"), StoragePath: env("STORAGE_PATH", "./data/storage"), SMTPHost: env("SMTP_HOST", "localhost"), SMTPPort: env("SMTP_PORT", "1025"), SMTPFrom: env("SMTP_FROM", "noreply@localhost"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), S3Endpoint: os.Getenv("S3_ENDPOINT"), S3Region: env("S3_REGION", "auto"), S3Bucket: os.Getenv("S3_BUCKET"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), OAuthSecret: os.Getenv("OAUTH_SECRET"), MaxUploadBytes: 512 << 20, QuotaBytes: 2 << 30}
 	// 后台读写可走内网；浏览器的预签名上传单独使用公网 HTTPS 来源。
 	c.S3PublicEndpoint = os.Getenv("S3_PUBLIC_ENDPOINT")
+	c.UmamiPublicURL = strings.TrimSpace(os.Getenv("UMAMI_PUBLIC_URL"))
+	c.UmamiAPIURL = strings.TrimSpace(os.Getenv("UMAMI_API_URL"))
+	c.UmamiWebsiteID = strings.TrimSpace(os.Getenv("UMAMI_WEBSITE_ID"))
+	c.UmamiAPIKey = strings.TrimSpace(os.Getenv("UMAMI_API_KEY"))
+	if err := validateAnalytics(&c); err != nil {
+		return c, err
+	}
 	// 暂停期间不创建或领取邮件任务；默认保持现有发信行为。
 	if raw := os.Getenv("MAIL_DELIVERY_DISABLED"); raw != "" {
 		value, err := strconv.ParseBool(raw)
@@ -112,3 +123,58 @@ func LoadConfig() (Config, error) {
 }
 
 const SessionLifetime = 7 * 24 * time.Hour
+
+// 公共采集与后台读取可以分别启用；任何部分配置都必须具有明确的网站标识。
+func validateAnalytics(c *Config) error {
+	if c.UmamiWebsiteID != "" {
+		id, err := uuid.Parse(c.UmamiWebsiteID)
+		if err != nil {
+			return fmt.Errorf("UMAMI_WEBSITE_ID 必须为 UUID")
+		}
+		c.UmamiWebsiteID = id.String()
+	}
+	if (c.UmamiAPIURL == "") != (c.UmamiAPIKey == "") {
+		return fmt.Errorf("UMAMI_API_URL 和 UMAMI_API_KEY 必须同时配置")
+	}
+	if (c.UmamiPublicURL != "" || c.UmamiAPIURL != "") && c.UmamiWebsiteID == "" {
+		return fmt.Errorf("启用 Umami 必须配置 UMAMI_WEBSITE_ID")
+	}
+	if strings.ContainsAny(c.UmamiAPIKey, "\r\n") {
+		return fmt.Errorf("UMAMI_API_KEY 不能包含换行")
+	}
+	for name, address := range map[string]*string{"UMAMI_PUBLIC_URL": &c.UmamiPublicURL, "UMAMI_API_URL": &c.UmamiAPIURL} {
+		if *address == "" {
+			continue
+		}
+		u, err := url.Parse(*address)
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Path != "" && u.Path != "/" || u.Scheme != "https" && u.Scheme != "http" {
+			return fmt.Errorf("%s 必须为独立 HTTP(S) 来源", name)
+		}
+		if name == "UMAMI_PUBLIC_URL" && u.Scheme != "https" {
+			host := u.Hostname()
+			if c.Environment == "production" || host != "localhost" && (net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback()) {
+				return fmt.Errorf("UMAMI_PUBLIC_URL 必须使用 HTTPS，开发 HTTP 仅支持回环地址")
+			}
+		}
+		if name == "UMAMI_PUBLIC_URL" {
+			app, parseErr := url.Parse(c.AppURL)
+			if parseErr == nil && analyticsOrigin(u) == analyticsOrigin(app) {
+				return fmt.Errorf("UMAMI_PUBLIC_URL 必须使用独立统计来源")
+			}
+		}
+		*address = strings.TrimRight(*address, "/")
+	}
+	return nil
+}
+
+func analyticsOrigin(u *url.URL) string {
+	port := u.Port()
+	if port == "" {
+		if u.Scheme == "https" {
+			port = "443"
+		} else if u.Scheme == "http" {
+			port = "80"
+		}
+	}
+	return strings.ToLower(u.Scheme+"://"+u.Hostname()) + ":" + port
+}

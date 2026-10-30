@@ -1,0 +1,65 @@
+# 放入现有 Nginx 的 conf.d；先替换域名与覆盖该域名的证书路径。
+# 不记录 IP、查询参数、来源网址或 User-Agent；诊断保留路由、状态和字节数。
+log_format xuansi_analytics '$time_iso8601 "$request_method $uri" $status $body_bytes_sent';
+
+server {
+    listen 80;
+    server_name stats.example.com;
+    return 301 https://stats.example.com$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name stats.example.com;
+    ssl_certificate /etc/nginx/certs/stats.example.com.pem;
+    ssl_certificate_key /etc/nginx/certs/stats.example.com.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # 2026-10-30 核对官方网段；仅信任 Cloudflare 来源传递的客户端 IP。
+    # 更新来源：https://www.cloudflare.com/ips-v4 和 /ips-v6。
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    set_real_ip_from 2400:cb00::/32;
+    set_real_ip_from 2606:4700::/32;
+    set_real_ip_from 2803:f800::/32;
+    set_real_ip_from 2405:b500::/32;
+    set_real_ip_from 2405:8100::/32;
+    set_real_ip_from 2a06:98c0::/29;
+    set_real_ip_from 2c0f:f248::/32;
+    real_ip_header CF-Connecting-IP;
+
+    access_log /dev/stdout xuansi_analytics;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Robots-Tag noindex always;
+    add_header Referrer-Policy no-referrer always;
+
+    # Nginx 加入统计专用网络，仅公开采集接口，管理后台始终留在内部。
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $umami_upstream umami:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 30s;
+
+    location = /script.js { proxy_pass http://$umami_upstream; }
+    location = /api/send { proxy_pass http://$umami_upstream; }
+    location / { return 404; }
+}
