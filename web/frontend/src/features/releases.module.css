@@ -15,10 +15,10 @@
   font-size: 36px;
   margin-bottom: 12px;
 }
-.package > a {
+.downloadAction {
   margin-top: 12px;
 }
-.package > :global(.button-link) {
+.downloadAction > :global(.button-link) {
   width: 100%;
   min-height: 52px;
 }

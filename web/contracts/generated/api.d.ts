@@ -1262,6 +1262,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 管理员读取匿名访问汇总及 GitHub 正式安装包累计下载次数 */
+        get: operations["get__api_v1_admin_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 公开匿名统计采集配置，不含读取密钥和内部地址 */
+        get: operations["get__api_v1_analytics_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1993,6 +2027,50 @@ export interface components {
         };
         FeedbackSpamClearResponse: {
             data: components["schemas"]["FeedbackSpamClearReceipt"];
+        };
+        AnalyticsPoint: {
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            pageviews: number;
+        };
+        AnalyticsTraffic: {
+            /** Format: int64 */
+            visitors: number;
+            /** Format: int64 */
+            pageviews: number;
+            /** Format: int64 */
+            visits: number;
+            downloadClicks: number | null;
+            trend: components["schemas"]["AnalyticsPoint"][];
+        };
+        AnalyticsVersion: {
+            version: string;
+            filename: string;
+            /** Format: int64 */
+            count: number;
+        };
+        AnalyticsDownloads: {
+            /** Format: int64 */
+            total: number;
+            versions: components["schemas"]["AnalyticsVersion"][];
+        };
+        AnalyticsReport: {
+            /** @enum {string} */
+            range: "7d" | "30d" | "90d";
+            traffic: components["schemas"]["AnalyticsTraffic"] | null;
+            downloads: components["schemas"]["AnalyticsDownloads"] | null;
+        };
+        AnalyticsResponse: {
+            data: components["schemas"]["AnalyticsReport"];
+        };
+        AnalyticsConfig: {
+            enabled: boolean;
+            websiteId: string | null;
+            scriptUrl: string | null;
+        };
+        AnalyticsConfigResponse: {
+            data: components["schemas"]["AnalyticsConfig"];
         };
     };
     responses: never;
@@ -5022,6 +5100,67 @@ export interface operations {
                 };
             };
             /** @description 统一业务错误；未登录 401、非管理员或 CSRF 失败 403。 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get__api_v1_admin_analytics: {
+        parameters: {
+            query?: {
+                /** @description 访问数据按北京时间分日；下载次数始终为所有正式版本累计。 */
+                range?: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功，单个数据来源不可用时对应字段为 null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsResponse"];
+                };
+            };
+            /** @description 业务错误 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get__api_v1_analytics_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功，单个数据来源不可用时对应字段为 null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsConfigResponse"];
+                };
+            };
+            /** @description 业务错误 */
             default: {
                 headers: {
                     [name: string]: unknown;

@@ -67,10 +67,17 @@ export function Releases({ history = false }: { history?: boolean }) {
               </dd>
             </div>
           </dl>
-          <a className="button-link" href={clientRelease.downloadUrl}>
-            <Download size={18} aria-hidden />
-            下载 Windows 安装包
-          </a>
+          {/* 事件放在容器上：Umami 不拦截链接默认行为，统计失败也立即下载。 */}
+          <div
+            className={styles.downloadAction}
+            data-umami-event="installer_download"
+            data-umami-event-version={clientRelease.version}
+          >
+            <a className="button-link" href={clientRelease.downloadUrl}>
+              <Download size={18} aria-hidden />
+              下载 Windows 安装包
+            </a>
+          </div>
           <p className={styles.downloadHint}>
             在线安装器：首次安装会联网下载所选组件，请保持网络连接。
           </p>

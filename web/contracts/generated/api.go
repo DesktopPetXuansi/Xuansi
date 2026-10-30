@@ -9,6 +9,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AnalyticsReportRange.
+const (
+	AnalyticsReportRangeAnalyticsRange30d AnalyticsReportRange = "30d"
+	AnalyticsReportRangeAnalyticsRange7d  AnalyticsReportRange = "7d"
+	AnalyticsReportRangeAnalyticsRange90d AnalyticsReportRange = "90d"
+)
+
+// Valid indicates whether the value is a known member of the AnalyticsReportRange enum.
+func (e AnalyticsReportRange) Valid() bool {
+	switch e {
+	case AnalyticsReportRangeAnalyticsRange30d:
+		return true
+	case AnalyticsReportRangeAnalyticsRange7d:
+		return true
+	case AnalyticsReportRangeAnalyticsRange90d:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AppearanceHistoryInputAppearanceKind.
 const (
 	AppearanceHistoryInputAppearanceKindANIMATION AppearanceHistoryInputAppearanceKind = "ANIMATION"
@@ -567,6 +588,27 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetApiV1AdminAnalyticsParamsRange.
+const (
+	GetApiV1AdminAnalyticsParamsRangeAnalyticsRange30d GetApiV1AdminAnalyticsParamsRange = "30d"
+	GetApiV1AdminAnalyticsParamsRangeAnalyticsRange7d  GetApiV1AdminAnalyticsParamsRange = "7d"
+	GetApiV1AdminAnalyticsParamsRangeAnalyticsRange90d GetApiV1AdminAnalyticsParamsRange = "90d"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1AdminAnalyticsParamsRange enum.
+func (e GetApiV1AdminAnalyticsParamsRange) Valid() bool {
+	switch e {
+	case GetApiV1AdminAnalyticsParamsRangeAnalyticsRange30d:
+		return true
+	case GetApiV1AdminAnalyticsParamsRangeAnalyticsRange7d:
+		return true
+	case GetApiV1AdminAnalyticsParamsRangeAnalyticsRange90d:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1AdminClientReleasesJSONBodyChannel.
 const (
 	PostApiV1AdminClientReleasesJSONBodyChannelBETA   PostApiV1AdminClientReleasesJSONBodyChannel = "BETA"
@@ -720,6 +762,61 @@ type AccountFeedbackInput struct {
 // AccountFeedbackMessageInput defines model for AccountFeedbackMessageInput.
 type AccountFeedbackMessageInput struct {
 	Body string `json:"body"`
+}
+
+// AnalyticsConfig defines model for AnalyticsConfig.
+type AnalyticsConfig struct {
+	Enabled   bool                `json:"enabled"`
+	ScriptUrl *string             `json:"scriptUrl"`
+	WebsiteId *openapi_types.UUID `json:"websiteId"`
+}
+
+// AnalyticsConfigResponse defines model for AnalyticsConfigResponse.
+type AnalyticsConfigResponse struct {
+	Data AnalyticsConfig `json:"data"`
+}
+
+// AnalyticsDownloads defines model for AnalyticsDownloads.
+type AnalyticsDownloads struct {
+	Total    int64              `json:"total"`
+	Versions []AnalyticsVersion `json:"versions"`
+}
+
+// AnalyticsPoint defines model for AnalyticsPoint.
+type AnalyticsPoint struct {
+	Date      openapi_types.Date `json:"date"`
+	Pageviews int64              `json:"pageviews"`
+}
+
+// AnalyticsReport defines model for AnalyticsReport.
+type AnalyticsReport struct {
+	Downloads *AnalyticsDownloads  `json:"downloads"`
+	Range     AnalyticsReportRange `json:"range"`
+	Traffic   *AnalyticsTraffic    `json:"traffic"`
+}
+
+// AnalyticsReportRange defines model for AnalyticsReport.Range.
+type AnalyticsReportRange string
+
+// AnalyticsResponse defines model for AnalyticsResponse.
+type AnalyticsResponse struct {
+	Data AnalyticsReport `json:"data"`
+}
+
+// AnalyticsTraffic defines model for AnalyticsTraffic.
+type AnalyticsTraffic struct {
+	DownloadClicks *int64           `json:"downloadClicks"`
+	Pageviews      int64            `json:"pageviews"`
+	Trend          []AnalyticsPoint `json:"trend"`
+	Visitors       int64            `json:"visitors"`
+	Visits         int64            `json:"visits"`
+}
+
+// AnalyticsVersion defines model for AnalyticsVersion.
+type AnalyticsVersion struct {
+	Count    int64  `json:"count"`
+	Filename string `json:"filename"`
+	Version  string `json:"version"`
 }
 
 // AppearanceHistoryInput defines model for AppearanceHistoryInput.
@@ -1550,6 +1647,15 @@ type UserResponse struct {
 		NextCursor *string `json:"nextCursor,omitempty"`
 	} `json:"meta,omitempty"`
 }
+
+// GetApiV1AdminAnalyticsParams defines parameters for GetApiV1AdminAnalytics.
+type GetApiV1AdminAnalyticsParams struct {
+	// Range 访问数据按北京时间分日；下载次数始终为所有正式版本累计。
+	Range *GetApiV1AdminAnalyticsParamsRange `form:"range,omitempty" json:"range,omitempty"`
+}
+
+// GetApiV1AdminAnalyticsParamsRange defines parameters for GetApiV1AdminAnalytics.
+type GetApiV1AdminAnalyticsParamsRange string
 
 // PostApiV1AdminClientReleasesJSONBody defines parameters for PostApiV1AdminClientReleases.
 type PostApiV1AdminClientReleasesJSONBody struct {

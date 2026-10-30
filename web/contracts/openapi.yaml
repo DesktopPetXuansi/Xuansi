@@ -5111,6 +5111,95 @@
           }
         }
       }
+    },
+    "/api/v1/admin/analytics": {
+      "get": {
+        "operationId": "get__api_v1_admin_analytics",
+        "summary": "管理员读取匿名访问汇总及 GitHub 正式安装包累计下载次数",
+        "tags": [
+          "analytics"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功，单个数据来源不可用时对应字段为 null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "description": "访问数据按北京时间分日；下载次数始终为所有正式版本累计。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ],
+              "x-enum-varnames": [
+                "AnalyticsRange7d",
+                "AnalyticsRange30d",
+                "AnalyticsRange90d"
+              ],
+              "default": "7d"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/config": {
+      "get": {
+        "operationId": "get__api_v1_analytics_config",
+        "summary": "公开匿名统计采集配置，不含读取密钥和内部地址",
+        "tags": [
+          "analytics"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "请求成功，单个数据来源不可用时对应字段为 null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsConfigResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7796,6 +7885,210 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/FeedbackSpamClearReceipt"
+          }
+        }
+      },
+      "AnalyticsPoint": {
+        "type": "object",
+        "required": [
+          "date",
+          "pageviews"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "pageviews": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "AnalyticsTraffic": {
+        "type": "object",
+        "required": [
+          "visitors",
+          "pageviews",
+          "visits",
+          "downloadClicks",
+          "trend"
+        ],
+        "properties": {
+          "visitors": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pageviews": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "visits": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "downloadClicks": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsPoint"
+            }
+          }
+        }
+      },
+      "AnalyticsVersion": {
+        "type": "object",
+        "required": [
+          "version",
+          "filename",
+          "count"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "AnalyticsDownloads": {
+        "type": "object",
+        "required": [
+          "total",
+          "versions"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsVersion"
+            }
+          }
+        }
+      },
+      "AnalyticsReport": {
+        "type": "object",
+        "required": [
+          "range",
+          "traffic",
+          "downloads"
+        ],
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "30d",
+              "90d"
+            ],
+            "x-enum-varnames": [
+              "AnalyticsRange7d",
+              "AnalyticsRange30d",
+              "AnalyticsRange90d"
+            ]
+          },
+          "traffic": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsTraffic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downloads": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsDownloads"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AnalyticsResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AnalyticsReport"
+          }
+        }
+      },
+      "AnalyticsConfig": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "websiteId",
+          "scriptUrl"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "websiteId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scriptUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AnalyticsConfigResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AnalyticsConfig"
           }
         }
       }

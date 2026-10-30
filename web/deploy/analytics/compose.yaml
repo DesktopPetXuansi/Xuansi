@@ -1,0 +1,53 @@
+# 可选统计服务，与官网的数据库、迁移及发布事务相互独立。
+name: xuansi-analytics
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.1
+    init: true
+    restart: unless-stopped
+    # 共享主机资源有限，限制统计服务对官网的影响。
+    mem_limit: 320m
+    cpus: 1.0
+    ports:
+      - '${UMAMI_BIND_ADDRESS:-127.0.0.1}:18192:3000'
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?配置独立统计数据库密码}@db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?配置独立随机认证密钥}
+      TWO_FACTOR_ENCRYPTION_KEY: ${UMAMI_TWO_FACTOR_KEY:?配置64位十六进制双因素加密密钥}
+      DISABLE_TELEMETRY: '1'
+      # Nginx 覆盖此请求头；仅对受控代理开放上游端口。
+      CLIENT_IP_HEADER: x-real-ip
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, curl, -fsS, 'http://127.0.0.1:3000/api/heartbeat']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    logging: &bounded_logs
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 160m
+    cpus: 0.5
+    # 独立数据库只承载统计，减少 PostgreSQL 默认共享内存占用。
+    command: [postgres, -c, shared_buffers=32MB, -c, max_connections=40, -c, work_mem=2MB, -c, maintenance_work_mem=32MB]
+    environment:
+      POSTGRES_USER: umami
+      POSTGRES_DB: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:?配置独立统计数据库密码}
+      TZ: UTC
+    # 不发布数据库端口；迁移、账号和数据均不进入官网业务数据库。
+    volumes:
+      - umami_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *bounded_logs
+volumes:
+  umami_data:
