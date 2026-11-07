@@ -1,48 +1,36 @@
 import { expect, test } from "@playwright/test";
 import { publicVisitor } from "./public-fixtures";
 
-// 验证实际选中的图片像素能覆盖高分屏，防止低清原图被重复压缩后冒充高清。
-for (const [width, dpr] of [[1440, 2], [390, 3]]) {
-  test(`${width}px / ${dpr}x 实拍原图像素充足并可放大查看`, async ({ browser, baseURL }) => {
+// 首页截图模块已移除：桌面和手机都不应继续请求旧截图。
+for (const [width, dpr] of [
+  [1440, 2],
+  [390, 3],
+]) {
+  test(`${width}px / ${dpr}x 首页不加载已移除的客户端截图`, async ({
+    browser,
+    baseURL,
+  }) => {
     const context = await browser.newContext({
       baseURL,
       viewport: { width, height: 1000 },
       deviceScaleFactor: dpr,
+      reducedMotion: "reduce",
     });
     try {
       const page = await context.newPage();
+      const screenshots: string[] = [];
+      page.on("request", (request) => {
+        if (new URL(request.url()).pathname.startsWith("/product/client-")) {
+          screenshots.push(request.url());
+        }
+      });
       await publicVisitor(page);
-      await page.goto("/");
-      const panel = page.getByRole("tabpanel");
-      for (const name of ["开始对话", "管理记忆", "更换形象"]) {
-        await page.getByRole("tab", { name }).click();
-        const image = panel.getByRole("img");
-        await image.scrollIntoViewIfNeeded();
-        const metrics = await image.evaluate(async (element: HTMLImageElement) => {
-          await element.decode();
-          const original = new Image();
-          original.src = element.currentSrc;
-          await original.decode();
-          return {
-            source: element.currentSrc,
-            pixels: original.naturalWidth,
-            displayed: element.getBoundingClientRect().width,
-          };
-        });
-        expect(metrics.pixels, `${name} 实际像素不足`).toBeGreaterThanOrEqual(
-          Math.ceil(metrics.displayed * dpr),
-        );
-        expect(new URL(metrics.source).pathname).toMatch(/-3x\.png$/);
-        if (width === 1440) expect(metrics.displayed).toBeGreaterThan(1000);
-        await expect(panel.getByRole("link", { name: "放大查看原图 ↗" }))
-          .toHaveAttribute("href", new URL(metrics.source).pathname);
-      }
-      const [original] = await Promise.all([
-        page.waitForEvent("popup"),
-        panel.getByRole("link", { name: "放大查看原图 ↗" }).click(),
-      ]);
-      await original.waitForLoadState();
-      await expect(original).toHaveURL(/client-appearance-v0\.8\.0-3x\.png$/);
+      await page.goto("/", { waitUntil: "networkidle" });
+      await expect(page.locator("#product-preview")).toHaveCount(0);
+      await expect(
+        page.getByAltText("玄司角色：黑金服饰与长发的桌面伙伴"),
+      ).toBeVisible();
+      expect(screenshots).toEqual([]);
     } finally {
       await context.close();
     }
