@@ -28,9 +28,11 @@
 /* form 类同时用于外壳和表单，只有外壳加面板，避免嵌套双重留白。 */
 .section > .form {
   padding: 28px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .form textarea {
   min-height: 144px;
@@ -44,12 +46,28 @@
   border-block: 1px solid var(--line);
   padding-block: 12px;
 }
-.options summary {
+.optionsTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
   color: var(--muted);
   font-size: 14px;
 }
-.options[open] summary {
+.optionsTrigger::after {
+  content: "+";
+  color: var(--green);
+}
+.optionsTrigger[data-state="open"]::after {
+  content: "−";
+}
+.optionsTrigger[data-state="open"] {
   margin-bottom: 16px;
 }
 .optionFields {
@@ -87,7 +105,7 @@
   font-size: 13px;
   color: var(--muted);
 }
-.consent input {
+.consent :global([data-slot="checkbox"]) {
   flex: 0 0 auto;
   margin-top: 6px;
   width: 18px;

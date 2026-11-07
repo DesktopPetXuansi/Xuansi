@@ -6,6 +6,27 @@ test.beforeEach(async ({ page }) => {
   await publicVisitor(page);
 });
 
+test("首页按钮使用 shadcn 变体并保持铅笔与纸色对比", async ({ page }) => {
+  await page.goto("/");
+  const primary = page.getByRole("link", {
+    name: "下载 Windows 客户端",
+    exact: true,
+  });
+  await expect(primary).toHaveAttribute("data-slot", "button");
+  await expect(primary).toHaveAttribute("data-variant", "default");
+  await expect(primary).toHaveCSS("color", "rgb(245, 240, 232)");
+  await expect(primary).toHaveCSS("background-color", "rgb(44, 44, 44)");
+  await primary.hover();
+  await expect(primary).toHaveCSS("color", "rgb(245, 240, 232)");
+
+  const outline = page
+    .locator(".library-promo")
+    .getByRole("link", { name: "挑选形象", exact: true });
+  await expect(outline).toHaveAttribute("data-slot", "button");
+  await expect(outline).toHaveAttribute("data-variant", "outline");
+  await expect(outline).toHaveCSS("background-color", "rgb(249, 245, 237)");
+});
+
 test("匿名下载保持官方地址，摘要复制成功与失败都有反馈", async ({
   page,
   context,
@@ -100,17 +121,9 @@ test("资源接口失败后能重试，空库仍提供本地使用路径", async
   await expect(page.getByLabel("搜索名称")).toHaveValue("");
 });
 
-test("真实截图可用键盘切换，菜单关闭后归还焦点", async ({ page }) => {
+test("手机菜单关闭后归还焦点", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "管理记忆" }).click();
-  await expect(page.getByRole("tab", { name: "管理记忆" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.keyboard.press("Home");
-  await expect(page.getByRole("tab", { name: "开始对话" })).toBeFocused();
-  await expect(page.getByRole("tabpanel")).toHaveAccessibleName(/开始对话/);
   await page.getByRole("button", { name: "展开主导航" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "展开主导航" })).toBeFocused();
@@ -119,21 +132,20 @@ test("真实截图可用键盘切换，菜单关闭后归还焦点", async ({ pa
   ).toHaveAttribute("aria-expanded", "false");
 });
 
-test("截图加载失败时保留说明，切换后可恢复查看", async ({ page }) => {
-  await page.route("**/product/client-*-3x.png", async (route) => {
-    if (new URL(route.request().url()).pathname.includes("client-appearance")) await route.abort();
-    else await route.continue();
+test("首页不再显示客户端截图模块或请求其中的图片", async ({ page }) => {
+  const screenshots: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/product/client-"))
+      screenshots.push(request.url());
   });
-  await page.goto("/");
-  const panel = page.getByRole("tabpanel");
-  await expect(panel.getByRole("status")).toContainText("截图暂时无法显示");
-  await page.getByRole("tab", { name: "管理记忆" }).click();
-  await expect
-    .poll(() =>
-      panel
-        .getByRole("img")
-        .evaluate((image: HTMLImageElement) => image.naturalWidth),
-    )
-    .toBeGreaterThan(0);
-  await expect(panel.getByRole("status")).toHaveCount(0);
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { name: "看看玄司，用起来是什么样。" }),
+  ).toHaveCount(0);
+  await expect(page.locator("#product-preview")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "看看实际界面" })).toHaveCount(0);
+  await expect(
+    page.getByAltText("玄司角色：黑金服饰与长发的桌面伙伴"),
+  ).toBeVisible();
+  expect(screenshots).toEqual([]);
 });

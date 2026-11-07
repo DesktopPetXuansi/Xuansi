@@ -23,8 +23,8 @@
 }
 .card {
   padding: 32px;
-  border-radius: 12px;
-  background: var(--white);
+  border-radius: 16px;
+  background: var(--glass-surface);
 }
 .card :global(.field) {
   margin: 0 0 20px;
@@ -58,8 +58,7 @@
 .recovery:hover,
 .switchAccount a:hover,
 .mailHelp a:hover {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  color: var(--green-hover);
 }
 .passwordControl {
   position: relative;

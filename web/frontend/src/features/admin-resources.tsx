@@ -1,9 +1,18 @@
 "use client";
-import { Button, Notice } from "@/components/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Notice } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { type Resource, type Version, statuses } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+const noVersion = "__none__";
 export function AdminResources() {
   const query = useQuery({
     queryKey: ["admin-resources"],
@@ -56,28 +65,33 @@ function Publication({ resource }: { resource: Resource }) {
         {resource.license}
       </p>
       <div className="actions">
-        <select
-          aria-label={`${resource.name}的发布版本`}
-          value={version}
-          onChange={(event) => setVersion(event.target.value)}
+        <Select
+          value={version || noVersion}
+          onValueChange={(selected) =>
+            setVersion(selected === noVersion ? "" : selected)
+          }
         >
-          <option value="">选择就绪版本</option>
-          {query.data
-            ?.filter((version) => version.validationStatus === "READY")
-            .map((version) => (
-              <option value={version.id} key={version.id}>
-                {version.version}
-              </option>
-            ))}
-        </select>
+          <SelectTrigger
+            className="w-full"
+            aria-label={`${resource.name}的发布版本`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value={noVersion}>选择就绪版本</SelectItem>
+            {query.data
+              ?.filter((version) => version.validationStatus === "READY")
+              .map((version) => (
+                <SelectItem value={version.id} key={version.id}>
+                  {version.version}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
         <Button disabled={!version || busy} onClick={() => act(true)}>
           发布公开资源
         </Button>
-        <Button
-          className="secondary"
-          disabled={busy}
-          onClick={() => act(false)}
-        >
+        <Button variant="outline" disabled={busy} onClick={() => act(false)}>
           {resource.status === "HIDDEN" ? "恢复" : "隐藏"}
         </Button>
       </div>

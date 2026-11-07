@@ -48,7 +48,7 @@ export function UserTable({
             <td data-label="操作" role="cell">
               <div className={styles.rowActions}>
                 {user.id === currentId ? (
-                  <Button className="secondary" disabled>
+                  <Button variant="outline" disabled>
                     当前账号
                   </Button>
                 ) : confirming === user.id ? (
@@ -60,7 +60,7 @@ export function UserTable({
                       {busy ? "正在停用…" : "确认停用"}
                     </Button>
                     <Button
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       onClick={() => onConfirm(null)}
                     >
@@ -69,7 +69,7 @@ export function UserTable({
                   </>
                 ) : (
                   <Button
-                    className="secondary"
+                    variant="outline"
                     disabled={busy}
                     onClick={() =>
                       user.status === "ACTIVE"

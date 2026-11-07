@@ -1,16 +1,7 @@
 import { message } from "@/lib/api";
-import type { ButtonHTMLAttributes,ReactNode } from "react";
-export function Button({
-  children,
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button className={`button ${className}`} {...props}>
-      {children}
-    </button>
-  );
-}
+import type { ReactNode } from "react";
+// 兼容既有导入路径，所有按钮使用同一个 shadcn 实现与 variant。
+export { Button } from "@/components/ui/button";
 export function Notice({
   error,
   children,

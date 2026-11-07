@@ -28,8 +28,10 @@
 .download {
   padding: 48px;
   margin-top: 48px;
-  border-radius: 16px;
-  background: var(--green);
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #56745a, var(--green-hover));
+  box-shadow: var(--glass-shadow);
   color: var(--white);
 }
 .download h2 {
@@ -52,8 +54,7 @@
 }
 .download a:hover {
   color: var(--white);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  opacity: 0.85;
 }
 .download > div:last-child {
   flex-shrink: 0;

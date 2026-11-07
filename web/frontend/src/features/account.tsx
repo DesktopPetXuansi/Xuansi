@@ -1,4 +1,7 @@
 "use client";
+
+import { Input } from "@/components/ui/input";
+
 import { useMe } from "@/components/navigation";
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { replaceSession } from "./identity/session";
@@ -74,7 +77,7 @@ export function Account() {
             {me.data?.email} · {me.data?.emailVerified ? "已验证" : "待验证"}
           </p>
           <Field label="昵称">
-            <input
+            <Input
               name="displayName"
               defaultValue={me.data?.displayName}
               required
@@ -90,7 +93,7 @@ export function Account() {
         >
           <h3>修改密码</h3>
           <Field label="当前密码">
-            <input
+            <Input
               type="password"
               name="currentPassword"
               autoComplete="current-password"
@@ -101,7 +104,7 @@ export function Account() {
             label="新密码"
             hint={config.data && passwordHint(config.data.password)}
           >
-            <input
+            <Input
               type="password"
               name="password"
               autoComplete="new-password"
@@ -114,7 +117,7 @@ export function Account() {
       </div>
       {error !== undefined && <Notice error={error} />}{" "}
       {success && <Notice>{success}</Notice>}
-      <Button className="secondary" style={{ marginTop: 24 }} onClick={logout}>
+      <Button variant="outline" style={{ marginTop: 24 }} onClick={logout}>
         退出登录
       </Button>
     </>

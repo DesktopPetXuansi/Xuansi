@@ -1,6 +1,13 @@
 "use client";
 
 import { Notice } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { api, safeUrl } from "@/lib/api";
 import { clientRelease } from "@/lib/client-release";
 import { type Release, bytes } from "@/lib/types";
@@ -39,8 +46,9 @@ export function PlatformHistory() {
           <p className="muted">
             平台记录暂时无法读取，已核实的官方下载仍可正常使用。
           </p>
-          <button
-            className="button secondary"
+          <Button
+
+            variant="outline"
             type="button"
             disabled={query.isFetching}
             onClick={() => {
@@ -49,7 +57,7 @@ export function PlatformHistory() {
             }}
           >
             {query.isFetching ? "正在重试…" : "重新读取平台记录"}
-          </button>
+          </Button>
         </div>
       )}
       {!query.isPending && !query.error && !query.data?.length && (
@@ -69,26 +77,39 @@ export function PlatformHistory() {
           </p>
           <p className={styles.notes}>{release.releaseNotes}</p>
           {!!release.artifacts?.length && (
-            <details className={styles.details}>
-              <summary>此版本的安装文件与校验信息</summary>
-              {release.artifacts.map((artifact) => (
-                <div className={styles.artifact} key={artifact.id}>
-                  <a
-                    className="quiet-link"
-                    href={safeUrl(artifact.downloadUrl)}
-                  >
-                    下载此版本 · {bytes(artifact.bytes)}
-                  </a>
-                  <p className="legal-note">
-                    SHA-256：
-                    <code>{artifact.sha256 || "发行方未提供摘要"}</code>
-                  </p>
-                  <p className="legal-note">
-                    {artifact.systemRequirements?.join(" · ")}
-                  </p>
-                </div>
-              ))}
-            </details>
+            <Collapsible className={styles.details}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={styles.detailsTrigger}
+                >
+                  此版本的安装文件与校验信息
+                  <ChevronDown size={16} aria-hidden />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                {release.artifacts.map((artifact) => (
+                  <div className={styles.artifact} key={artifact.id}>
+                    <Button asChild variant="link" className="h-auto px-0 py-0">
+                      <a
+                        className="quiet-link"
+                        href={safeUrl(artifact.downloadUrl)}
+                      >
+                        下载此版本 · {bytes(artifact.bytes)}
+                      </a>
+                    </Button>
+                    <p className="legal-note">
+                      SHA-256：
+                      <code>{artifact.sha256 || "发行方未提供摘要"}</code>
+                    </p>
+                    <p className="legal-note">
+                      {artifact.systemRequirements?.join(" · ")}
+                    </p>
+                  </div>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </article>
       ))}

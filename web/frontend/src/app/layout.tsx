@@ -1,8 +1,21 @@
 import { Footer, Navigation } from "@/components/navigation";
+import { AssemblyMotion } from "@/components/assembly/assembly-motion";
 import { Providers } from "@/components/providers";
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import "./sketch.css";
+
+// 在首次绘制前标记待组装组件；客户端迟迟未启动时自动恢复正文。
+const assemblyBootstrap = `(() => {
+  if (!window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      !('IntersectionObserver' in window) || !('animate' in Element.prototype)) return;
+  const root = document.documentElement;
+  root.setAttribute('data-assembly-pending', '');
+  window.setTimeout(() => {
+    if (!root.hasAttribute('data-assembly-active')) root.removeAttribute('data-assembly-pending');
+  }, 4000);
+})();`;
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "https://xuansi.kukude.top"),
   title: {
@@ -43,7 +56,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: assemblyBootstrap }} />
+      </head>
       <body>
         <Providers>
           <a className="skip-link" href="#main">
@@ -52,6 +68,7 @@ export default function RootLayout({
           <Navigation />
           <main id="main">{children}</main>
           <Footer />
+          <AssemblyMotion />
         </Providers>
         <Script src="/analytics-loader.js" strategy="afterInteractive" />
       </body>

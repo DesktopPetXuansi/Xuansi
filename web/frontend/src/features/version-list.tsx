@@ -1,4 +1,10 @@
 "use client";
+
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button, Notice } from "@/components/ui";
 import { api, safeUrl } from "@/lib/api";
 import { type Version, bytes, statuses } from "@/lib/types";
@@ -9,9 +15,11 @@ import styles from "./resources.module.css";
 export function VersionList({
   id,
   onSelect,
+  currentVersionId,
 }: {
   id: string;
   onSelect?: (id: string) => void;
+  currentVersionId?: string | null;
 }) {
   const query = useQuery({
     queryKey: ["versions", id],
@@ -67,6 +75,9 @@ export function VersionList({
           </h3>
           <span className="badge">{statuses[version.validationStatus]}</span>
           <span className="badge">{statuses[version.compatibilityStatus]}</span>
+          {onSelect && version.id === currentVersionId && (
+            <span className="badge">当前版本</span>
+          )}
         </div>
         <p className="muted">
           {bytes(version.packageBytes)}
@@ -85,29 +96,31 @@ export function VersionList({
               文件校验已完成，是否能正常显示仍需在客户端预览确认。
             </p>
           )}
-        <details className={styles.versionDetails}>
-          <summary>文件信息、校验与配套依赖</summary>
-          <p>
-            入口文件：<code>{version.entrypoint || "未指定"}</code>
-          </p>
-          <p>
-            版本 ID：<code>{version.id}</code>
-          </p>
-          <p>
-            SHA-256：<code>{version.packageSha256 || "校验完成后生成"}</code>
-          </p>
-          {version.dependencies?.length ? (
-            <ul>
-              {version.dependencies.map((dependency) => (
-                <li key={dependency.versionId}>
-                  {dependency.relation} · <code>{dependency.versionId}</code>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">作者未声明外部模型依赖。</p>
-          )}
-        </details>
+        <Collapsible className={styles.versionDetails}>
+          <CollapsibleTrigger>文件信息、校验与配套依赖</CollapsibleTrigger>
+          <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+            <p>
+              入口文件：<code>{version.entrypoint || "未指定"}</code>
+            </p>
+            <p>
+              版本 ID：<code>{version.id}</code>
+            </p>
+            <p>
+              SHA-256：<code>{version.packageSha256 || "校验完成后生成"}</code>
+            </p>
+            {version.dependencies?.length ? (
+              <ul>
+                {version.dependencies.map((dependency) => (
+                  <li key={dependency.versionId}>
+                    {dependency.relation} · <code>{dependency.versionId}</code>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">作者未声明外部模型依赖。</p>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
         {version.dependencies?.length ? (
           <p>此资源需要配套模型，请展开文件信息核对依赖版本。</p>
         ) : null}
@@ -131,10 +144,13 @@ export function VersionList({
             </Button>
             {onSelect && (
               <Button
-                className="secondary"
+                variant="outline"
+                disabled={version.id === currentVersionId}
                 onClick={() => onSelect(version.id)}
               >
-                设为当前版本
+                {version.id === currentVersionId
+                  ? "已是当前版本"
+                  : "设为当前版本"}
               </Button>
             )}
           </div>
@@ -147,7 +163,11 @@ export function VersionList({
       {query.isPending && <Notice>正在读取可下载版本…</Notice>}
       {query.error && <Notice error={query.error} />}
       {!query.isPending && !query.error && !query.data?.length && (
-        <Notice>作者还没有上传可用版本，请稍后再来。</Notice>
+        <Notice>
+          {onSelect
+            ? "还没有上传版本。选择上方文件开始上传。"
+            : "作者还没有上传可用版本，请稍后再来。"}
+        </Notice>
       )}
       {onSelect ? (
         query.data?.map(versionRow)
@@ -155,14 +175,22 @@ export function VersionList({
         <>
           {available && versionRow(available)}
           {!!otherVersions?.length && (
-            <details className={styles.versionDetails} open={!available}>
-              <summary>
+            <Collapsible
+              className={styles.versionDetails}
+              defaultOpen={!available}
+            >
+              <CollapsibleTrigger>
                 {available
                   ? "查看其他版本与校验状态"
                   : "目前没有可推荐的版本，查看校验状态"}
-              </summary>
-              {otherVersions.map(versionRow)}
-            </details>
+              </CollapsibleTrigger>
+              <CollapsibleContent
+                forceMount
+                className="data-[state=closed]:hidden"
+              >
+                {otherVersions.map(versionRow)}
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </>
       )}

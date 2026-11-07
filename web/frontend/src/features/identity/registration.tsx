@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+
 import { Button, Heading, Notice } from "@/components/ui";
 import Link from "next/link";
 import { LocalMailbox, passwordHint } from "../auth-config";
@@ -32,7 +35,7 @@ export function RegistrationPage() {
         <Heading eyebrow="YOUR ACCOUNT / 你的账号" title="创建账号">
           验证邮箱、设置密码，一次完成注册。
         </Heading>
-        <div className={`panel ${styles.card}`}>
+        <Card className={`panel gap-0 ${styles.card}`}>
           {config.isPending && <Notice>正在加载账号配置…</Notice>}
           {config.error && <Notice error={config.error} />}
           <form
@@ -42,7 +45,7 @@ export function RegistrationPage() {
             <div className={registrationStyles.emailRow}>
               <div className={`field ${registrationStyles.emailField}`}>
                 <label htmlFor="registration-email">邮箱</label>
-                <input
+                <Input
                   id="registration-email"
                   type="email"
                   autoComplete="email"
@@ -89,7 +92,7 @@ export function RegistrationPage() {
             )}
             <div className="field">
               <label htmlFor="registration-code">邮件验证码</label>
-              <input
+              <Input
                 id="registration-code"
                 className={registrationStyles.code}
                 type="text"
@@ -137,7 +140,7 @@ export function RegistrationPage() {
             destination={destination}
             complete={false}
           />
-        </div>
+        </Card>
         <p className={styles.backHome}>
           <Link href="/" className="quiet-link">
             返回首页

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { authHref } from "./return-path";
 import styles from "./auth.module.css";
 
@@ -9,9 +10,9 @@ export function AuthLinks({ mode, destination, complete }: {
   complete: boolean;
 }) {
   return <>
-    {complete ? <Link className={`button-link ${styles.submit}`} href={authHref("/login", destination)}>
+    {complete ? <Button asChild className={styles.submit}><Link href={authHref("/login", destination)}>
       返回登录
-    </Link> : <p className={styles.switchAccount}>
+    </Link></Button> : <p className={styles.switchAccount}>
       {mode === "login" ? <>
         <span>没有账号？</span><Link href={authHref("/register", destination)}>创建账号</Link>
       </> : <>

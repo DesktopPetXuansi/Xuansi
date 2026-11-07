@@ -1,5 +1,5 @@
 "use client";
-
+import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui";
 import { clientRelease } from "@/lib/client-release";
 import { bytes } from "@/lib/types";
@@ -10,7 +10,6 @@ import { PackageChecksum } from "./releases/checksum";
 import { CurrentRelease } from "./releases/current-release";
 import { PlatformHistory } from "./releases/platform-history";
 import { AiModes } from "./ai-modes";
-
 export function Releases({ history = false }: { history?: boolean }) {
   if (history) {
     return (
@@ -20,17 +19,25 @@ export function Releases({ history = false }: { history?: boolean }) {
         </Heading>
         <CurrentRelease />
         <div className="actions">
-          <a
-            className="button-link secondary"
-            href="https://github.com/DesktopPetXuansi/Xuansi/releases"
-            target="_blank"
-            rel="noreferrer"
+          <Button asChild variant="outline">
+            <a
+              className="button-link"
+              href="https://github.com/DesktopPetXuansi/Xuansi/releases"
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看完整发行历史 ↗
+            </a>
+          </Button>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto justify-start px-0 py-0 whitespace-normal"
           >
-            查看完整发行历史 ↗
-          </a>
-          <Link className="quiet-link" href="/download">
-            下载当前正式版 →
-          </Link>
+            <Link className="quiet-link" href="/download">
+              下载当前正式版 →
+            </Link>
+          </Button>
         </div>
         <PlatformHistory />
       </div>
@@ -73,26 +80,40 @@ export function Releases({ history = false }: { history?: boolean }) {
             data-umami-event="installer_download"
             data-umami-event-version={clientRelease.version}
           >
-            <a className="button-link" href={clientRelease.downloadUrl}>
-              <Download size={18} aria-hidden />
-              下载 Windows 安装包
-            </a>
+            <Button asChild variant="default">
+              <a className="button-link" href={clientRelease.downloadUrl}>
+                <Download size={18} aria-hidden />
+                下载 Windows 安装包
+              </a>
+            </Button>
           </div>
           <p className={styles.downloadHint}>
             在线安装器：首次安装会联网下载所选组件，请保持网络连接。
           </p>
           <div className={styles.packageLinks}>
-            <a
-              className="quiet-link"
-              href={clientRelease.releaseUrl}
-              target="_blank"
-              rel="noreferrer"
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
             >
-              下载没反应？前往 GitHub ↗
-            </a>
-            <Link className="quiet-link" href="/docs/getting-started">
-              查看安装步骤 →
-            </Link>
+              <a
+                className="quiet-link"
+                href={clientRelease.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                下载没反应？前往 GitHub ↗
+              </a>
+            </Button>
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
+            >
+              <Link className="quiet-link" href="/docs/getting-started">
+                查看安装步骤 →
+              </Link>
+            </Button>
           </div>
           <PackageChecksum />
         </section>
@@ -104,9 +125,15 @@ export function Releases({ history = false }: { history?: boolean }) {
             <li>安装向导会检查内存和存储空间，再提示可用方式。</li>
             <li>目前没有 macOS 和 Linux 安装包。</li>
           </ul>
-          <Link className="quiet-link" href="/docs/troubleshooting">
-            安装遇到问题 →
-          </Link>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto justify-start px-0 py-0 whitespace-normal"
+          >
+            <Link className="quiet-link" href="/docs/troubleshooting">
+              安装遇到问题 →
+            </Link>
+          </Button>
         </aside>
       </div>
       <AiModes />
@@ -117,9 +144,15 @@ export function Releases({ history = false }: { history?: boolean }) {
             先从托盘退出桌宠，再运行新版安装包并选择原安装目录。记忆、人设和导入形象会保留；模型及语音设置按本次向导更新，旧设置会另行备份。
           </p>
         </div>
-        <Link className="quiet-link" href="/changelog">
-          查看更新记录 →
-        </Link>
+        <Button
+          asChild
+          variant="link"
+          className="h-auto justify-start px-0 py-0 whitespace-normal"
+        >
+          <Link className="quiet-link" href="/changelog">
+            查看更新记录 →
+          </Link>
+        </Button>
       </section>
     </div>
   );

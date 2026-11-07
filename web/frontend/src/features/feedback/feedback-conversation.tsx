@@ -1,4 +1,10 @@
 "use client";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button, Notice } from "@/components/ui";
 import { feedbackStatuses } from "./feedback-statuses";
 import {
@@ -29,7 +35,7 @@ export function FeedbackConversationPanel(props: ConversationProps) {
   } = useFeedbackConversation(props);
   if (!opened)
     return (
-      <Button className="secondary" disabled={busy} onClick={() => void load()}>
+      <Button variant="outline" disabled={busy} onClick={() => void load()}>
         {admin ? "回复用户" : "查看对话"}
       </Button>
     );
@@ -42,7 +48,7 @@ export function FeedbackConversationPanel(props: ConversationProps) {
       <div className={styles.header}>
         <h4>私有对话</h4>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={busy || loading}
           onClick={() => void load()}
         >
@@ -58,13 +64,20 @@ export function FeedbackConversationPanel(props: ConversationProps) {
       {view && !denied && (
         <>
           <p>处理进度：{feedbackStatuses[view.status]}</p>
-          <details>
-            <summary>原始问题</summary>
-            <p className={styles.body}>{view.description}</p>
-          </details>
+          <Collapsible>
+            <CollapsibleTrigger
+              className={styles.originalTrigger}
+              aria-label="原始问题"
+            >
+              原始问题
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <p className={styles.body}>{view.description}</p>
+            </CollapsibleContent>
+          </Collapsible>
           {cursor && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy || loading}
               onClick={() => void load(true)}
             >
@@ -108,7 +121,7 @@ export function FeedbackConversationPanel(props: ConversationProps) {
             >
               <label className="field">
                 <span>{admin ? "回复内容" : "补充说明"}</span>
-                <textarea
+                <Textarea
                   aria-label={admin ? "回复内容" : "补充说明"}
                   ref={textarea}
                   rows={4}
@@ -136,7 +149,7 @@ export function FeedbackConversationPanel(props: ConversationProps) {
                     </Button>
                     <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy || loading}
                       onClick={rewrite}
                     >
@@ -155,7 +168,7 @@ export function FeedbackConversationPanel(props: ConversationProps) {
                   {admin && (
                     <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy || loading || !draft.trim()}
                       onClick={() => void send(true)}
                     >

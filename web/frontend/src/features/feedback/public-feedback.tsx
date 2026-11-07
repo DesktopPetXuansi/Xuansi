@@ -1,4 +1,13 @@
 "use client";
+import { Button as ShadcnButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 import { Button, Field, Notice } from "@/components/ui";
 import type { User } from "@/lib/types";
@@ -35,6 +44,8 @@ function PublicFeedbackForm({
   retryIdentity: () => void;
 }) {
   const identityBlocked = checking || identityError != null;
+  // 装饰性的加减号由 CSS 绘制，不应读入按钮的无障碍名称。
+  const optionsLabel = user ? "联系方式与公开选项（选填）" : "联系方式（选填）";
   const {
     description,
     setDescription,
@@ -67,9 +78,15 @@ function PublicFeedbackForm({
         </p>
         <p>默认仅开发者可见。请勿填写密码、API 密钥等敏感内容。</p>
         {user ? (
-          <Link className="quiet-link" href="/dashboard/feedback">
-            查看我的反馈 →
-          </Link>
+          <ShadcnButton
+            asChild
+            variant="link"
+            className="h-auto whitespace-normal p-0 text-left"
+          >
+            <Link className="quiet-link" href="/dashboard/feedback">
+              查看我的反馈 →
+            </Link>
+          </ShadcnButton>
         ) : (
           <p>
             匿名反馈仅进入开发者收件箱，不在本浏览器保存历史或建立聊天。登录后提交可持续沟通。
@@ -90,7 +107,7 @@ function PublicFeedbackForm({
             aria-busy={busy}
           >
             <Field label="问题或建议">
-              <textarea
+              <Textarea
                 ref={focusNewDraft}
                 required
                 maxLength={4000}
@@ -101,16 +118,19 @@ function PublicFeedbackForm({
                 placeholder="遇到了什么？可以写下操作步骤，或你期待的功能……"
               />
             </Field>
-            <details className={styles.options}>
-              <summary>
-                {user ? "联系方式与公开选项（选填）" : "联系方式（选填）"}
-              </summary>
-              <div className={styles.optionFields}>
+            <Collapsible className={styles.options}>
+              <CollapsibleTrigger
+                className={styles.optionsTrigger}
+                aria-label={optionsLabel}
+              >
+                {optionsLabel}
+              </CollapsibleTrigger>
+              <CollapsibleContent className={styles.optionFields}>
                 <Field
                   label="联系方式（选填）"
                   hint="仅开发者可见，方便需要时联系你。"
                 >
-                  <input
+                  <Input
                     maxLength={160}
                     value={contact}
                     disabled={busy || identityBlocked || attempt !== undefined}
@@ -120,14 +140,13 @@ function PublicFeedbackForm({
                 </Field>
                 {user && (
                   <label className={styles.consent}>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={publicConsent}
                       disabled={
                         busy || identityBlocked || attempt !== undefined
                       }
-                      onChange={(event) =>
-                        setPublicConsent(event.target.checked)
+                      onCheckedChange={(checked) =>
+                        setPublicConsent(checked === true)
                       }
                     />
                     <span>
@@ -135,15 +154,15 @@ function PublicFeedbackForm({
                     </span>
                   </label>
                 )}
-              </div>
-            </details>
+              </CollapsibleContent>
+            </Collapsible>
             {checking && <Notice>正在确认登录状态…</Notice>}
             {identityError != null && (
               <>
                 <Notice error={identityError} />
                 <Button
                   type="button"
-                  className="secondary"
+                  variant="outline"
                   onClick={retryIdentity}
                 >
                   重试登录状态

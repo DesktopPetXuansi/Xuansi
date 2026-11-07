@@ -21,7 +21,9 @@ test("标记垃圾成功后立即移出待处理，各筛选旧缓存也不能�
   await filters.getByRole("button", { name: "全部", exact: true }).click();
   await filters.getByRole("button", { name: "待处理", exact: true }).click();
   const card = page.getByRole("article", { name: item.title, exact: true });
-  await card.getByText("公开与其他操作", { exact: true }).click();
+  await card
+    .getByRole("button", { name: "公开与其他操作", exact: true })
+    .click();
   await card
     .getByRole("button", { name: "标记为垃圾反馈", exact: true })
     .click();
@@ -157,12 +159,13 @@ test("清空失败保留原文并可重试，提交中不能重复清空", async
   await page.goto("/admin/feedback/spam");
   await page.getByRole("button", { name: "清空垃圾邮件", exact: true }).click();
   await page.getByRole("button", { name: "确认清空", exact: true }).click();
-  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+  // shadcn 弹窗挂载在页面根部，错误提示属于仍然打开的确认对话框。
+  await expect(page.getByRole("dialog").getByRole("alert")).toHaveText(
     "测试清空失败",
   );
   await expect(
-    page.getByRole("article", { name: item.title, exact: true }),
-  ).toBeVisible();
+    page.locator("article").filter({ hasText: item.title }),
+  ).toHaveCount(1);
   await page.getByRole("button", { name: "确认清空", exact: true }).click();
   await expect.poll(() => clears).toBe(2);
   await expect(

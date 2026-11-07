@@ -45,7 +45,7 @@ export function Library() {
               固定版本：{item.pinnedVersionId ?? "使用当前版本"}
             </small>
             <Button
-              className="secondary"
+              variant="outline"
               onClick={() => remove(item.resource.id)}
             >
               取消收藏

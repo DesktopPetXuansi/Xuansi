@@ -85,7 +85,7 @@ export function Users() {
         </p>
         <span className={styles.hint}>按注册时间从新到旧 · 每页20个</span>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={query.isFetching || change.isPending}
           onClick={() => void query.refetch()}
         >
@@ -97,7 +97,7 @@ export function Users() {
       ) : query.error ? (
         <>
           <Notice error={query.error} />
-          <Button className="secondary" onClick={() => void query.refetch()}>
+          <Button variant="outline" onClick={() => void query.refetch()}>
             重试读取用户
           </Button>
         </>
@@ -115,7 +115,7 @@ export function Users() {
           <h2>没有符合条件的账号</h2>
           <p>请调整昵称、邮箱、角色或状态后重新查询。</p>
           {!!cursor && (
-            <Button className="secondary" onClick={() => setPages([""])}>
+            <Button variant="outline" onClick={() => setPages([""])}>
               返回第一页
             </Button>
           )}
@@ -125,7 +125,7 @@ export function Users() {
         <span>第{pages.length}页</span>
         {pages.length > 1 && (
           <Button
-            className="secondary"
+            variant="outline"
             disabled={query.isFetching || change.isPending}
             onClick={() => setPages([""])}
           >
@@ -133,7 +133,7 @@ export function Users() {
           </Button>
         )}
         <Button
-          className="secondary"
+          variant="outline"
           disabled={pages.length < 2 || query.isFetching || change.isPending}
           onClick={() => {
             setPages((values) => values.slice(0, -1));
@@ -143,7 +143,7 @@ export function Users() {
           上一页
         </Button>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={!next || query.isFetching || change.isPending}
           onClick={() => {
             if (next) setPages((values) => [...values, next]);

@@ -1,165 +1,199 @@
 "use client";
+
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+
 import { Button, Field, Notice } from "@/components/ui";
-import { api } from "@/lib/api";
-import { type Resource, type Upload, type Version } from "@/lib/types";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { bytes, type Resource, type Upload } from "@/lib/types";
+import Link from "next/link";
+import { useUploadVersion } from "./use-upload-version";
+import styles from "./resource-upload.module.css";
+
 export function UploadVersion({ resource }: { resource: Resource }) {
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<unknown>();
-  const [upload, setUpload] = useState<Upload>();
-  const cache = useQueryClient();
-  const state = useQuery({
-    queryKey: ["upload", upload?.id],
-    queryFn: () => api<Upload>(`/uploads/${upload?.id}`),
-    enabled: !!upload,
-    refetchInterval: (query) =>
-      query.state.data &&
-      ["READY", "FAILED", "CANCELLED", "EXPIRED"].includes(
-        query.state.data.status,
-      )
-        ? false
-        : 2000,
-  });
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const file = form.get("file");
-    if (!(file instanceof File) || !file.size) return;
-    // 不存在的可选输入必须省略，不能把 FormData 的 null 变成字符串。
-    const targetModelVersionId = form.get("targetModelVersionId");
-    setBusy(true);
-    setError(undefined);
-    setProgress(0);
-    try {
-      const created = await api<{ version: Version; upload: Upload }>(
-        `/resources/${resource.id}/versions`,
-        "POST",
-        {
-          version: String(form.get("version")),
-          filename: file.name,
-          expectedBytes: file.size,
-          minimumClientVersion: String(form.get("minimumClientVersion")),
-          targetModelVersionId:
-            typeof targetModelVersionId === "string" && targetModelVersionId
-              ? targetModelVersionId
-              : undefined,
-          entrypoint: String(form.get("entrypoint")) || undefined,
-        },
-      );
-      if (created.upload.method !== "PUT")
-        throw new Error("当前上传服务未提供受支持的 PUT 地址，请联系管理员。");
-      await putFile(created.upload, file, setProgress);
-      await api(`/uploads/${created.upload.id}/completion`, "POST", {});
-      setUpload(created.upload);
-      await cache.invalidateQueries({ queryKey: ["versions", resource.id] });
-    } catch (cause) {
-      setError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const {
+    busy,
+    progress,
+    phase,
+    file,
+    upload,
+    visibleError,
+    canRetryCompletion,
+    status,
+    statusError,
+    selectFile,
+    submit,
+    retryCompletion,
+  } = useUploadVersion(resource);
+  const accept =
+    resource.kind === "MODEL"
+      ? ".zip"
+      : resource.kind === "MOTION"
+        ? ".motion3.json"
+        : resource.kind === "EXPRESSION"
+          ? ".exp3.json"
+          : resource.kind === "IMAGE"
+            ? "image/png,image/jpeg,image/webp"
+            : ".gif";
   return (
     <form className="panel" onSubmit={submit}>
-      <p className="muted">
-        Live2D 模型上传
-        ZIP，完整保留导出文件相对路径。动作和表情绑定精确的模型版本，上传不等于客户端兼容。
-      </p>
-      <div className="grid-two">
-        <Field label="版本号">
-          <input name="version" placeholder="1.0.0" required />
-        </Field>
-        <Field label="最低客户端版本">
-          <input
-            name="minimumClientVersion"
-            placeholder="接入版实际最低版本；未验证可留空"
-          />
-        </Field>
-      </div>
       <Field
-        label="模型入口路径"
-        hint="模型 ZIP 内的 .model3.json 相对路径；其他类型可留空。"
+        label={resource.kind === "MODEL" ? "选择模型压缩包" : "选择作品文件"}
       >
-        <input
-          name="entrypoint"
-          placeholder="character/character.model3.json"
-        />
-      </Field>
-      {["MOTION", "EXPRESSION"].includes(resource.kind) && (
-        <Field label="目标模型版本 ID">
-          <input
-            name="targetModelVersionId"
-            required
-            placeholder="精确模型版本 UUID"
-          />
-        </Field>
-      )}
-      <Field label="资源文件">
-        <input
+        <Input
           name="file"
           type="file"
           required
-          accept={
-            resource.kind === "MODEL"
-              ? ".zip"
-              : resource.kind === "MOTION"
-                ? ".motion3.json"
-                : resource.kind === "EXPRESSION"
-                  ? ".exp3.json"
-                  : resource.kind === "IMAGE"
-                    ? "image/png,image/jpeg,image/webp"
-                    : ".gif"
-          }
+          accept={accept}
+          disabled={busy}
+          onChange={(event) => selectFile(event.target.files?.[0])}
         />
       </Field>
-      <Button disabled={busy}>{busy ? "正在上传…" : "上传并校验"}</Button>
+      {file && (
+        <p className={styles.fileSummary} role="status">
+          已选择：{file.name}（{bytes(file.size)}）
+        </p>
+      )}
+      <Field
+        label="版本号"
+        hint="第一次上传可以填写 1.0.0；再次上传请使用新的版本号。"
+      >
+        <Input
+          name="version"
+          placeholder="例如 1.0.0"
+          required
+          disabled={busy}
+        />
+      </Field>
+      {["MOTION", "EXPRESSION"].includes(resource.kind) && (
+        <Field
+          label="配套模型版本 ID"
+          hint="在对应模型的版本列表展开“文件信息”，复制版本 ID。"
+        >
+          <Input
+            name="targetModelVersionId"
+            required
+            placeholder="粘贴模型版本 ID"
+            disabled={busy}
+          />
+        </Field>
+      )}
+      <Collapsible className={styles.advanced}>
+        <CollapsibleTrigger>高级设置（选填）</CollapsibleTrigger>
+        <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+          <Field
+            label="最低客户端版本"
+            hint="已确认最低支持版本时填写，例如 0.9.0；不确定可留空。"
+          >
+            <Input
+              name="minimumClientVersion"
+              placeholder="例如 0.9.0"
+              disabled={busy}
+            />
+          </Field>
+          {resource.kind === "MODEL" && (
+            <Field
+              label="模型入口路径"
+              hint="只有压缩包包含多个 .model3.json 时才需填写：输入入口文件在 ZIP 内的相对路径。"
+            >
+              <Input
+                name="entrypoint"
+                placeholder="角色文件夹/角色.model3.json"
+                disabled={busy}
+              />
+            </Field>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+      <p>文件会先进行后台校验；校验完成不代表已公开。</p>
+      <Button type="submit" disabled={busy || canRetryCompletion}>
+        {busy ? "正在上传…" : "上传文件并校验"}
+      </Button>
       {busy && (
         <>
-          <p role="status">已上传 {progress}%</p>
-          <progress className="progress" max={100} value={progress} />
+          <p role="status">
+            {phase === "preparing"
+              ? "正在准备上传任务…"
+              : phase === "confirming" || progress === 100
+                ? "文件已发送，正在等待服务器确认…"
+                : `文件上传中：${progress}%`}
+          </p>
+          {phase !== "preparing" && (
+            <Progress value={progress} aria-label="文件上传进度" />
+          )}
         </>
       )}
-      {error !== undefined && <Notice error={error} />}{" "}
-      {state.error && <Notice error={state.error} />}{" "}
-      {state.data && (
-        <Notice>
-          {state.data.status === "READY"
-            ? "文件校验完成，请在版本列表检查兼容性并选择当前版本。"
-            : state.data.status === "FAILED"
-              ? `校验失败：${state.data.errorCode ?? "请查看版本报告"}`
-              : "文件已提交，正在后台校验。"}
-        </Notice>
+      {visibleError !== undefined && <Notice error={visibleError} />}
+      {canRetryCompletion && visibleError !== undefined && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() => void retryCompletion()}
+        >
+          重试提交校验
+        </Button>
+      )}
+      {visibleError !== undefined && upload && (
+        <Link href="/dashboard/uploads" className="quiet-link">
+          查看上传队列
+        </Link>
+      )}
+      {statusError && <Notice error={statusError} />}
+      {!busy && status && (
+        <UploadStatus status={status} canRetry={canRetryCompletion} />
       )}
     </form>
   );
 }
-// XHR仅用于文件字节进度；业务状态始终以服务端校验结果为准。
-async function putFile(
-  upload: Upload,
-  file: File,
-  onProgress: (value: number) => void,
-) {
-  let csrf: string | undefined;
-  if (upload.url.startsWith("/"))
-    csrf = (await api<{ token: string }>("/auth/csrf")).token;
-  return new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", upload.url);
-    xhr.withCredentials = upload.url.startsWith("/");
-    Object.entries(upload.headers ?? {}).forEach(([key, value]) =>
-      xhr.setRequestHeader(key, value),
+
+function UploadStatus({
+  status,
+  canRetry,
+}: {
+  status: Upload["status"];
+  canRetry: boolean;
+}) {
+  if (status === "READY")
+    return (
+      <Notice>
+        文件校验已完成。请在下方“已上传版本”选择当前版本；上传不会改变作品的公开状态。
+      </Notice>
     );
-    if (csrf) xhr.setRequestHeader("X-CSRF-Token", csrf);
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable)
-        onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`文件上传失败（${xhr.status}），请重试。`));
-    xhr.onerror = () => reject(new Error("文件上传连接中断，请重试。"));
-    xhr.send(file);
-  });
+  if (status === "FAILED")
+    return (
+      <Notice
+        error={
+          new Error(
+            "文件校验未通过，请查看下方版本列表中的具体原因；修正后使用新的版本号重新上传。",
+          )
+        }
+      />
+    );
+  if (status === "CANCELLED")
+    return <Notice>上传已取消。如需重新上传，请使用新的版本号。</Notice>;
+  if (status === "EXPIRED")
+    return <Notice>上传任务已过期。如需重新上传，请使用新的版本号。</Notice>;
+  if (status === "CREATED")
+    return (
+      <Notice>
+        {canRetry
+          ? "文件已发送，等待提交后台校验。"
+          : "上传任务已创建，文件尚未确认上传。请查看上传队列。"}
+      </Notice>
+    );
+  if (status === "UPLOADED")
+    return (
+      <Notice>
+        {canRetry
+          ? "文件已上传，可以重试提交后台校验。"
+          : "文件已上传，等待提交后台校验。请查看上传队列。"}
+      </Notice>
+    );
+  return <Notice>文件已提交，正在后台校验；请稍候查看下方版本列表。</Notice>;
 }

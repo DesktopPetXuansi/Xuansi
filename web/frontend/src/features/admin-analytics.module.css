@@ -56,9 +56,11 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .metrics > div {
   min-width: 0;
@@ -141,20 +143,25 @@
 .trendPoint {
   fill: var(--green);
 }
-.dailyData summary {
+.dailyDataTrigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
   display: inline-flex;
   min-height: 44px;
   align-items: center;
   cursor: pointer;
   color: var(--green);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  font-weight: 600;
 }
-.dailyData summary::before {
+.dailyDataTrigger:hover {
+  color: var(--green-hover);
+}
+.dailyDataTrigger::before {
   content: "+";
   margin-right: 8px;
 }
-.dailyData[open] summary::before {
+.dailyDataTrigger[data-state="open"]::before {
   content: "−";
 }
 .dailyTable,

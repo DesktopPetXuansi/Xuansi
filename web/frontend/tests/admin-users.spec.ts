@@ -28,12 +28,53 @@ test("昵称邮箱搜索作用于全站账号，切换筛选重置分页", async
   expect(state.reads.at(-1)?.searchParams.get("cursor")).toBeNull();
   await expect(page.getByText("共1个账号", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "清除筛选", exact: true }).click();
-  await page.getByLabel("账号状态", { exact: true }).selectOption("DISABLED");
+  await page.getByRole("combobox", { name: "账号状态", exact: true }).click();
+  await page
+    .getByRole("listbox")
+    .getByRole("option", { name: "已停用", exact: true })
+    .click();
   await expect(page.getByText("共2个账号", { exact: true })).toBeVisible();
-  await page.getByLabel("角色", { exact: true }).selectOption("ADMIN");
+  await page.getByRole("combobox", { name: "角色", exact: true }).click();
+  await page
+    .getByRole("listbox")
+    .getByRole("option", { name: "管理员", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "没有符合条件的账号" }),
   ).toBeVisible();
+  expect(state.writes).toHaveLength(0);
+});
+
+test("管理员下拉可用键盘关闭并重新选择全部，筛选值不泄漏内部标识", async ({
+  page,
+}) => {
+  const state = await adminUsers(page);
+  await page.goto("/admin/users");
+  const role = page.getByRole("combobox", { name: "角色", exact: true });
+  await role.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(role).toBeFocused();
+  await role.click();
+  await page
+    .getByRole("listbox")
+    .getByRole("option", { name: "管理员", exact: true })
+    .click();
+  await expect(role).toContainText("管理员");
+  await role.click();
+  await page
+    .getByRole("listbox")
+    .getByRole("option", { name: "全部角色", exact: true })
+    .click();
+  await expect(role).toContainText("全部角色");
+  await expect(page.getByText("共42个账号", { exact: true })).toBeVisible();
+  // 返回“全部”可以复用缓存，但任何请求都不能携带下拉内部标识。
+  expect(
+    state.reads.every(
+      (request) => request.searchParams.get("role") !== "__all__",
+    ),
+  ).toBe(true);
   expect(state.writes).toHaveLength(0);
 });
 
@@ -101,12 +142,10 @@ test.describe("用户列表布局", () => {
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
-      await page
-        .getByRole("main")
-        .screenshot({
-          path: testInfo.outputPath(`users-${width}-2x.png`),
-          animations: "disabled",
-        });
+      await page.getByRole("main").screenshot({
+        path: testInfo.outputPath(`users-${width}-2x.png`),
+        animations: "disabled",
+      });
     });
   }
 });

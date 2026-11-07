@@ -1,4 +1,8 @@
 "use client";
+
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { replaceSession } from "./identity/session";
 import { authHref, returnPath } from "./identity/return-path";
@@ -79,7 +83,10 @@ export function AuthPage({ mode }: { mode: string }) {
     setSuccess("");
     try {
       if (mode === "login") {
-        await api("/auth/login", "POST", { email: values.email, password: values.password });
+        await api("/auth/login", "POST", {
+          email: values.email,
+          password: values.password,
+        });
         await replaceSession(client, true);
         console.debug("[账号] 登录成功，返回原站内页面");
         router.replace(destination);
@@ -129,65 +136,100 @@ export function AuthPage({ mode }: { mode: string }) {
           eyebrow="YOUR ACCOUNT / 你的账号"
           title={labels[mode] ?? "账号"}
         >
-          {confirmation ? "确认邮箱后，即可上传与分享作品。" : descriptions[mode]}
+          {confirmation
+            ? "确认邮箱后，即可上传与分享作品。"
+            : descriptions[mode]}
         </Heading>
-        <div className={`panel ${styles.card}`}>
+        <Card className={`panel gap-0 ${styles.card}`}>
           {config.isPending && <Notice>正在加载账号配置…</Notice>}
           {config.error && <Notice error={config.error} />}
-          {!complete && (confirmation ? (
-            <Button className={styles.submit} disabled={verifying} onClick={confirm}>
-              {verifying ? "正在验证…" : "确认验证邮箱"}
-            </Button>
-          ) : (
-            <form onSubmit={handleSubmit(submit)} noValidate>
-              {mode !== "reset-password" && (
-                <Field label="邮箱">
-                  <input
-                    type="email"
-                    id="auth-email"
-                    placeholder="请输入邮箱地址"
-                    autoComplete={mode === "login" ? "username" : "email"}
-                    aria-invalid={!!errors.email}
-                    aria-describedby={errors.email ? "auth-email-error" : undefined}
-                    {...register("email")}
+          {!complete &&
+            (confirmation ? (
+              <Button
+                className={styles.submit}
+                disabled={verifying}
+                onClick={confirm}
+              >
+                {verifying ? "正在验证…" : "确认验证邮箱"}
+              </Button>
+            ) : (
+              <form onSubmit={handleSubmit(submit)} noValidate>
+                {mode !== "reset-password" && (
+                  <Field label="邮箱">
+                    <Input
+                      type="email"
+                      id="auth-email"
+                      placeholder="请输入邮箱地址"
+                      autoComplete={mode === "login" ? "username" : "email"}
+                      aria-invalid={!!errors.email}
+                      aria-describedby={
+                        errors.email ? "auth-email-error" : undefined
+                      }
+                      {...register("email")}
+                    />
+                    {errors.email && (
+                      <small
+                        id="auth-email-error"
+                        className="form-error"
+                        role="alert"
+                      >
+                        {errors.email.message}
+                      </small>
+                    )}
+                  </Field>
+                )}
+                {["login", "reset-password"].includes(mode) && (
+                  <PasswordField
+                    registration={register("password")}
+                    autoComplete={
+                      mode === "login" ? "current-password" : "new-password"
+                    }
+                    recoveryHref={
+                      mode === "login"
+                        ? authHref("/forgot-password", destination)
+                        : undefined
+                    }
+                    error={errors.password?.message}
+                    hint={
+                      mode === "login"
+                        ? undefined
+                        : config.data && passwordHint(config.data.password)
+                    }
                   />
-                  {errors.email && (
-                    <small id="auth-email-error" className="form-error" role="alert">{errors.email.message}</small>
-                  )}
-                </Field>
-              )}
-              {["login", "reset-password"].includes(mode) && (
-                <PasswordField
-                  registration={register("password")}
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  recoveryHref={mode === "login" ? authHref("/forgot-password", destination) : undefined}
-                  error={errors.password?.message}
-                  hint={
-                    mode === "login"
-                      ? undefined
-                      : config.data && passwordHint(config.data.password)
-                  }
-                />
-              )}
-              {error !== undefined && <Notice error={error} />}
-              <Button className={styles.submit} disabled={isSubmitting || !config.data} type="submit">
-                {isSubmitting
-                  ? "正在处理…"
-                  : mode === "login"
-                    ? "登录"
+                )}
+                {error !== undefined && <Notice error={error} />}
+                <Button
+                  className={styles.submit}
+                  disabled={isSubmitting || !config.data}
+                  type="submit"
+                >
+                  {isSubmitting
+                    ? "正在处理…"
+                    : mode === "login"
+                      ? "登录"
                       : mode === "reset-password"
                         ? "更新密码"
                         : "发送邮件"}
-              </Button>
-            </form>
-          ))}
+                </Button>
+              </form>
+            ))}
           {confirmation && error !== undefined && <Notice error={error} />}
           {success && <Notice>{success}</Notice>}
-          {(mode === "verify-email" || (!!success && mode === "forgot-password")) &&
-            <LocalMailbox config={config.data} />}
-          <AuthLinks mode={mode} destination={destination} complete={complete} />
-        </div>
-        <p className={styles.backHome}><Link href="/" className="quiet-link">返回首页</Link></p>
+          {(mode === "verify-email" ||
+            (!!success && mode === "forgot-password")) && (
+            <LocalMailbox config={config.data} />
+          )}
+          <AuthLinks
+            mode={mode}
+            destination={destination}
+            complete={complete}
+          />
+        </Card>
+        <p className={styles.backHome}>
+          <Link href="/" className="quiet-link">
+            返回首页
+          </Link>
+        </p>
         <p className={styles.legal}>
           继续即表示你已阅读{" "}
           <Link href="/terms" className="quiet-link">

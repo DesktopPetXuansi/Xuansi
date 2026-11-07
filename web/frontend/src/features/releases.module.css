@@ -57,12 +57,25 @@
   padding-top: 16px;
   font-size: 14px;
 }
-.details summary {
+.detailsTrigger {
   cursor: pointer;
   color: var(--green);
   padding: 10px 0;
   min-height: 44px;
   font-weight: 600;
+  width: 100%;
+  height: auto;
+  justify-content: space-between;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.75;
+}
+.detailsTrigger svg {
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+.detailsTrigger[data-state="open"] svg {
+  transform: rotate(180deg);
 }
 .details p {
   margin-top: 12px;

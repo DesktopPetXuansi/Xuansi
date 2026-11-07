@@ -58,6 +58,7 @@ export function ResourceRow({
     <Link
       href={`${personal ? "/dashboard" : ""}/resources/${resource.id}`}
       className={personal ? "resource-link" : styles.card}
+      data-assembly="panel"
       aria-label={
         personal
           ? `管理资源：${resource.name}`

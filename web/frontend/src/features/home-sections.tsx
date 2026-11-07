@@ -1,7 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { ArrowUpRight, Images, Layers3, Moon, Monitor } from "lucide-react";
 import Link from "next/link";
 import { AiModes } from "@/features/ai-modes";
-
+import { clientRelease } from "@/lib/client-release";
 const moments = [
   {
     icon: Monitor,
@@ -18,12 +19,10 @@ const moments = [
       "随时让桌宠休眠，再按需要唤醒。朗读、连续对话与看屏幕分别设置，按自己的节奏使用。",
   },
 ];
-
 const resourceKinds = [
   { icon: Images, title: "图片和动图", description: "用喜欢的画面陪伴你" },
   { icon: Layers3, title: "Live2D 形象", description: "会动的角色" },
 ];
-
 const firstSteps = [
   {
     title: "安装客户端",
@@ -45,7 +44,6 @@ const firstSteps = [
     link: "查看开始步骤",
   },
 ];
-
 // 说明区保持服务端渲染，与导航交互分离，避免增加首页客户端脚本。
 export function HomeSections() {
   return (
@@ -54,9 +52,15 @@ export function HomeSections() {
         <header className="section-top">
           <h2 id="everyday-title">想聊就聊，想安静也可以。</h2>
           <p className="muted">从一句闲聊开始，按你的节奏慢慢熟悉。</p>
-          <Link className="quiet-link" href="/features">
-            查看全部功能 <ArrowUpRight size={16} aria-hidden />
-          </Link>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto justify-start px-0 py-0 whitespace-normal"
+          >
+            <Link className="quiet-link" href="/features">
+              查看全部功能 <ArrowUpRight size={16} aria-hidden />
+            </Link>
+          </Button>
         </header>
         <div className="feature-list">
           {moments.map(({ icon: Icon, label, title, description }) => (
@@ -72,9 +76,26 @@ export function HomeSections() {
             </article>
           ))}
         </div>
+        <p className="legal-note">
+          本地开发进展：更贴合话题的回应、轻微回复表情和可选主动问候，尚未公开提供，也未打包进{" "}
+          {clientRelease.version} 安装包。
+          <Button
+            asChild
+            variant="link"
+            className="h-auto justify-start px-0 py-0 whitespace-normal"
+          >
+            <Link className="quiet-link" href="/docs/companion">
+              了解开发进展 →
+            </Link>
+          </Button>
+        </p>
       </section>
       <AiModes />
-      <section className="library-promo" aria-labelledby="library-title">
+      <section
+        className="library-promo"
+        aria-labelledby="library-title"
+        data-assembly="panel"
+      >
         <div>
           <h2 id="library-title">
             今天，想和谁一起？
@@ -84,9 +105,11 @@ export function HomeSections() {
           <p className="library-description">
             安装后可以直接使用玄司。想换个样子，就去挑选形象，或把自己的图片、动图导入客户端的“更换形象”。
           </p>
-          <Link className="button-link secondary" href="/resources">
-            挑选形象 <ArrowUpRight size={16} aria-hidden />
-          </Link>
+          <Button asChild variant="outline">
+            <Link className="button-link" href="/resources">
+              挑选形象 <ArrowUpRight size={16} aria-hidden />
+            </Link>
+          </Button>
         </div>
         <div className="library-types">
           {resourceKinds.map(({ icon: Icon, title, description }) => (
@@ -98,9 +121,15 @@ export function HomeSections() {
           ))}
           <p className="legal-note">
             网页负责挑选，实际更换在客户端完成。
-            <Link className="quiet-link" href="/docs/appearance">
-              查看换形象步骤 →
-            </Link>
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
+            >
+              <Link className="quiet-link" href="/docs/appearance">
+                查看换形象步骤 →
+              </Link>
+            </Button>
           </p>
         </div>
       </section>
@@ -118,17 +147,29 @@ export function HomeSections() {
               </span>
               <h3>{step.title}</h3>
               <p>{step.description}</p>
-              <Link className="quiet-link" href={step.href}>
-                {step.link} <ArrowUpRight size={16} aria-hidden />
-              </Link>
+              <Button
+                asChild
+                variant="link"
+                className="h-auto justify-start px-0 py-0 whitespace-normal"
+              >
+                <Link className="quiet-link" href={step.href}>
+                  {step.link} <ArrowUpRight size={16} aria-hidden />
+                </Link>
+              </Button>
             </li>
           ))}
         </ol>
         <p className="start-help">
           卡在哪一步了？
-          <Link className="quiet-link" href="/docs">
-            到使用帮助找答案 →
-          </Link>
+          <Button
+            asChild
+            variant="link"
+            className="h-auto justify-start px-0 py-0 whitespace-normal"
+          >
+            <Link className="quiet-link" href="/docs">
+              到使用帮助找答案 →
+            </Link>
+          </Button>
         </p>
       </section>
     </div>

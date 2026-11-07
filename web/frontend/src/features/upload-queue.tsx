@@ -48,7 +48,7 @@ export function UploadQueue() {
             </p>
           </div>
           {["CREATED", "UPLOADED"].includes(item.status) && (
-            <Button className="secondary" onClick={() => cancel(item.id)}>
+            <Button variant="outline" onClick={() => cancel(item.id)}>
               取消上传
             </Button>
           )}

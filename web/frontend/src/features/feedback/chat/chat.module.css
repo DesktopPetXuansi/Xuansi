@@ -3,10 +3,12 @@
   display: grid;
   grid-template-columns: minmax(230px, 0.78fr) minmax(0, 1.5fr);
   min-height: 660px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
   overflow: hidden;
-  background: var(--white);
+  background: var(--glass-strong);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .pageLinks {
   display: flex;
@@ -65,6 +67,8 @@
 }
 .threadButton {
   display: block;
+  height: auto;
+  white-space: normal;
   width: 100%;
   min-width: 0;
   padding: 14px 12px;
@@ -277,14 +281,18 @@
   margin: 10px 0;
 }
 .textButton {
+  height: auto;
+  min-height: 36px;
   border: 0;
   padding: 4px;
   background: transparent;
   color: var(--green);
   font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-weight: 600;
   cursor: pointer;
+}
+.textButton:hover {
+  color: var(--green-hover);
 }
 .back {
   display: none;

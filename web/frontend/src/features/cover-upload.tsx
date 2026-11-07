@@ -1,4 +1,7 @@
 "use client";
+
+import { Input } from "@/components/ui/input";
+
 import { Button, Field, Notice } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Upload } from "@/lib/types";
@@ -62,14 +65,14 @@ export function CoverUpload({ id }: { id: string }) {
     <form className="panel" onSubmit={upload} style={{ marginTop: 24 }}>
       <h3>资源封面</h3>
       <Field label="封面图片" hint="仅用于展示，请上传有权使用的图片。">
-        <input
+        <Input
           type="file"
           name="cover"
           accept="image/png,image/jpeg,image/webp"
           required
         />
       </Field>
-      <Button disabled={busy} className="secondary">
+      <Button disabled={busy} variant="outline">
         {busy ? "正在上传…" : "上传封面"}
       </Button>
       {error !== undefined && <Notice error={error} />}{" "}
@@ -89,7 +92,7 @@ export function CoverUpload({ id }: { id: string }) {
           封面校验完成。
           <Button
             type="button"
-            className="secondary"
+            variant="outline"
             onClick={() =>
               cache.invalidateQueries({ queryKey: ["resource", id] })
             }

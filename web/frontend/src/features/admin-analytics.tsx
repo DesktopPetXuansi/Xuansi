@@ -63,7 +63,7 @@ export function AdminAnalytics() {
             {analyticsRanges.map((option) => (
               <Button
                 key={option.value}
-                className="secondary"
+                variant="outline"
                 aria-pressed={range === option.value}
                 onClick={() => {
                   setRange(option.value);
@@ -76,7 +76,7 @@ export function AdminAnalytics() {
           </div>
         </fieldset>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={query.isFetching}
           onClick={refresh}
         >
@@ -91,7 +91,7 @@ export function AdminAnalytics() {
       ) : query.error ? (
         <>
           <Notice error={query.error} />
-          <Button className="secondary" onClick={refresh}>
+          <Button variant="outline" onClick={refresh}>
             重试读取统计
           </Button>
         </>

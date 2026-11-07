@@ -9,11 +9,15 @@ const routes = [
   "/resources",
   "/changelog",
   "/docs/chat",
+  "/docs/companion",
+  "/features",
+  "/faq",
   "/privacy",
   "/terms",
 ];
 const screenshotDirectory = resolve(
-  "../.runtime/screenshots/site-audit-2026-10-22/final",
+  process.env.SITE_AUDIT_SCREENSHOT_DIR ??
+    "../.runtime/screenshots/site-audit-2026-10-22/final",
 );
 
 test.beforeAll(async () => {

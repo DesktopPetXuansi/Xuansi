@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Heading, Notice } from "@/components/ui";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { apiPage } from "@/lib/api";
 import type { Resource } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -28,9 +29,9 @@ export function ResourceList({ personal = false }: { personal?: boolean }) {
       </Heading>
       {personal ? (
         <div className="actions resource-create">
-          <Link href="/dashboard/resources/new" className="button-link">
-            新建资源 +
-          </Link>
+          <ShadcnButton asChild>
+            <Link href="/dashboard/resources/new">新建资源 +</Link>
+          </ShadcnButton>
         </div>
       ) : (
         <BuiltinAppearance />
@@ -65,7 +66,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
       aria-labelledby="resource-catalog-title"
       aria-busy={query.isFetching}
     >
-      <div className={styles.browseHeading}>
+      <div className={styles.browseHeading} data-assembly="panel">
         <div>
           <h2 id="resource-catalog-title">
             {personal ? "管理已上传资源" : addon ? "动作与表情" : "社区形象"}
@@ -85,9 +86,14 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
         )}
       </div>
       {!personal && (
-        <div className={styles.groups} role="group" aria-label="资源用途">
+        <div
+          className={styles.groups}
+          role="group"
+          aria-label="资源用途"
+          data-assembly="panel"
+        >
           <Button
-            className="secondary"
+            variant="outline"
             aria-pressed={!addon}
             onClick={() =>
               apply({ group: "APPEARANCE", kind: "", search: "", tag: "" })
@@ -96,7 +102,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
             桌宠形象
           </Button>
           <Button
-            className="secondary"
+            variant="outline"
             aria-pressed={addon}
             onClick={() =>
               apply({ group: "ADDON", kind: "", search: "", tag: "" })
@@ -124,7 +130,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
             </Link>
             。
           </p>
-          <Button className="secondary" onClick={() => void query.refetch()}>
+          <Button variant="outline" onClick={() => void query.refetch()}>
             重新加载
           </Button>
         </>
@@ -140,7 +146,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
           ))}
         </div>
       ) : (
-        <section className={styles.empty} role="status">
+        <section className={styles.empty} role="status" data-assembly="panel">
           <span className={styles.emptyLabel}>
             {filtered
               ? "换个条件再找找"
@@ -175,7 +181,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
         <nav className={styles.pagination} aria-label="资源分页">
           {filter.cursor && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={query.isFetching}
               onClick={() => apply({ cursor: "" }, true)}
             >
@@ -184,7 +190,7 @@ function ResourceCatalog({ personal }: { personal: boolean }) {
           )}
           {query.data?.meta?.nextCursor && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={query.isFetching}
               onClick={() =>
                 apply({ cursor: query.data?.meta?.nextCursor ?? "" }, true)

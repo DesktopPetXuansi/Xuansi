@@ -97,7 +97,9 @@ test("匿名反馈只需填写正文，成功后显示简洁回执并可开始�
   });
   await page.goto("/#feedback");
   const section = page.locator("#feedback");
-  await expect(section.getByLabel(/^联系方式（选填）/)).not.toBeVisible();
+  await expect(
+    section.getByRole("textbox", { name: /^联系方式（选填）/ }),
+  ).not.toBeVisible();
   await expect(section.getByRole("checkbox")).not.toBeVisible();
   const text = section.getByRole("textbox", {
     name: "问题或建议",
@@ -156,11 +158,10 @@ test("访客反馈保持私有，不提供公开授权或管理凭据", async ({
   const section = page.locator("#feedback");
   await expect(section.getByRole("checkbox")).toHaveCount(0);
   await section
-    .locator("summary")
-    .filter({ hasText: /^联系方式（选填）$/ })
+    .getByRole("button", { name: "联系方式（选填）", exact: true })
     .click();
   await section
-    .getByLabel(/^联系方式（选填）/)
+    .getByRole("textbox", { name: /^联系方式（选填）/ })
     .fill("test-contact@example.invalid");
   await section
     .getByRole("textbox", { name: "问题或建议", exact: true })

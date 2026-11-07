@@ -1,6 +1,7 @@
 "use client";
 import { useMe } from "@/components/navigation";
 import { Button, Heading, Notice } from "@/components/ui";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { api, safeUrl } from "@/lib/api";
 import { type Resource, kinds } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,7 +28,7 @@ export function ResourceDetail({ id }: { id: string }) {
       <>
         <Notice error={resource.error} />
         <div className="actions">
-          <Button className="secondary" onClick={() => void resource.refetch()}>
+          <Button variant="outline" onClick={() => void resource.refetch()}>
             重新加载
           </Button>
           <Link className="quiet-link" href="/resources">
@@ -130,7 +131,7 @@ export function ResourceDetail({ id }: { id: string }) {
           ) : me.error ? (
             <>
               <Notice error={me.error} />
-              <Button className="secondary" onClick={() => void me.refetch()}>
+              <Button variant="outline" onClick={() => void me.refetch()}>
                 重试登录状态
               </Button>
             </>
@@ -142,12 +143,11 @@ export function ResourceDetail({ id }: { id: string }) {
               {add.isSuccess ? "已收藏" : "收藏这个资源"}
             </Button>
           ) : (
-            <Link
-              className="button-link"
-              href={authHref("/login", `/resources/${id}`)}
-            >
-              登录后收藏
-            </Link>
+            <ShadcnButton asChild>
+              <Link href={authHref("/login", `/resources/${id}`)}>
+                登录后收藏
+              </Link>
+            </ShadcnButton>
           )}
           {add.error && <Notice error={add.error} />}
         </aside>

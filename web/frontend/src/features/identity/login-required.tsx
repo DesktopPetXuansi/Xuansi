@@ -1,6 +1,7 @@
 "use client";
 
 import { Heading } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { authHref } from "./return-path";
@@ -17,12 +18,12 @@ export function LoginRequired() {
           收藏、使用历史与作品管理需要登录。你也可以先回到首页，认识玄司、浏览资源或下载客户端。
         </Heading>
         <div className="actions">
-          <Link className="button-link" href={authHref("/login", destination)}>
+          <Button asChild><Link href={authHref("/login", destination)}>
             登录后继续
-          </Link>
-          <Link className="button-link secondary" href={authHref("/register", destination)}>
+          </Link></Button>
+          <Button asChild variant="outline"><Link href={authHref("/register", destination)}>
             创建账号
-          </Link>
+          </Link></Button>
           <Link className="quiet-link" href="/">返回首页</Link>
         </div>
       </div>
