@@ -1,6 +1,13 @@
 "use client";
 
 import { Button, Heading, Notice } from "@/components/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { api, apiPage, ApiError } from "@/lib/api";
 import type { Feedback, FeedbackSpamClearReceipt } from "@/lib/types";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +22,8 @@ export function FeedbackSpam() {
   const [clearError, setClearError] = useState<unknown>();
   const [accessError, setAccessError] = useState<ApiError>();
   const [saved, setSaved] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [confirming, setConfirming] = useState(false);
+  const focusListAfterClose = useRef(false);
   const listHeading = useRef<HTMLHeadingElement>(null);
   const lock = useRef(false);
   const successfulReads = useRef(0);
@@ -76,7 +84,8 @@ export function FeedbackSpam() {
     if (busy || accessDenied || !items.length) return;
     setClearError(undefined);
     setSaved("");
-    dialog.current?.showModal();
+    setConfirming(true);
+    console.debug("[垃圾邮件] 打开清空确认");
   }
 
   async function clear() {
@@ -95,14 +104,15 @@ export function FeedbackSpam() {
         queryKey: ["feedback-chat"],
         predicate: (entry) => entry.queryKey[2] === true,
       });
-      dialog.current?.close();
+      focusListAfterClose.current = true;
+      setConfirming(false);
       setSaved(`已清空 ${receipt.clearedCount} 条垃圾邮件。`);
-      listHeading.current?.focus();
       console.debug("[垃圾邮件] 清空成功", { count: receipt.clearedCount });
     } catch (error) {
       if (error instanceof ApiError && [401, 403].includes(error.status)) {
         setAccessError(error);
-        dialog.current?.close();
+        focusListAfterClose.current = true;
+        setConfirming(false);
         await clearFeedbackCaches(cache);
       } else {
         setClearError(error);
@@ -115,7 +125,13 @@ export function FeedbackSpam() {
   }
 
   return (
-    <>
+    <Dialog
+      open={confirming}
+      onOpenChange={(open) => {
+        // 进行中的清空请求只由结果收束，阻止 Escape 或外部点击误关闭。
+        if (!lock.current) setConfirming(open);
+      }}
+    >
       <Heading title="垃圾邮件">
         已标记为垃圾的反馈集中放在这里，不会出现在待处理列表中。
       </Heading>
@@ -126,19 +142,21 @@ export function FeedbackSpam() {
           </h2>
           <div className={styles.listActions}>
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => void reload()}
             >
               {query.isFetching && !query.isPending ? "刷新中…" : "刷新列表"}
             </Button>
-            <Button
-              className="danger"
-              disabled={busy || accessDenied || !items.length}
-              onClick={confirmClear}
-            >
-              清空垃圾邮件
-            </Button>
+            <DialogTrigger asChild>
+              <Button
+                variant="destructive"
+                disabled={busy || accessDenied || !items.length}
+                onClick={confirmClear}
+              >
+                清空垃圾邮件
+              </Button>
+            </DialogTrigger>
           </div>
         </div>
         {saved && <Notice>{saved}</Notice>}
@@ -147,7 +165,7 @@ export function FeedbackSpam() {
           <div className={styles.failure}>
             <Notice error={listError} />
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() =>
                 void reload(!accessDenied && query.isFetchNextPageError)
@@ -167,7 +185,7 @@ export function FeedbackSpam() {
         </div>
         {!accessDenied && query.hasNextPage && (
           <Button
-            className="secondary"
+            variant="outline"
             disabled={busy}
             onClick={() => void reload(true)}
           >
@@ -175,37 +193,42 @@ export function FeedbackSpam() {
           </Button>
         )}
       </section>
-      <dialog
-        ref={dialog}
+      <DialogContent
         className={styles.clearDialog}
-        aria-labelledby="spam-clear-title"
-        aria-describedby="spam-clear-description"
-        onCancel={(event) => {
+        showCloseButton={false}
+        onEscapeKeyDown={(event) => {
           if (lock.current) event.preventDefault();
         }}
+        onInteractOutside={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => {
+          if (!focusListAfterClose.current) return;
+          event.preventDefault();
+          focusListAfterClose.current = false;
+          listHeading.current?.focus();
+        }}
       >
-        <h2 id="spam-clear-title">清空垃圾邮件？</h2>
-        <p id="spam-clear-description">
+        <DialogTitle>清空垃圾邮件？</DialogTitle>
+        <DialogDescription>
           将清空所有垃圾反馈的正文、联系方式和私有对话，包含尚未加载的页面。此操作无法恢复，正常反馈不会被清空。
-        </p>
+        </DialogDescription>
         {clearError !== undefined && <Notice error={clearError} />}
         <div className={styles.actions}>
           <Button
-            className="secondary"
+            variant="outline"
             disabled={clearing}
-            onClick={() => dialog.current?.close()}
+            onClick={() => setConfirming(false)}
           >
             取消
           </Button>
           <Button
-            className="danger"
+            variant="destructive"
             disabled={clearing}
             onClick={() => void clear()}
           >
             {clearing ? "正在清空…" : "确认清空"}
           </Button>
         </div>
-      </dialog>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

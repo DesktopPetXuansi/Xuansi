@@ -58,7 +58,7 @@ function SessionList({
             </h3>
             <p>创建于 {new Date(item.createdAt).toLocaleString("zh-CN")}</p>
           </div>
-          <Button className="secondary" onClick={() => revoke(item.id)}>
+          <Button variant="outline" onClick={() => revoke(item.id)}>
             撤销
           </Button>
         </article>

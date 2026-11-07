@@ -9,9 +9,11 @@
 .toolbar {
   margin-bottom: 24px;
   padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .meta,
 .label {
@@ -35,17 +37,14 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-/* 原生对话框保留焦点约束与 Escape，清空操作在同一处确认。 */
+/* shadcn 对话框负责焦点约束；清空动作仍由同一确认入口发起。 */
 .clearDialog {
   max-width: min(520px, calc(100vw - 40px));
   padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-strong);
   color: var(--ink);
-}
-.clearDialog::backdrop {
-  background: rgb(25 40 28 / 28%);
 }
 .clearDialog h2 {
   margin-top: 0;
@@ -66,9 +65,11 @@
 .item {
   min-width: 0;
   padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
   overflow-wrap: anywhere;
 }
 .item h3 {
@@ -87,7 +88,14 @@
   background: var(--green-soft);
   border-radius: 6px;
 }
-.item summary {
+.extraTrigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
   color: var(--green);
   min-height: 44px;
@@ -131,9 +139,19 @@
 .extra {
   border-top: 1px solid var(--line);
 }
-.extra > summary {
+.extraTrigger::after {
+  content: "+";
+  color: var(--green);
+}
+.extraTrigger[data-state="open"]::after {
+  content: "−";
+}
+.extra > .extraTrigger {
   color: var(--muted);
   font-size: 14px;
+}
+.extraContent[data-state="closed"] {
+  display: none;
 }
 .technical {
   border-top: 1px solid var(--line);
@@ -151,7 +169,7 @@
   align-items: flex-start;
   margin-bottom: 16px;
 }
-.confirmation input {
+.confirmation :global([data-slot="checkbox"]) {
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
@@ -165,7 +183,7 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
   }
-  .filters :global(.button) {
+  .filters :global([data-slot="button"]) {
     padding-inline: 6px;
     min-width: 0;
   }

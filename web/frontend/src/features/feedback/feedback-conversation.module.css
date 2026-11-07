@@ -54,11 +54,25 @@
 .actions {
   margin: 12px 0;
 }
-.conversation summary {
+.originalTrigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
   min-height: 44px;
   padding-block: 8px;
   color: var(--muted);
+}
+.originalTrigger::after {
+  content: "+";
+  color: var(--green);
+}
+.originalTrigger[data-state="open"]::after {
+  content: "−";
 }
 @media (max-width: 540px) {
   .messages li {

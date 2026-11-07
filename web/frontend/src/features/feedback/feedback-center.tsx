@@ -18,12 +18,12 @@ export function FeedbackCenter() {
       <Heading title="反馈中心">
         直接查看并回复反馈。私有对话不会公开到 GitHub；只标记状态不会发送回复。
       </Heading>
-      <div className={styles.toolbar}>
+      <div className={styles.toolbar} data-assembly="panel">
         <div className={styles.filters} role="group" aria-label="处理状态">
           {filters.map((value) => (
             <Button
               key={value}
-              className={filter === value ? "" : "secondary"}
+              variant={filter === value ? "default" : "outline"}
               aria-pressed={filter === value}
               disabled={working}
               onClick={() => {

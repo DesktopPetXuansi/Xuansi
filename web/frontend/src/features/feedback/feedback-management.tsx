@@ -1,6 +1,15 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-import { Button, Notice } from "@/components/ui";
+import { Notice } from "@/components/ui";
 import { api, ApiError, safeUrl } from "@/lib/api";
 import type { FeedbackManagement } from "@/lib/types";
 import { useRef, useState, useSyncExternalStore } from "react";
@@ -135,12 +144,12 @@ function BrowserManagementPanel({
       {!provided && saved.length > 1 && (
         <label className="field">
           <span>本浏览器保存的反馈</span>
-          <select
+          <Select
             disabled={busy}
             value={credentials.idempotencyKey}
-            onChange={(event) => {
+            onValueChange={(value) => {
               const selected = saved.find(
-                (item) => item.idempotencyKey === event.target.value,
+                (item) => item.idempotencyKey === value,
               );
               if (selected) {
                 setCredentials(selected);
@@ -152,13 +161,21 @@ function BrowserManagementPanel({
               }
             }}
           >
-            {saved.map((item, index) => (
-              <option key={item.idempotencyKey} value={item.idempotencyKey}>
-                反馈 {index + 1}
-                {item.id ? ` · ${item.id.slice(0, 8)}` : " · 提交未确认"}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full" aria-label="本浏览器保存的反馈">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {saved.map((item, index) => (
+                <SelectItem
+                  key={item.idempotencyKey}
+                  value={item.idempotencyKey}
+                >
+                  反馈 {index + 1}
+                  {item.id ? ` · ${item.id.slice(0, 8)}` : " · 提交未确认"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       )}
       {credentials.id ? (
@@ -168,14 +185,14 @@ function BrowserManagementPanel({
           </p>
           <div className="actions">
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => void perform()}
             >
               查看最新状态
             </Button>
             <Button
-              className="secondary"
+              variant="outline"
               disabled={
                 busy ||
                 view?.moderationStatus === "WITHDRAWN" ||
@@ -229,9 +246,19 @@ function BrowserManagementPanel({
           />
         )}
       {view?.githubIssueUrl && (
-        <a href={safeUrl(view.githubIssueUrl)} target="_blank" rel="noreferrer">
-          查看公开问题 ↗
-        </a>
+        <Button
+          asChild
+          variant="link"
+          className="h-auto whitespace-normal p-0 text-left"
+        >
+          <a
+            href={safeUrl(view.githubIssueUrl)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            查看公开问题 ↗
+          </a>
+        </Button>
       )}
       {error !== undefined && <Notice error={error} />}
       {storageWarning && (
@@ -245,14 +272,14 @@ function BrowserManagementPanel({
             <span>
               专属管理链接（请勿分享，持有者可查看对话、补充及撤回反馈）
             </span>
-            <input
+            <Input
               readOnly
               value={link}
               onFocus={(event) => event.target.select()}
             />
           </label>
           <Button
-            className="secondary"
+            variant="outline"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(link);

@@ -265,7 +265,7 @@ export function FeedbackList({
           反馈收件箱
         </h2>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={query.isFetching || pendingId !== undefined}
           onClick={() => void reload()}
         >
@@ -278,7 +278,7 @@ export function FeedbackList({
         <div className={styles.failure}>
           <Notice error={listError} />
           <Button
-            className="secondary"
+            variant="outline"
             disabled={query.isFetching || pendingId !== undefined}
             onClick={() =>
               void reload(!accessDenied && query.isFetchNextPageError)
@@ -328,7 +328,7 @@ export function FeedbackList({
       </div>
       {!accessDenied && query.hasNextPage && (
         <Button
-          className="secondary"
+          variant="outline"
           disabled={query.isFetching || pendingId !== undefined}
           onClick={() => void reload(true)}
         >

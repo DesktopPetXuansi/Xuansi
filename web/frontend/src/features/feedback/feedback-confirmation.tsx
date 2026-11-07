@@ -1,3 +1,4 @@
+import { Button as ShadcnButton } from "@/components/ui/button";
 import Link from "next/link";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui";
@@ -35,16 +36,22 @@ export function FeedbackConfirmation({
         </div>
       </div>
       <div className="actions">
-        <Button type="button" className="secondary" onClick={onStartAgain}>
+        <Button type="button" variant="outline" onClick={onStartAgain}>
           再写一条
         </Button>
         {account && (
-          <Link
-            className="quiet-link"
-            href={`/dashboard/feedback?id=${receipt.id}`}
+          <ShadcnButton
+            asChild
+            variant="link"
+            className="h-auto whitespace-normal p-0 text-left"
           >
-            打开反馈会话 →
-          </Link>
+            <Link
+              className="quiet-link"
+              href={`/dashboard/feedback?id=${receipt.id}`}
+            >
+              打开反馈会话 →
+            </Link>
+          </ShadcnButton>
         )}
       </div>
     </>

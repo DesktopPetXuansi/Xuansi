@@ -1,7 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { clientRelease } from "@/lib/client-release";
 import Link from "next/link";
 import styles from "./home-closing.module.css";
-
 // 正式版摘要和第二处下载入口均为静态内容，不增加首页数据请求。
 export function HomeClosing() {
   return (
@@ -19,9 +19,15 @@ export function HomeClosing() {
             先收到文字回复，再按需要设置语音和形象；遇到问题有对应的处理入口。
           </p>
         </div>
-        <Link className="quiet-link" href="/changelog">
-          查看完整更新记录 →
-        </Link>
+        <Button
+          asChild
+          variant="link"
+          className="h-auto justify-start px-0 py-0 whitespace-normal"
+        >
+          <Link className="quiet-link" href="/changelog">
+            查看完整更新记录 →
+          </Link>
+        </Button>
       </section>
       <section
         className={styles.download}
@@ -33,13 +39,21 @@ export function HomeClosing() {
           <p>Windows 10 1809 及以上 · 64 位 · 无需注册</p>
         </div>
         <div>
-          <Link className="button-link" href="/download">
-            下载玄司 v{clientRelease.version}
-          </Link>
+          <Button asChild variant="default">
+            <Link className="button-link" href="/download">
+              下载玄司 v{clientRelease.version}
+            </Link>
+          </Button>
           <p className={styles.note}>
             先选好 AI，再开始聊天。
             <br />
-            <Link href="/docs/getting-started">查看新手步骤 →</Link>
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
+            >
+              <Link href="/docs/getting-started">查看新手步骤 →</Link>
+            </Button>
           </p>
         </div>
       </section>

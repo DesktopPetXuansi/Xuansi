@@ -1,14 +1,48 @@
 "use client";
+
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 import { useMe } from "@/components/navigation";
 import { Button, Field, Heading, Notice } from "@/components/ui";
 import { api } from "@/lib/api";
-import { type Resource, kinds } from "@/lib/types";
+import { kinds, type Resource } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CoverUpload } from "./cover-upload";
+import { ResourceDetailsForm } from "./resource-details-form";
+import {
+  ResourceUploadGuide,
+  ResourceUploadSteps,
+} from "./resource-upload-guide";
+import styles from "./resource-upload.module.css";
 import { VersionList } from "./resources";
 import { UploadVersion } from "./upload-version";
+
 export function ResourceEditor({ id }: { id?: string }) {
   const me = useMe();
   const resource = useQuery({
@@ -18,167 +52,213 @@ export function ResourceEditor({ id }: { id?: string }) {
   });
   const router = useRouter();
   const cache = useQueryClient();
+  const [kind, setKind] = useState("MODEL");
   const [error, setError] = useState<unknown>();
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-    const values = new FormData(event.currentTarget);
-    const body = {
-      name: String(values.get("name")),
-      description: String(values.get("description")),
-      author: String(values.get("author")),
-      license: String(values.get("license")),
-      source: String(values.get("source")),
-      tags: String(values.get("tags"))
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    };
-    try {
-      const saved = await api<Resource>(
-        id ? `/resources/${id}` : "/resources",
-        id ? "PATCH" : "POST",
-        id ? body : { ...body, kind: String(values.get("kind")) },
-      );
-      await cache.invalidateQueries({ queryKey: ["resource", id] });
-      setSuccess("资源资料已保存。");
-      if (!id) router.push(`/dashboard/resources/${saved.id}`);
-    } catch (cause) {
-      setError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   async function change(body: unknown) {
     setError(undefined);
+    setSuccess("");
     try {
       await api(`/resources/${id}`, "PATCH", body);
       await cache.invalidateQueries({ queryKey: ["resource", id] });
-      setSuccess("资源已更新。");
+      setSuccess("作品已更新。");
+      console.debug("[作品上传] 作品状态已更新");
     } catch (cause) {
       setError(cause);
+      console.warn("[作品上传] 作品状态更新失败");
     }
   }
+
   async function remove() {
-    if (!window.confirm("删除这个资源？已被引用的资源不能删除。")) return;
+    if (busy) return;
     setBusy(true);
+    setError(undefined);
     try {
       await api(`/resources/${id}`, "DELETE");
+      setDeleteOpen(false);
       router.push("/dashboard/resources");
+      console.debug("[作品上传] 作品已删除");
     } catch (cause) {
       setError(cause);
+      console.warn("[作品上传] 删除作品失败");
     } finally {
       setBusy(false);
     }
   }
-  if (id && resource.isPending) return <Notice>正在读取资源…</Notice>;
+
+  if (id && resource.isPending) return <Notice>正在读取作品…</Notice>;
   if (resource.error) return <Notice error={resource.error} />;
   const item = resource.data;
+  const verified = !!me.data?.emailVerified;
   return (
     <>
-      <Heading
-        eyebrow="CREATOR / 资源管理"
-        title={id ? "编辑资源" : "创建你的第一个版本"}
-      >
-        先记录资源身份和许可，再上传文件。新资源默认私有。
+      <Heading eyebrow="创作者工作台" title={item ? item.name : "上传你的作品"}>
+        {item
+          ? item.visibility === "PRIVATE"
+            ? "上传后先检查校验结果，再选择当前版本。作品目前私有，公开需要管理员操作。"
+            : "上传后先检查校验结果，再选择当前版本。作品的公开状态由管理员管理。"
+          : "先填写资料，再选择文件上传。作品默认私有，公开需要管理员操作。"}
       </Heading>
-      <form onSubmit={save} className="panel" key={item?.id ?? "new"}>
-        <div className="grid-two">
-          <Field label="资源名称">
-            <input
-              name="name"
-              required
-              maxLength={120}
-              defaultValue={item?.name}
-            />
-          </Field>
-          <Field label="资源类型">
-            <select
-              name="kind"
-              defaultValue={item?.kind ?? "MODEL"}
-              disabled={!!id}
-            >
-              {Object.entries(kinds).map(([kind, label]) => (
-                <option value={kind} key={kind}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            {id && <input name="kind" type="hidden" value={item?.kind} />}
-          </Field>
-        </div>
-        <Field label="介绍">
-          <textarea name="description" defaultValue={item?.description} />
-        </Field>
-        <div className="grid-two">
-          <Field label="作者">
-            <input name="author" required defaultValue={item?.author} />
-          </Field>
-          <Field label="使用许可" hint="明确允许的用途和再分发条件。">
-            <input
-              name="license"
-              required
-              defaultValue={item?.license}
-              placeholder="例如：仅个人使用，禁止再分发"
-            />
-          </Field>
-        </div>
-        <Field label="来源链接">
-          <input type="url" name="source" defaultValue={item?.source} />
-        </Field>
-        <Field label="标签" hint="用英文逗号分隔。">
-          <input name="tags" defaultValue={item?.tags.join(", ")} />
-        </Field>
-        <Button disabled={busy}>{busy ? "正在保存…" : "保存资料"}</Button>
-      </form>
-      {error !== undefined && <Notice error={error} />}{" "}
-      {success && <Notice>{success}</Notice>}
-      {id && item && (
+      <ResourceUploadSteps current={item ? 2 : 1} />
+      {!verified && (
+        <Notice>
+          上传作品前请先验证邮箱。
+          <Link className="quiet-link" href="/verify-email">
+            前往验证邮箱
+          </Link>
+        </Notice>
+      )}
+      {!item ? (
+        <>
+          <div className={styles.typePicker}>
+            <Field label="你要上传什么？">
+              <Select value={kind} onValueChange={setKind}>
+                <SelectTrigger aria-label="你要上传什么？" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {Object.entries(kinds).map(([value, label]) => (
+                    <SelectItem value={value} key={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <ResourceUploadGuide kind={kind} />
+          <ResourceDetailsForm
+            verified={verified}
+            kind={kind}
+            onCreated={(saved) =>
+              router.push(`/dashboard/resources/${saved.id}#upload-version`)
+            }
+          />
+        </>
+      ) : (
         <>
           {item.status === "DISABLED" && (
-            <Notice>资源已被管理员停用，恢复后才能上传和使用。</Notice>
+            <Notice>作品已被管理员停用，恢复后才能上传和使用。</Notice>
           )}
-          {item.status !== "DISABLED" && <CoverUpload id={id} />}
-          <section style={{ marginTop: 40 }}>
-            <h2>上传新版本</h2>
+          <section
+            className={styles.section}
+            id="upload-version"
+            aria-labelledby="upload-version-title"
+          >
+            <h2 id="upload-version-title">
+              上传{item.kind === "MODEL" ? "模型" : "作品"}文件
+            </h2>
+            <p>
+              {item.kind === "MODEL"
+                ? "选择包含 Live2D 运行文件的 .zip 压缩包。"
+                : "选择要供下载和使用的文件。"}
+              封面可以稍后单独上传。
+            </p>
+            <ResourceUploadGuide kind={item.kind} compact />
             {item.status === "DISABLED" ? (
-              <Notice>请联系管理员处理资源停用状态。</Notice>
-            ) : me.data?.emailVerified ? (
+              <Notice>请联系管理员处理作品停用状态。</Notice>
+            ) : verified ? (
               <UploadVersion resource={item} />
-            ) : (
-              <Notice>
-                请先验证邮箱，再上传文件。
-                <a className="quiet-link" href="/verify-email">
-                  发送验证邮件
-                </a>
-              </Notice>
-            )}
+            ) : null}
           </section>
-          <section style={{ marginTop: 40 }}>
-            <h2>已有版本</h2>
+          <section className={styles.section} aria-labelledby="versions-title">
+            <h2 id="versions-title">已上传版本</h2>
+            <p>
+              校验完成后，选择“设为当前版本”。校验通过还需要在客户端试用确认效果。
+            </p>
             <VersionList
-              id={id}
-              onSelect={(versionId) => change({ currentVersionId: versionId })}
+              id={item.id}
+              currentVersionId={item.currentVersionId}
+              onSelect={(versionId) =>
+                void change({ currentVersionId: versionId })
+              }
             />
           </section>
-          <section className="actions" style={{ marginTop: 30 }}>
-            {item.status !== "DISABLED" && <Button
-              className="secondary"
-              onClick={() =>
-                change({
-                  status: item.status === "HIDDEN" ? "ACTIVE" : "HIDDEN",
-                })
-              }
+          {error !== undefined && <Notice error={error} />}
+          {success && <Notice>{success}</Notice>}
+          <Collapsible className={styles.settings}>
+            <CollapsibleTrigger>
+              修改作品资料、封面和管理作品
+            </CollapsibleTrigger>
+            <CollapsibleContent
+              forceMount
+              className="data-[state=closed]:hidden"
             >
-              {item.status === "HIDDEN" ? "恢复资源" : "隐藏资源"}
-            </Button>}
-            <Button className="danger" disabled={busy} onClick={remove}>
-              删除资源
-            </Button>
-          </section>
+              <ResourceDetailsForm
+                item={item}
+                verified={verified}
+                kind={item.kind}
+                onCreated={() => {}}
+              />
+              {item.status !== "DISABLED" && verified && (
+                <CoverUpload id={item.id} />
+              )}
+              <div className="actions">
+                {item.status !== "DISABLED" && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void change({
+                        status: item.status === "HIDDEN" ? "ACTIVE" : "HIDDEN",
+                      })
+                    }
+                  >
+                    {item.status === "HIDDEN" ? "恢复作品" : "隐藏作品"}
+                  </Button>
+                )}
+                <AlertDialog
+                  open={deleteOpen}
+                  onOpenChange={(open) => {
+                    if (busy) return;
+                    if (open) setError(undefined);
+                    setDeleteOpen(open);
+                    console.debug(
+                      "[作品上传]",
+                      open ? "打开删除确认" : "关闭删除确认",
+                    );
+                  }}
+                >
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={busy}>
+                      删除作品
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent
+                    onEscapeKeyDown={(event) => {
+                      if (busy) event.preventDefault();
+                    }}
+                  >
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>删除这个资源？</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        删除后无法恢复。已被引用的资源不能删除。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {error !== undefined && <Notice error={error} />}
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={busy}>
+                        取消
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={busy}
+                        onClick={(event) => {
+                          // 异步删除结束后再关闭确认，失败时保留说明和重试入口。
+                          event.preventDefault();
+                          void remove();
+                        }}
+                      >
+                        {busy ? "正在删除…" : "确认删除"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </>
       )}
     </>

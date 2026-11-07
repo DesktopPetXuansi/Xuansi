@@ -1,4 +1,6 @@
 "use client";
+import { Textarea } from "@/components/ui/textarea";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { Button, Notice } from "@/components/ui";
 import type { FeedbackThread } from "@/lib/types";
 import { useState } from "react";
@@ -38,13 +40,15 @@ export function ChatThread(
     >
       <header className={styles.threadHeader}>
         <div>
-          <button
+          <ShadcnButton
+            variant="ghost"
+            type="button"
             aria-label="返回会话列表"
             className={`${styles.textButton} ${styles.back}`}
             onClick={props.onBack}
           >
             ← 返回会话列表
-          </button>
+          </ShadcnButton>
           <p className={styles.eyebrow}>
             {props.admin
               ? view?.participant?.displayName ||
@@ -55,7 +59,7 @@ export function ChatThread(
           <h2>{view?.title || props.thread?.title || "反馈对话"}</h2>
         </div>
         <Button
-          className="secondary"
+          variant="outline"
           disabled={loading || sending || withdrawing}
           onClick={() => {
             props.onUpdated();
@@ -83,7 +87,7 @@ export function ChatThread(
           )}
           {cursor && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={loading || sending}
               onClick={() => void load(true)}
             >
@@ -110,7 +114,7 @@ export function ChatThread(
             >
               <label className="field">
                 <span>消息内容</span>
-                <textarea
+                <Textarea
                   ref={textarea}
                   aria-label="消息内容"
                   rows={3}
@@ -141,7 +145,7 @@ export function ChatThread(
                     </Button>
                     <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={loading}
                       onClick={rewrite}
                     >
@@ -162,7 +166,7 @@ export function ChatThread(
                   {props.admin && (
                     <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={loading || sending || !draft.trim()}
                       onClick={() => void send(true)}
                     >
@@ -207,7 +211,7 @@ export function ChatThread(
                     <div className={styles.actions}>
                       <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         disabled={loading || sending || withdrawing}
                         onClick={() => void withdraw()}
                       >
@@ -215,7 +219,7 @@ export function ChatThread(
                       </Button>
                       <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         disabled={withdrawing}
                         onClick={() => setConfirmWithdrawal(false)}
                       >
@@ -224,13 +228,15 @@ export function ChatThread(
                     </div>
                   </>
                 ) : (
-                  <button
+                  <ShadcnButton
+                    variant="ghost"
+                    type="button"
                     className={styles.textButton}
                     disabled={loading || sending || withdrawing}
                     onClick={() => setConfirmWithdrawal(true)}
                   >
                     撤回这条反馈
-                  </button>
+                  </ShadcnButton>
                 )}
               </div>
             )}

@@ -13,9 +13,11 @@
   gap: 12px;
   margin-bottom: 24px;
   padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .filters label {
   min-width: 0;

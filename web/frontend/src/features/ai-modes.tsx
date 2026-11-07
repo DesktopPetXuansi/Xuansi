@@ -1,4 +1,5 @@
 import { ArrowUpRight, Cpu, Globe } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import styles from "./ai-modes.module.css";
 
@@ -55,7 +56,7 @@ export function AiModes() {
           形象决定陪伴的样子，AI 决定如何回应。两种方式都不需要网站账号。
         </p>
       </header>
-      <div className={styles.modes}>
+      <div className={styles.modes} data-assembly="panel">
         {modes.map(({ title, icon: Icon, subtitle, facts }) => (
           <article key={title}>
             <div className={styles.title}>
@@ -82,12 +83,16 @@ export function AiModes() {
         自动观察截图与在线记忆读取分别授权、默认关闭。单次附图和对话中的按需截图是独立操作，使用前请检查屏幕内容。
       </p>
       <div className="actions">
-        <Link className="quiet-link" href="/docs/chat">
-          跟着教程配置 <ArrowUpRight size={16} aria-hidden />
-        </Link>
-        <Link className="quiet-link" href="/privacy">
-          完整数据与隐私说明 →
-        </Link>
+        <Button asChild variant="link" className="h-auto p-0">
+          <Link className="quiet-link" href="/docs/chat">
+            跟着教程配置 <ArrowUpRight size={16} aria-hidden />
+          </Link>
+        </Button>
+        <Button asChild variant="link" className="h-auto p-0">
+          <Link className="quiet-link" href="/privacy">
+            完整数据与隐私说明 →
+          </Link>
+        </Button>
       </div>
     </section>
   );

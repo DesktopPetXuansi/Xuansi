@@ -26,7 +26,7 @@ test("管理员能区分访问指标和全来源安装包下载次数", async ({
       { exact: true },
     ),
   ).toBeVisible();
-  await page.getByText("查看每日数据", { exact: true }).click();
+  await page.getByRole("button", { name: "查看每日数据", exact: true }).click();
   await expect(page.getByRole("row", { name: "2026-10-29 20" })).toBeVisible();
 });
 

@@ -15,7 +15,7 @@ export function AnalyticsTrafficOverview({
   return (
     <section aria-label="网站访问概览">
       <h2 className={styles.sectionTitle}>网站访问</h2>
-      <dl className={styles.metrics}>
+      <dl className={styles.metrics} data-assembly="panel">
         {metrics.map((metric) => (
           <div key={metric.label}>
             <dt>{metric.label}</dt>

@@ -1,25 +1,23 @@
+import { Button } from "@/components/ui/button";
 import { HomeSections } from "@/features/home-sections";
 import { PublicFeedback } from "@/features/feedback/public-feedback";
-import { ProductPreview } from "@/features/product-preview";
 import { HomeClosing } from "@/features/home-closing";
 import { clientRelease } from "@/lib/client-release";
 import { publicPageMetadata } from "@/lib/site-metadata";
-import { ArrowDown, ArrowUpRight, Download } from "lucide-react";
+import { ArrowUpRight, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import "./home.css";
-
 export const metadata = {
   ...publicPageMetadata(
     "你的桌面 AI 伙伴",
-    "玄司是个人开发者维护的开源 Windows 桌面伙伴。查看真实客户端界面，了解聊天、记忆和换形象；选择本机模型或在线 API，无需注册即可下载体验。",
+    "玄司是个人开发者维护的开源 Windows 桌面伙伴。了解聊天、记忆和换形象，选择本机模型或在线 API，无需注册即可下载体验。",
     "/",
   ),
   // 根路由页面不会继承同层 layout 的标题模板，明确保留品牌名称。
   title: { absolute: "玄司 Xuansi · 你的桌面 AI 伙伴" },
 };
-
-// 首页保持服务端渲染，复用真实品牌素材，不添加持续动画和额外请求。
+// 首页保持服务端渲染，复用真实品牌素材；组装动画只在组件进入视野时运行。
 export default function Home() {
   return (
     <>
@@ -43,7 +41,7 @@ export default function Home() {
         }}
       />
       <section className="hero" aria-labelledby="home-title">
-        <div className="hero-copy">
+        <div className="hero-copy" data-assembly="panel">
           <p className="hero-kicker">一个在你桌面上的 AI 伙伴</p>
           <h1 id="home-title">
             把陪伴，
@@ -56,13 +54,12 @@ export default function Home() {
             <span>你忙的时候，玄司就安静地待在一旁。</span>
           </p>
           <div className="actions hero-actions">
-            <Link className="button-link" href="/download">
-              <Download size={17} aria-hidden />
-              下载 Windows 客户端
-            </Link>
-            <a href="#product-preview" className="quiet-link">
-              看看实际界面 <ArrowDown size={16} aria-hidden />
-            </a>
+            <Button asChild variant="default">
+              <Link className="button-link" href="/download">
+                <Download size={17} aria-hidden />
+                下载 Windows 客户端
+              </Link>
+            </Button>
           </div>
           <p className="hero-access">无需注册即可下载和本地使用</p>
           <p className="hero-note">
@@ -74,16 +71,22 @@ export default function Home() {
           </p>
           <p className="hero-project">
             个人开发者维护 <span aria-hidden>·</span>{" "}
-            <a
-              href="https://github.com/DesktopPetXuansi/Xuansi"
-              target="_blank"
-              rel="noreferrer"
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
             >
-              查看开源项目 <ArrowUpRight size={14} aria-hidden />
-            </a>
+              <a
+                href="https://github.com/DesktopPetXuansi/Xuansi"
+                target="_blank"
+                rel="noreferrer"
+              >
+                查看开源项目 <ArrowUpRight size={14} aria-hidden />
+              </a>
+            </Button>
           </p>
         </div>
-        <figure className="hero-art">
+        <figure className="hero-art" data-assembly="panel">
           <div className="art-backdrop" aria-hidden />
           <div className="art-portrait">
             <Image
@@ -99,13 +102,18 @@ export default function Home() {
               <strong>玄司</strong>
               <span>安装后就能见到的伙伴</span>
             </span>
-            <Link href="/resources">
-              挑选形象 <ArrowUpRight size={16} aria-hidden />
-            </Link>
+            <Button
+              asChild
+              variant="link"
+              className="h-auto justify-start px-0 py-0 whitespace-normal"
+            >
+              <Link href="/resources">
+                挑选形象 <ArrowUpRight size={16} aria-hidden />
+              </Link>
+            </Button>
           </figcaption>
         </figure>
       </section>
-      <ProductPreview />
       <HomeSections />
       <HomeClosing />
       <PublicFeedback />

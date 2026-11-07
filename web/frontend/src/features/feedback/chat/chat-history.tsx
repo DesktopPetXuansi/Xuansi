@@ -1,4 +1,5 @@
 "use client";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import type { FeedbackConversation } from "@/lib/types";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -183,12 +184,14 @@ export function ChatHistory({
       {readError && (
         <p className={styles.muted}>
           未能同步已读状态。
-          <button
+          <ShadcnButton
+            variant="ghost"
+            type="button"
             className={styles.textButton}
             onClick={() => setRetryRead((value) => value + 1)}
           >
             重试已读确认
-          </button>
+          </ShadcnButton>
         </p>
       )}
     </>

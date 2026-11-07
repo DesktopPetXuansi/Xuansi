@@ -70,7 +70,7 @@ export function FeedbackClaim({
         」。关联后，原管理链接将失效；历史匿名消息仍显示为访客。
       </p>
       <Button
-        className="secondary"
+        variant="outline"
         disabled={busy}
         onClick={() => void claim()}
       >

@@ -1,6 +1,7 @@
 "use client";
 import { useMe } from "@/components/navigation";
 import { Button, Heading, Notice } from "@/components/ui";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { api, safeUrl } from "@/lib/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -18,7 +19,12 @@ export function Authorize() {
     (!historyWrite || historyRead) &&
     new Set(scopes).size === scopes.length &&
     scopes.every((scope) =>
-      ["resources:read", "resources:write", "history:read", "history:write"].includes(scope),
+      [
+        "resources:read",
+        "resources:write",
+        "history:read",
+        "history:write",
+      ].includes(scope),
     );
   const me = useMe();
   const [error, setError] = useState<unknown>();
@@ -65,7 +71,15 @@ export function Authorize() {
     <div className="container">
       <div className="narrow">
         <Heading
-          title={historyWrite ? "允许客户端同步形象历史？" : historyRead ? "允许客户端读取历史？" : upload ? "允许客户端上传模型？" : "允许客户端读取资源？"}
+          title={
+            historyWrite
+              ? "允许客户端同步形象历史？"
+              : historyRead
+                ? "允许客户端读取历史？"
+                : upload
+                  ? "允许客户端上传模型？"
+                  : "允许客户端读取资源？"
+          }
         >
           请确认这是你刚刚在桌面客户端发起的操作。
         </Heading>
@@ -74,9 +88,17 @@ export function Authorize() {
           <p>此次申请的权限：</p>
           <ul className="consent-permissions">
             <li>资源读取：查看收藏、资源清单与下载资源包。</li>
-            {upload && <li>模型上传：上传你选择的本地模型，设为当前版本并加入收藏。</li>}
-            {historyRead && <li>历史读取：读取账号中的形象使用记录和下载记录。</li>}
-            {historyWrite && <li>历史同步与删除：保存你此后成功使用的形象记录，并允许删除历史。不自动上传开启同步以前的本机记录。</li>}
+            {upload && (
+              <li>模型上传：上传你选择的本地模型，设为当前版本并加入收藏。</li>
+            )}
+            {historyRead && (
+              <li>历史读取：读取账号中的形象使用记录和下载记录。</li>
+            )}
+            {historyWrite && (
+              <li>
+                历史同步与删除：保存你此后成功使用的形象记录，并允许删除历史。不自动上传开启同步以前的本机记录。
+              </li>
+            )}
           </ul>
           <p className="muted">
             不会获取你的密码，不会上传聊天、截图、录音或本地记忆。你可以随时在会话与授权页面撤销。
@@ -88,20 +110,32 @@ export function Authorize() {
           ) : me.error ? (
             <Notice error={me.error} />
           ) : !me.data ? (
-            <Link
-              className="button-link"
-              href={`/login?returnTo=${encodeURIComponent(`/authorize?${params}`)}`}
-            >
-              登录后继续
-            </Link>
+            <ShadcnButton asChild>
+              <Link
+                className="button-link"
+                href={`/login?returnTo=${encodeURIComponent(`/authorize?${params}`)}`}
+              >
+                登录后继续
+              </Link>
+            </ShadcnButton>
           ) : (
             <div className="actions">
               <Button disabled={busy} onClick={allow}>
-                {busy ? "正在授权…" : historyWrite ? "允许同步形象历史" : historyRead ? "允许读取历史" : upload ? "允许上传模型" : "允许读取资源"}
+                {busy
+                  ? "正在授权…"
+                  : historyWrite
+                    ? "允许同步形象历史"
+                    : historyRead
+                      ? "允许读取历史"
+                      : upload
+                        ? "允许上传模型"
+                        : "允许读取资源"}
               </Button>
-              <Link href="/dashboard/sessions" className="quiet-link">
-                暂不授权
-              </Link>
+              <ShadcnButton asChild variant="link" className="h-auto p-0">
+                <Link href="/dashboard/sessions" className="quiet-link">
+                  暂不授权
+                </Link>
+              </ShadcnButton>
             </div>
           )}
           {error !== undefined && <Notice error={error} />}

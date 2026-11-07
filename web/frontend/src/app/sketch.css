@@ -1,0 +1,247 @@
+/* 铅笔与纸张主题：保留现有组件和交互，统一替换磨砂材质。 */
+:root {
+  --paper: #f5f0e8;
+  --ink: #2c2c2c;
+  --muted: #5e5a53;
+  --line: #81796d;
+  --green: #3f654a;
+  --green-hover: #2c2c2c;
+  --green-soft: #e6e8d8;
+  --white: #f9f5ed;
+  --glass-surface: #f9f5ed;
+  --glass-strong: #f9f5ed;
+  --glass-border: #81796d;
+  --glass-blur: 0px;
+  --glass-shadow: none;
+  --primary: #2c2c2c;
+  --primary-foreground: #f9f5ed;
+  --input: #81796d;
+  --ring: #3f654a;
+  --radius: 3px;
+  --font-heading: "KaiTi", "STKaiti", "Songti SC", serif;
+}
+
+/* 细小纸纤维由本地 SVG 绘制，不加载远程字体或纹理。 */
+body {
+  background-color: var(--paper) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='%237b7060' opacity='.11'%3E%3Ccircle cx='13' cy='24' r='.6'/%3E%3Ccircle cx='78' cy='43' r='.7'/%3E%3Ccircle cx='144' cy='18' r='.5'/%3E%3Ccircle cx='40' cy='101' r='.6'/%3E%3Ccircle cx='117' cy='135' r='.7'/%3E%3Ccircle cx='169' cy='91' r='.5'/%3E%3Ccircle cx='70' cy='166' r='.5'/%3E%3C/g%3E%3Cpath d='M24 76l5 -1 M93 13l4 1 M152 151l5 -1 M10 156l4 1' stroke='%237b7060' stroke-opacity='.13' stroke-width='.7'/%3E%3C/svg%3E") !important;
+  background-repeat: repeat;
+  font-family: "KaiTi", "STKaiti", "Songti SC", "Microsoft YaHei", serif;
+}
+
+/* 清除旧主题的渐变和玻璃模糊，图片本身仍由 img 正常展示。 */
+:where(.site-header, #main, .site-footer, [data-radix-popper-content-wrapper])
+  * {
+  background-image: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+.site-header {
+  background: var(--paper) !important;
+  border-bottom: 2px dashed var(--line);
+  backdrop-filter: none !important;
+}
+:is(
+  .primary-navigation,
+  .panel,
+  .sidebar,
+  [data-slot="card"],
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="select-content"],
+  [class*="filterForm"],
+  [class*="builtinStage"],
+  [class*="auth_card"],
+  [class*="authForm"],
+  [class*="_empty_"]
+) {
+  background: var(--white) !important;
+  border: 2px dashed var(--line) !important;
+  border-radius: 3px 6px 2px 5px !important;
+}
+:is(
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="select-content"]
+) {
+  background-image: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+:is(
+  .art-backdrop,
+  .art-bottom,
+  .library-promo,
+  [data-assembly="panel"][class*="modes"],
+  [class*="start_"]
+) {
+  background: #ebe8d8 !important;
+  border: 2px dashed #81796d !important;
+  border-radius: 4px 8px 3px 6px !important;
+}
+[class*="public-feedback_section"] > [class*="public-feedback_form"] {
+  background: var(--white) !important;
+  border: 2px dashed var(--line) !important;
+  border-radius: 3px 6px 2px 5px !important;
+}
+.art-backdrop {
+  inset: 56px 0 64px 24px;
+  transform: rotate(-1deg);
+  /* 交叉铅笔线代替柔焦阴影。 */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-4 12L12 -4M4 20L20 4M-4 4L12 20M4 -4L20 12' fill='none' stroke='%23645f55' stroke-opacity='.12' stroke-width='.7'/%3E%3C/svg%3E") !important;
+}
+[class*="home-closing_download"] {
+  background: var(--ink) !important;
+  border: 2px dashed #81796d !important;
+  border-radius: 4px 7px 3px 5px !important;
+  color: var(--paper);
+}
+.hero-version {
+  border: 1px dashed var(--line);
+  border-radius: 2px 5px 3px 4px;
+  transform: rotate(-1deg);
+}
+.notice {
+  border: 2px dashed currentColor;
+  border-radius: 3px 5px 2px 4px;
+}
+
+/* 控件沿用 shadcn 语义，边框和短促的铅笔反馈保持一致。 */
+:is(
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="checkbox"],
+  [data-slot="tabs-list"],
+  [data-slot="progress"]
+) {
+  border: 2px dashed var(--line) !important;
+  border-radius: 3px 5px 2px 4px !important;
+}
+:is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border: 2px dashed var(--line) !important;
+  border-radius: 3px 5px 2px 4px !important;
+  background-color: var(--white) !important;
+}
+:is(
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="tabs-list"]
+) {
+  background-color: var(--white) !important;
+  color: var(--ink);
+}
+/* 链接式、幽灵式和 Radix 操作按钮都使用同一套笔触；品牌标识保留原样。 */
+:is(button:not([data-slot="checkbox"]), [data-slot="button"]:not(.brand)) {
+  border: 2px dashed var(--line) !important;
+  border-radius: 3px 6px 2px 5px !important;
+  background-color: var(--white) !important;
+  color: var(--ink) !important;
+  transition:
+    background-color 120ms,
+    color 120ms,
+    opacity 120ms;
+}
+:is(
+  [data-slot="button"][data-variant="link"]:not(.brand),
+  [data-slot="button"][data-variant="ghost"]
+) {
+  padding: 4px 8px !important;
+}
+:is(
+  [data-slot="button"][data-variant="default"],
+  [data-slot="alert-dialog-action"][data-variant="default"],
+  .primary-navigation [data-slot="button"].nav-download
+) {
+  background-color: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+}
+:is(
+  button:not([data-slot="checkbox"]),
+  [data-slot="button"],
+  [data-slot="alert-dialog-action"]
+)[data-variant="destructive"] {
+  background-color: #87392a !important;
+  border-color: #87392a !important;
+  color: var(--paper) !important;
+}
+:is([data-slot="button"]:not(.brand), [data-slot="tabs-trigger"]):is(
+    [aria-current="page"],
+    [aria-pressed="true"],
+    [data-state="active"]
+  ):not(.nav-download) {
+  background-color: var(--green-soft) !important;
+  color: var(--ink) !important;
+}
+:is(button:not([data-slot="checkbox"]), [data-slot="button"]:not(.brand)):not(
+    :disabled
+  ):not([aria-disabled="true"]):not([data-variant="destructive"]):hover {
+  background-color: var(--ink) !important;
+  color: var(--paper) !important;
+}
+:is(
+    button:not([data-slot="checkbox"]),
+    [data-slot="button"],
+    [data-slot="alert-dialog-action"]
+  )[data-variant="destructive"]:not(:disabled):hover {
+  background-color: #652a20 !important;
+  color: var(--paper) !important;
+}
+:is(
+    button:not([data-slot="checkbox"]),
+    [data-slot="button"],
+    [data-slot="alert-dialog-action"]
+  )[data-variant="default"]:not(:disabled):hover,
+.primary-navigation [data-slot="button"].nav-download:hover {
+  background-color: #48443e !important;
+}
+:is(button:not([data-slot="checkbox"]), [data-slot="button"]:not(.brand)):not(
+    :disabled
+  ):active {
+  opacity: 0.8;
+}
+:is(button:not([data-slot="checkbox"]), [data-slot="button"]:not(.brand)):hover
+  svg {
+  color: inherit !important;
+  opacity: 1;
+}
+:focus-visible {
+  outline: 3px dashed #3f654a !important;
+  outline-offset: 3px;
+}
+:is(
+  button:not([data-slot="checkbox"]),
+  [data-slot="button"]:not(.brand)
+):focus-visible {
+  outline-color: var(--ink) !important;
+  box-shadow: 2px 2px 0 rgb(44 44 44 / 40%) !important;
+}
+
+/* 原有绘图选框保留，颜色改为铅笔灰与纸色。 */
+.assembly-layer .assembly-frame {
+  --assembly-line: #5e5a53;
+}
+.assembly-layer .assembly-handle {
+  background: var(--paper);
+}
+.assembly-layer .assembly-badge {
+  color: var(--paper);
+}
+@media (max-width: 640px) {
+  :is(button, [role="button"], [data-slot="select-trigger"]) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  a[data-slot="button"] {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+  }
+}

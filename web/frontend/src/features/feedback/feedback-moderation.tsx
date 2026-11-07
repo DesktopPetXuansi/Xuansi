@@ -1,3 +1,5 @@
+import { Button as ShadcnButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui";
 import { safeUrl } from "@/lib/api";
 import type { Feedback, FeedbackModerationInput } from "@/lib/types";
@@ -31,13 +33,19 @@ export function FeedbackModeration({
       </p>
       {item.githubIssueUrl && (
         <p>
-          <a
-            href={safeUrl(item.githubIssueUrl)}
-            target="_blank"
-            rel="noreferrer"
+          <ShadcnButton
+            asChild
+            variant="link"
+            className="h-auto whitespace-normal p-0 text-left"
           >
-            查看 GitHub 公开内容 ↗
-          </a>
+            <a
+              href={safeUrl(item.githubIssueUrl)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看 GitHub 公开内容 ↗
+            </a>
+          </ShadcnButton>
         </p>
       )}
       <div className={styles.actions}>
@@ -45,7 +53,7 @@ export function FeedbackModeration({
           <>
             {item.publicConsent && (
               <Button
-                className="secondary"
+                variant="outline"
                 disabled={busy}
                 onClick={() => onModerate("APPROVE")}
               >
@@ -53,7 +61,7 @@ export function FeedbackModeration({
               </Button>
             )}
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => onModerate("SPAM")}
             >
@@ -66,7 +74,7 @@ export function FeedbackModeration({
           item.publicConsent &&
           !item.githubIssueUrl && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => onModerate("APPROVE")}
             >
@@ -81,17 +89,16 @@ export function FeedbackModeration({
               删除；已经被他人保存的内容无法保证清除。
             </p>
             <label className={styles.confirmation}>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={cleaned}
                 disabled={busy}
-                onChange={(event) => setCleaned(event.target.checked)}
+                onCheckedChange={(checked) => setCleaned(checked === true)}
               />{" "}
               我已检查投递结果并在 GitHub 完成公开内容清理
             </label>
             <div>
               <Button
-                className="secondary"
+                variant="outline"
                 disabled={busy || !cleaned}
                 onClick={() => onModerate("CONFIRM_WITHDRAWAL")}
               >

@@ -1,5 +1,15 @@
 "use client";
-import { Button, Field, Notice } from "@/components/ui";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Field, Notice } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { type Release } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,31 +35,35 @@ export function ReleaseAdmin() {
           ? `/admin/client-releases/${editing.id}`
           : "/admin/client-releases",
         editing ? "PATCH" : "POST",
-        editing ? { releaseNotes: String(form.get("releaseNotes")) } : {
-          version: String(form.get("version")),
-          channel: String(form.get("channel")),
-          sourceCommit: String(form.get("sourceCommit")),
-          releaseNotes: String(form.get("releaseNotes")),
-          artifacts: [
-            {
-              os: "windows",
-              arch: "x64",
-              distributionType: "ONLINE_INSTALLER",
-              downloadUrl: String(form.get("downloadUrl")),
-              sha256: String(form.get("sha256")),
-              bytes: Number(form.get("bytes")),
-              systemRequirements: [
-                "Windows 11 x64",
-                "NVIDIA / CUDA 12.4",
-                "D 盘",
-                "首次联网",
+        editing
+          ? { releaseNotes: String(form.get("releaseNotes")) }
+          : {
+              version: String(form.get("version")),
+              channel: String(form.get("channel")),
+              sourceCommit: String(form.get("sourceCommit")),
+              releaseNotes: String(form.get("releaseNotes")),
+              artifacts: [
+                {
+                  os: "windows",
+                  arch: "x64",
+                  distributionType: "ONLINE_INSTALLER",
+                  downloadUrl: String(form.get("downloadUrl")),
+                  sha256: String(form.get("sha256")),
+                  bytes: Number(form.get("bytes")),
+                  systemRequirements: [
+                    "Windows 11 x64",
+                    "NVIDIA / CUDA 12.4",
+                    "D 盘",
+                    "首次联网",
+                  ],
+                },
               ],
             },
-          ],
-        },
       );
       await cache.invalidateQueries({ queryKey: ["admin-releases"] });
-      setSuccess(editing ? "版本说明已保存。" : "版本草稿已创建，请核对后发布。");
+      setSuccess(
+        editing ? "版本说明已保存。" : "版本草稿已创建，请核对后发布。",
+      );
       setEditing(undefined);
     } catch (cause) {
       setError(cause);
@@ -72,10 +86,14 @@ export function ReleaseAdmin() {
     <>
       <form className="panel" onSubmit={create} key={editing?.id ?? "new"}>
         <h2>{editing ? "编辑版本草稿" : "创建版本草稿"}</h2>
-        {editing && <p className="muted">草稿的版本身份与安装包保持固定，此处可修改更新说明。</p>}
+        {editing && (
+          <p className="muted">
+            草稿的版本身份与安装包保持固定，此处可修改更新说明。
+          </p>
+        )}
         <div className="grid-two">
           <Field label="版本">
-            <input
+            <Input
               name="version"
               disabled={!!editing}
               required
@@ -84,14 +102,23 @@ export function ReleaseAdmin() {
             />
           </Field>
           <Field label="渠道">
-            <select name="channel" disabled={!!editing} defaultValue={editing?.channel}>
-              <option>STABLE</option>
-              <option>BETA</option>
-            </select>
+            <Select
+              name="channel"
+              disabled={!!editing}
+              defaultValue={editing?.channel ?? "STABLE"}
+            >
+              <SelectTrigger className="w-full" aria-label="渠道">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="STABLE">STABLE</SelectItem>
+                <SelectItem value="BETA">BETA</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
         </div>
         <Field label="源码提交">
-          <input
+          <Input
             name="sourceCommit"
             disabled={!!editing}
             required
@@ -99,14 +126,14 @@ export function ReleaseAdmin() {
           />
         </Field>
         <Field label="更新说明">
-          <textarea
+          <Textarea
             name="releaseNotes"
             required
             defaultValue={editing?.releaseNotes}
           />
         </Field>
         <Field label="安装包 URL">
-          <input
+          <Input
             name="downloadUrl"
             disabled={!!editing}
             type="url"
@@ -116,7 +143,7 @@ export function ReleaseAdmin() {
         </Field>
         <div className="grid-two">
           <Field label="SHA-256">
-            <input
+            <Input
               name="sha256"
               disabled={!!editing}
               pattern="[a-fA-F0-9]{64}"
@@ -125,7 +152,7 @@ export function ReleaseAdmin() {
             />
           </Field>
           <Field label="字节数">
-            <input
+            <Input
               name="bytes"
               disabled={!!editing}
               type="number"
@@ -138,7 +165,7 @@ export function ReleaseAdmin() {
         <Button disabled={busy}>保存草稿</Button>
         {editing && (
           <Button
-            className="secondary"
+            variant="outline"
             type="button"
             onClick={() => setEditing(undefined)}
           >
@@ -162,7 +189,7 @@ export function ReleaseAdmin() {
               <Button disabled={busy} onClick={() => publish(release.id)}>
                 确认发布
               </Button>
-              <Button className="secondary" onClick={() => setEditing(release)}>
+              <Button variant="outline" onClick={() => setEditing(release)}>
                 编辑草稿
               </Button>
             </div>

@@ -1,3 +1,4 @@
+import { Button as ShadcnButton } from "@/components/ui/button";
 import type { FeedbackThread } from "@/lib/types";
 import { feedbackStatuses } from "../feedback-statuses";
 import styles from "./chat.module.css";
@@ -17,7 +18,9 @@ export function ThreadItem({
   const name = admin ? thread.participant.displayName : "玄司开发者";
   return (
     <li>
-      <button
+      <ShadcnButton
+        variant="ghost"
+        type="button"
         className={styles.threadButton}
         aria-current={selected ? "true" : undefined}
         onClick={() => onSelect(thread.id)}
@@ -51,7 +54,7 @@ export function ThreadItem({
             })}
           </time>
         </span>
-      </button>
+      </ShadcnButton>
     </li>
   );
 }

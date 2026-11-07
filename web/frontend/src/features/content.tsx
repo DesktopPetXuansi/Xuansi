@@ -1,4 +1,5 @@
 import { Heading } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { clientRelease } from "@/lib/client-release";
@@ -27,11 +28,27 @@ const content: Record<
       },
       {
         title: "明确授权的记忆",
-        text: "你可以在“记忆”中查看和管理本机保存的事项。允许在线服务读取长期记忆需要单独开启；网站账号不提供聊天或记忆的云同步。",
+        text: "你可以在“记忆”中查看和管理本机保存的事项。对话保存只追加新条目；更正或删除旧内容，需要在“记忆”中手动编辑并保存。允许在线服务读取长期记忆需要单独开启；网站账号不提供聊天或记忆的云同步。",
       },
       {
         title: "用喜欢的形象陪伴",
         text: `在“更换形象”本地导入图片、动图或导出的 Live2D 模型，也可以在线挑选，无需先上传。当前正式版 ${clientRelease.version} 支持选中形象后直接点击“使用这个形象”，自动下载、检查并保存；独立预览可选。旧版 0.7.1 在线挑选需先下载并预览，再点击使用。暂时不想被打扰时，可以让桌宠休眠。`,
+      },
+      {
+        // 源码进展单独标明交付状态，避免被理解成下载页安装包的承诺。
+        title: "开发进展：更贴合话题的陪伴",
+        text: (
+          <>
+            2026-11-02
+            的本地开发版本增加了面向倾诉、求助和结束话题的回应原则，保留你设定的人设。经验证的标准本机
+            9B
+            配置搭配内置玄司时，可用轻微眼睑变化配合部分回复；主动问候则是默认关闭的独立选项。
+            这些变化仍在开发验证中，尚未公开提供，也未打包进当前正式版{" "}
+            {clientRelease.version}
+            ，模型仍可能误解或推测细节。
+            <Link href="/docs/companion">了解适用条件与使用方式 →</Link>
+          </>
+        ),
       },
     ],
   },
@@ -48,9 +65,8 @@ const content: Record<
         title: "Live2D",
         text: (
           <>
-            网站仅展示角色图片和客户端截图，不在浏览器运行 Cubism
-            Core。客户端使用 Live2D 的 SDK
-            与运行组件，接入、分发及所导入模型的使用须遵守
+            网站展示角色图片，不在浏览器运行 Cubism Core。客户端使用 Live2D 的
+            SDK 与运行组件，接入、分发及所导入模型的使用须遵守
             <a
               href="https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html"
               target="_blank"
@@ -74,7 +90,24 @@ const content: Record<
             >
               Apache-2.0
             </a>{" "}
-            开源。 网站使用的 React、Next.js、Go、PostgreSQL
+            开源。 网站界面使用遵循 MIT 许可的{" "}
+            <a
+              href="https://github.com/shadcn-ui/ui"
+              target="_blank"
+              rel="noreferrer"
+            >
+              shadcn/ui
+            </a>
+            （<a href="/licenses/shadcn-ui.txt">查看许可</a>）；页面组装效果参考
+            <a
+              href="https://github.com/appautomaton/delineate/tree/main/assembly"
+              target="_blank"
+              rel="noreferrer"
+            >
+              delineate Assembly
+            </a>
+            （<a href="/licenses/delineate.txt">查看许可</a>）。此外，
+            React、Next.js、Go、PostgreSQL
             等软件遵循各自许可，完整依赖与锁定版本可在仓库查阅。源码许可不自动覆盖角色素材和用户上传资源。
           </>
         ),
@@ -101,12 +134,16 @@ export function ContentPage({ slug }: { slug: string }) {
         ))}
         {slug === "features" && (
           <div className="actions" style={{ marginTop: 30 }}>
-            <Link className="button-link" href="/download">
-              下载客户端
-            </Link>
-            <Link className="quiet-link" href="/docs/getting-started">
-              跟着步骤开始使用 →
-            </Link>
+            <Button asChild>
+              <Link className="button-link" href="/download">
+                下载客户端
+              </Link>
+            </Button>
+            <Button asChild variant="link" className="h-auto p-0">
+              <Link className="quiet-link" href="/docs/getting-started">
+                跟着步骤开始使用 →
+              </Link>
+            </Button>
           </div>
         )}
       </div>

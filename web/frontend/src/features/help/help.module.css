@@ -10,8 +10,15 @@
   justify-content: space-between;
   gap: 32px;
   padding: 36px 40px;
-  background: var(--green-soft);
-  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 74%),
+    rgb(218 236 216 / 70%)
+  );
+  border-radius: 18px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .start h2 {
   font-size: 30px;
@@ -56,8 +63,13 @@
   color: var(--green);
 }
 .topics > a:hover h2 {
-  text-decoration: underline;
-  text-underline-offset: 5px;
+  color: var(--green);
+}
+.topicLink {
+  height: auto;
+  white-space: normal;
+  text-align: left;
+  border-radius: 0;
 }
 .faq {
   margin-top: 64px;
@@ -75,19 +87,19 @@
 .questions {
   margin-top: 20px;
 }
-.questions details {
+.question {
   border-bottom: 1px solid var(--line);
 }
-.questions details[open] {
+.question[data-state="open"] {
   background: var(--white);
 }
-.questions summary {
-  padding: 22px 0;
+.questionTrigger {
+  padding: 22px 16px;
   cursor: pointer;
   font-weight: 600;
   font-size: 17px;
 }
-.questions details > div {
+.questionContent {
   padding: 0 24px 24px;
   max-width: 48em;
 }
@@ -173,9 +185,11 @@
   position: sticky;
   top: 32px;
   padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
 }
 .aside h2 {
   font-size: 15px;
@@ -192,7 +206,11 @@
 }
 .aside a:hover {
   color: var(--green);
-  text-decoration: underline;
+}
+.asideLink {
+  height: auto;
+  white-space: normal;
+  text-align: left;
 }
 .questionPage .questions {
   max-width: 900px;
@@ -208,6 +226,8 @@
     border-top: 1px solid var(--line);
     border-radius: 0;
     background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
     padding: 24px 0 0;
   }
   .aside nav:first-child {
@@ -247,8 +267,9 @@
     flex-direction: column;
     gap: 12px;
   }
-  .questions details > div {
-    padding-inline: 0;
+  .questionTrigger,
+  .questionContent {
+    padding-inline: 12px;
   }
   .steps li {
     gap: 12px;

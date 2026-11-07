@@ -1,10 +1,28 @@
 "use client";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 import { Button, Field } from "@/components/ui";
 import { kinds } from "@/lib/types";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import styles from "./resources.module.css";
+
+// Radix 将空字符串保留为未选择状态；“全部”在界面内使用独立值。
+const allKinds = "__all_resource_kinds__";
 
 export type ResourceFilters = {
   group: string;
@@ -70,6 +88,7 @@ export function ResourceFilterForm({
   return (
     <form
       className={styles.filterForm}
+      data-assembly="panel"
       onSubmit={(event) => {
         event.preventDefault();
         onApply({ search: search.trim(), tag: tag.trim() });
@@ -77,7 +96,7 @@ export function ResourceFilterForm({
     >
       <div className={styles.search}>
         <Field label="搜索名称">
-          <input
+          <Input
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -85,51 +104,57 @@ export function ResourceFilterForm({
           />
         </Field>
         <Field label="想找哪一种">
-          <select
-            aria-label="想找哪一种"
-            value={filter.kind}
-            onChange={(event) =>
+          <Select
+            value={filter.kind || allKinds}
+            onValueChange={(value) =>
               onApply({
-                kind: event.target.value,
+                kind: value === allKinds ? "" : value,
                 search: search.trim(),
                 tag: tag.trim(),
               })
             }
           >
-            <option value="">
-              {filter.group === "APPEARANCE"
-                ? "全部形象"
-                : filter.group === "ADDON"
-                  ? "全部配套资源"
-                  : "全部资源"}
-            </option>
-            {available.map((kind) => (
-              <option value={kind} key={kind}>
-                {kinds[kind]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="想找哪一种" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectItem value={allKinds}>
+                {filter.group === "APPEARANCE"
+                  ? "全部形象"
+                  : filter.group === "ADDON"
+                    ? "全部配套资源"
+                    : "全部资源"}
+              </SelectItem>
+              {available.map((kind) => (
+                <SelectItem value={kind} key={kind}>
+                  {kinds[kind]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Button type="submit">搜索</Button>
       </div>
       <div className={styles.filterActions}>
-        <details
+        <Collapsible
           className={styles.advanced}
-          open={filter.tag ? true : undefined}
+          defaultOpen={filter.tag ? true : undefined}
         >
-          <summary>按标签筛选</summary>
-          <Field label="标签">
-            <input
-              value={tag}
-              onChange={(event) => setTag(event.target.value)}
-              placeholder="输入作者提供的标签"
-            />
-          </Field>
-        </details>
+          <CollapsibleTrigger>按标签筛选</CollapsibleTrigger>
+          <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+            <Field label="标签">
+              <Input
+                value={tag}
+                onChange={(event) => setTag(event.target.value)}
+                placeholder="输入作者提供的标签"
+              />
+            </Field>
+          </CollapsibleContent>
+        </Collapsible>
         {filtered && (
           <Button
             type="button"
-            className="secondary"
+            variant="outline"
             onClick={() => onApply({ search: "", kind: "", tag: "" })}
           >
             清除筛选

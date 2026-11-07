@@ -1,9 +1,20 @@
 "use client";
-import { Button, Field } from "@/components/ui";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Field } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import styles from "./admin-users.module.css";
 
 export type UserFilters = { search: string; role: string; status: string };
+// Radix 保留空字符串用于清除选择，内部标识只在控件边界使用。
+const allOptions = "__all__";
 
 // 管理员的邮箱关键词只保留在当前页面内存，不写地址栏或本机存储。
 export function UserFilterForm({
@@ -19,13 +30,14 @@ export function UserFilterForm({
   return (
     <form
       className={styles.filters}
+      data-assembly="panel"
       onSubmit={(event) => {
         event.preventDefault();
         if (!disabled) onApply({ ...value, search: search.trim() });
       }}
     >
       <Field label="搜索用户">
-        <input
+        <Input
           type="search"
           maxLength={240}
           value={search}
@@ -37,40 +49,48 @@ export function UserFilterForm({
         />
       </Field>
       <Field label="角色">
-        <select
-          aria-label="角色"
+        <Select
           disabled={disabled}
-          value={value.role}
-          onChange={(event) =>
+          value={value.role || allOptions}
+          onValueChange={(selected) =>
             onApply({
               ...value,
-              role: event.target.value,
+              role: selected === allOptions ? "" : selected,
               search: search.trim(),
             })
           }
         >
-          <option value="">全部角色</option>
-          <option value="USER">普通用户</option>
-          <option value="ADMIN">管理员</option>
-        </select>
+          <SelectTrigger className="w-full" aria-label="角色">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value={allOptions}>全部角色</SelectItem>
+            <SelectItem value="USER">普通用户</SelectItem>
+            <SelectItem value="ADMIN">管理员</SelectItem>
+          </SelectContent>
+        </Select>
       </Field>
       <Field label="账号状态">
-        <select
-          aria-label="账号状态"
+        <Select
           disabled={disabled}
-          value={value.status}
-          onChange={(event) =>
+          value={value.status || allOptions}
+          onValueChange={(selected) =>
             onApply({
               ...value,
-              status: event.target.value,
+              status: selected === allOptions ? "" : selected,
               search: search.trim(),
             })
           }
         >
-          <option value="">全部状态</option>
-          <option value="ACTIVE">正常</option>
-          <option value="DISABLED">已停用</option>
-        </select>
+          <SelectTrigger className="w-full" aria-label="账号状态">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value={allOptions}>全部状态</SelectItem>
+            <SelectItem value="ACTIVE">正常</SelectItem>
+            <SelectItem value="DISABLED">已停用</SelectItem>
+          </SelectContent>
+        </Select>
       </Field>
       <Button type="submit" disabled={disabled}>
         搜索
@@ -78,7 +98,7 @@ export function UserFilterForm({
       {!!(value.search || value.role || value.status) && (
         <Button
           type="button"
-          className="secondary"
+          variant="outline"
           disabled={disabled}
           onClick={() => onApply({ search: "", role: "", status: "" })}
         >

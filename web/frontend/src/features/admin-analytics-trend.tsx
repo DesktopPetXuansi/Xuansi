@@ -1,4 +1,9 @@
 import { analyticsNumber, type AnalyticsTraffic } from "./admin-analytics-data";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import styles from "./admin-analytics.module.css";
 
 // 日期由服务端按北京时间分桶；直接显示日期文本，避免浏览器时区重新偏移。
@@ -59,30 +64,39 @@ export function AnalyticsTrend({ trend }: Pick<AnalyticsTraffic, "trend">) {
         )}
       </svg>
       <div className={styles.axisLabels} aria-hidden="true">
-        {labels.map((index) => <span key={index}>{trend[index].date.slice(5)}</span>)}
+        {labels.map((index) => (
+          <span key={index}>{trend[index].date.slice(5)}</span>
+        ))}
       </div>
-      <details className={styles.dailyData}>
-        <summary>查看每日数据</summary>
-        <table className={styles.dailyTable}>
-          <caption className={styles.visuallyHidden}>
-            每日浏览量明细（北京时间）
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">日期</th>
-              <th scope="col">浏览量</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trend.map((point) => (
-              <tr key={point.date}>
-                <th scope="row">{point.date}</th>
-                <td>{analyticsNumber.format(point.pageviews)}</td>
+      <Collapsible className={styles.dailyData}>
+        <CollapsibleTrigger
+          className={styles.dailyDataTrigger}
+          aria-label="查看每日数据"
+        >
+          查看每日数据
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <table className={styles.dailyTable}>
+            <caption className={styles.visuallyHidden}>
+              每日浏览量明细（北京时间）
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">日期</th>
+                <th scope="col">浏览量</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
+            </thead>
+            <tbody>
+              {trend.map((point) => (
+                <tr key={point.date}>
+                  <th scope="row">{point.date}</th>
+                  <td>{analyticsNumber.format(point.pageviews)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CollapsibleContent>
+      </Collapsible>
     </figure>
   );
 }

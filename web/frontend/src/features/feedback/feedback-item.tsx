@@ -1,4 +1,9 @@
 import { Button, Notice } from "@/components/ui";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { Feedback, FeedbackModerationInput } from "@/lib/types";
 import { FeedbackModeration } from "./feedback-moderation";
 import styles from "./feedback.module.css";
@@ -38,6 +43,9 @@ export function FeedbackItem({
 }) {
   const diagnostics = item.diagnostics;
   const needsCleanup = item.moderationStatus === "WITHDRAWAL_REQUESTED";
+  const extraLabel = needsCleanup
+    ? "撤回请求：待清理公开内容"
+    : "公开与其他操作";
   // 官网标题取自正文首行，相同内容只显示一次，长正文仍完整可读。
   const hasDescription = item.description.trim() !== item.title.trim();
   const actionLabels = {
@@ -46,7 +54,11 @@ export function FeedbackItem({
     RESOLVED: "标记已解决",
   } satisfies Record<Feedback["status"], string>;
   return (
-    <article className={styles.item} aria-label={item.title || "已撤回的反馈"}>
+    <article
+      className={styles.item}
+      aria-label={item.title || "已撤回的反馈"}
+      data-assembly="panel"
+    >
       <div className={styles.meta}>
         <span>{categories[item.category]}</span>
         <span className={styles.status}>
@@ -76,7 +88,7 @@ export function FeedbackItem({
             .map((status) => (
               <Button
                 key={status}
-                className={status === "RESOLVED" ? "" : "secondary"}
+                variant={status === "RESOLVED" ? "default" : "outline"}
                 disabled={busy}
                 onClick={() => onChange(status)}
               >
@@ -98,39 +110,49 @@ export function FeedbackItem({
       {saving && <Notice>正在保存处理操作…</Notice>}
       {error !== undefined && <Notice error={error} />}
       {(onModerate || diagnostics) && (
-        <details className={styles.extra} open={needsCleanup}>
-          <summary>
-            {needsCleanup ? "撤回请求：待清理公开内容" : "公开与其他操作"}
-          </summary>
-          {onModerate && (
-            <FeedbackModeration
-              item={item}
-              busy={busy}
-              onModerate={onModerate}
-            />
-          )}
-          {diagnostics && (
-            <div className={styles.technical}>
-              <p className={styles.label}>版本与系统</p>
-              <dl className={styles.diagnostics}>
-                {(
-                  [
-                    ["软件版本", diagnostics.appVersion],
-                    ["操作系统", diagnostics.system],
-                    ["系统架构", diagnostics.architecture],
-                    ["Python 版本", diagnostics.pythonVersion],
-                    ["Qt 版本", diagnostics.qtVersion],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value || "未提供"}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-        </details>
+        <Collapsible
+          key={needsCleanup ? "cleanup" : "other"}
+          className={styles.extra}
+          defaultOpen={needsCleanup}
+        >
+          <CollapsibleTrigger
+            className={styles.extraTrigger}
+            aria-label={extraLabel}
+          >
+            {extraLabel}
+          </CollapsibleTrigger>
+          {/* 保留已选的审核确认状态，收起仅隐藏内容，不重建表单组件。 */}
+          <CollapsibleContent forceMount className={styles.extraContent}>
+            {onModerate && (
+              <FeedbackModeration
+                item={item}
+                busy={busy}
+                onModerate={onModerate}
+              />
+            )}
+            {diagnostics && (
+              <div className={styles.technical}>
+                <p className={styles.label}>版本与系统</p>
+                <dl className={styles.diagnostics}>
+                  {(
+                    [
+                      ["软件版本", diagnostics.appVersion],
+                      ["操作系统", diagnostics.system],
+                      ["系统架构", diagnostics.architecture],
+                      ["Python 版本", diagnostics.pythonVersion],
+                      ["Qt 版本", diagnostics.qtVersion],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value || "未提供"}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </article>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { useMe } from "@/components/navigation";
 import { Button, Heading, Notice } from "@/components/ui";
 import type { FeedbackManagement } from "@/lib/types";
@@ -61,7 +62,14 @@ function ChatWorkspace({
   if (denied)
     return (
       <Notice>
-        会话权限已失效，请重新登录后查看。<Link href="/login">前往登录</Link>
+        会话权限已失效，请重新登录后查看。
+        <ShadcnButton
+          asChild
+          variant="link"
+          className="h-auto whitespace-normal p-0 text-left"
+        >
+          <Link href="/login">前往登录</Link>
+        </ShadcnButton>
       </Notice>
     );
   return (
@@ -133,21 +141,37 @@ function ChatContent({
       </Heading>
       <div className={styles.pageLinks}>
         {admin ? (
-          <Link href="/admin/feedback">收件与审核 ↗</Link>
+          <ShadcnButton
+            asChild
+            variant="link"
+            className="h-auto whitespace-normal p-0 text-left"
+          >
+            <Link href="/admin/feedback">收件与审核 ↗</Link>
+          </ShadcnButton>
         ) : (
-          <Link href="/#feedback">提交新的反馈 ↗</Link>
+          <ShadcnButton
+            asChild
+            variant="link"
+            className="h-auto whitespace-normal p-0 text-left"
+          >
+            <Link href="/#feedback">提交新的反馈 ↗</Link>
+          </ShadcnButton>
         )}
         <span>仅在页面可见时自动同步</span>
       </div>
       {missing && (
         <Notice>这条反馈不存在或已无法查看，请从列表选择其他会话。</Notice>
       )}
-      <div className={styles.workspace} data-detail={!!selected}>
+      <div
+        className={styles.workspace}
+        data-detail={!!selected}
+        data-assembly="panel"
+      >
         <aside className={styles.listPane} aria-label="会话列表">
           <header className={styles.listHeader}>
             <h2>{admin ? "全部反馈" : "你的会话"}</h2>
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy || query.isFetching}
               onClick={onUpdated}
             >
@@ -159,7 +183,7 @@ function ChatContent({
             <>
               <Notice error={query.error} />
               <Button
-                className="secondary"
+                variant="outline"
                 disabled={busy || query.isFetching}
                 onClick={onUpdated}
               >
@@ -187,7 +211,7 @@ function ChatContent({
           </ul>
           {query.hasNextPage && (
             <Button
-              className="secondary"
+              variant="outline"
               disabled={busy || query.isFetching}
               onClick={() => void query.fetchNextPage()}
             >
@@ -218,14 +242,28 @@ function ChatContent({
             <h2>{admin ? "一条反馈，一段对话。" : "把问题聊清楚。"}</h2>
             <p>选择一条反馈，查看问题和后续消息。</p>
             <p className={styles.muted}>对话不会公开到 GitHub。</p>
-            {!admin && <Link href="/#feedback">提交反馈</Link>}
+            {!admin && (
+              <ShadcnButton
+                asChild
+                variant="link"
+                className="h-auto whitespace-normal p-0 text-left"
+              >
+                <Link href="/#feedback">提交反馈</Link>
+              </ShadcnButton>
+            )}
           </div>
         )}
       </div>
       {/* 保留稳定路由，浏览器前进/后退和外部反馈链接都可直接打开同一会话。 */}
-      <Link className={styles.allLink} href={base}>
-        查看全部{admin ? "反馈" : "我的反馈"}
-      </Link>
+      <ShadcnButton
+        asChild
+        variant="link"
+        className="h-auto whitespace-normal p-0 text-left"
+      >
+        <Link className={styles.allLink} href={base}>
+          查看全部{admin ? "反馈" : "我的反馈"}
+        </Link>
+      </ShadcnButton>
     </>
   );
 }
