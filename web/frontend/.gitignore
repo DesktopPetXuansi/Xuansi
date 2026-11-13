@@ -1,7 +1,0 @@
-node_modules/
-.next/
-.next-production/
-*.tsbuildinfo
-.env.local
-playwright-report/
-test-results/

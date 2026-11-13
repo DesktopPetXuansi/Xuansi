@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 LOG = logging.getLogger("installer-payload")
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def verify(compiler: Path):
@@ -30,6 +30,9 @@ def verify(compiler: Path):
             fixture = payload / relative
             fixture.parent.mkdir(parents=True, exist_ok=True)
             fixture.write_text("# 仅供编译验证，不执行\n", encoding="utf-8")
+        notice = Path("omx_wiki/项目/THIRD_PARTY.md")
+        (payload / notice).parent.mkdir(parents=True)
+        (payload / notice).write_bytes((ROOT / notice).read_bytes())
         shared = payload / "web/contracts/fixtures/model-references.json"
         shared.parent.mkdir(parents=True)
         shared.write_bytes((ROOT / "web/contracts/fixtures/model-references.json").read_bytes())
