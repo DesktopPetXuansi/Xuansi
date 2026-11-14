@@ -26,9 +26,9 @@ func trialCandidate(root, version string) error {
 	if err != nil {
 		return err
 	}
-	python := filepath.Join(path, "runtime", "python", "python.exe")
-	if info, err := os.Lstat(python); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("candidate missing Python: %v", err)
+	python, err := pythonPath(path, false)
+	if err != nil {
+		return err
 	}
 	nonceBytes := make([]byte, 32)
 	if _, err := rand.Read(nonceBytes); err != nil {
@@ -40,7 +40,7 @@ func trialCandidate(root, version string) error {
 	cmd := exec.CommandContext(ctx, python, "-B", "-m", "pet", "--update-health-check")
 	cmd.Dir = path
 	cmd.Env = append(os.Environ(),
-		"XUANSI_WRITABLE_ROOT="+filepath.Join(root, "shared"),
+		"XUANSI_WRITABLE_ROOT="+root,
 		"XUANSI_VERSION_RUNTIME_ROOT="+filepath.Join(path, "runtime"),
 		"XUANSI_UPDATE_TRIAL_NONCE="+nonce,
 	)

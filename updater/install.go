@@ -13,7 +13,7 @@ import (
 )
 
 func waitForAppExit(root string) error {
-	lock := filepath.Join(root, "shared", "data", "app.lock")
+	lock := filepath.Join(root, "data", "app.lock")
 	deadline := time.Now().Add(45 * time.Second)
 	for {
 		_, err := os.Lstat(lock)
@@ -41,7 +41,7 @@ func installCandidate(root string, store engine.Store, state engine.State, candi
 	if info, err := os.Lstat(versions); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("version directory is unavailable or unsafe")
 	}
-	if info, err := os.Lstat(filepath.Join(root, "shared", "data")); err != nil || !info.IsDir() {
+	if info, err := os.Lstat(filepath.Join(root, "data")); err != nil || !info.IsDir() {
 		return errors.New("shared user data has not been prepared")
 	}
 	if err := waitForAppExit(root); err != nil {

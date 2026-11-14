@@ -43,17 +43,33 @@ func start(root string, state engine.State, args []string) error {
 	if err != nil {
 		return err
 	}
-	python := filepath.Join(path, "runtime", "python", "pythonw.exe")
-	if info, err := os.Lstat(python); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("committed version missing Python: %v", err)
+	python, err := pythonPath(path, true)
+	if err != nil {
+		return err
 	}
 	cmd := exec.Command(python, append([]string{"-B", "-m", "pet"}, args...)...)
 	cmd.Dir = path
 	cmd.Env = append(os.Environ(),
-		"XUANSI_WRITABLE_ROOT="+filepath.Join(root, "shared"),
+		"XUANSI_WRITABLE_ROOT="+root,
 		"XUANSI_VERSION_RUNTIME_ROOT="+filepath.Join(path, "runtime"),
 	)
 	return cmd.Start()
+}
+
+func pythonPath(versionRoot string, windowed bool) (string, error) {
+	name := "python.exe"
+	if windowed {
+		name = "pythonw.exe"
+	}
+	for _, candidate := range []string{
+		filepath.Join(versionRoot, ".venv", "Scripts", name),
+		filepath.Join(versionRoot, "runtime", "python", name),
+	} {
+		if info, err := os.Lstat(candidate); err == nil && info.Mode().IsRegular() {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("version missing %s", name)
 }
 
 func main() {
@@ -76,6 +92,28 @@ func run() error {
 	}
 	defer mutex.Close()
 	store := engine.Store{Root: filepath.Join(root, "update")}
+	if len(os.Args) == 3 && os.Args[1] == "--initialize" {
+		if _, err := os.Lstat(filepath.Join(root, "update", "update-state.json")); err == nil {
+			return errors.New("launcher is already initialized")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if _, err := versionPath(root, os.Args[2]); err != nil {
+			return err
+		}
+		if info, err := os.Lstat(filepath.Join(root, "data")); err != nil || !info.IsDir() {
+			return errors.New("user data is missing")
+		}
+		if _, err := os.Lstat(filepath.Join(root, "data", "app.lock")); err == nil {
+			return errors.New("legacy application is still running")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err := trialCandidate(root, os.Args[2]); err != nil {
+			return err
+		}
+		return store.Save(engine.State{Current: os.Args[2]})
+	}
 	state, err := store.Load()
 	if err != nil {
 		return err
