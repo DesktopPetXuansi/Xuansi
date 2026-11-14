@@ -113,9 +113,6 @@ def _privacy_form(page, layout, settings):
     page.cloud_memory.setChecked(settings.cloud_memory)
     privacy.addRow(page.cloud_memory)
     form_hint(privacy, "开启后可能分批发送整个记忆库，不只发送最终找到的摘录；记忆文件仍保存在本机。")
-    page.cloud_observation = QCheckBox("允许自动观察时向在线服务发送屏幕截图")
-    page.cloud_observation.setChecked(settings.cloud_observation)
-    privacy.addRow(page.cloud_observation)
     form_hint(privacy, "关闭只限制自动观察；手动附图和对话中按需截图仍可使用。录音在本机识别，不发送给在线模型。")
 
 

@@ -2,13 +2,10 @@
 
 import argparse
 import binascii
-import hashlib
 import json
 import logging
 import sys
 import tarfile
-import time
-import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from pet.ai.install_plan import default_model_dir
+from pet.ai.resource_download import fetch_resource
 
 MODELS = Path(default_model_dir())
 RUNTIME = ROOT / "runtime"
@@ -64,58 +62,8 @@ ASSETS = [
 ]
 
 
-def digest(path: Path):
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
 def fetch(asset: tuple[str, Path, str]):
-    url, path, expected = asset
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_file() and digest(path) == expected:
-        LOG.info("已校验 %s", path.name)
-        return
-    partial = path.with_suffix(path.suffix + ".part")
-    for attempt in range(6):
-        offset = partial.stat().st_size if partial.exists() else 0
-        headers = {"User-Agent": "DesktopPet-Local-Setup/1.0"}
-        if offset:
-            headers["Range"] = f"bytes={offset}-"
-        try:
-            request = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(request, timeout=25) as response:
-                # 服务端不支持 Range 时从头开始，避免拼接出损坏的模型。
-                if response.status != 206:
-                    offset = 0
-                elif not response.headers.get("Content-Range", "").startswith(f"bytes {offset}-"):
-                    raise ValueError("续传起点不匹配")
-                total = offset + int(response.headers.get("Content-Length", "0"))
-                started, current, reported = time.monotonic(), offset, time.monotonic()
-                LOG.info("下载 %s，%.1f / %.1f MiB", path.name, offset / 2**20, total / 2**20)
-                with partial.open("ab" if offset else "wb") as stream:
-                    while chunk := response.read(1024 * 1024):
-                        stream.write(chunk)
-                        current += len(chunk)
-                        # 每个任务最多 2MiB/s；三个并发避免占满用户网络。
-                        delay = (current - offset) / (2 * 1024 * 1024) - (time.monotonic() - started)
-                        if delay > 0:
-                            time.sleep(delay)
-                        if time.monotonic() - reported > 30:
-                            LOG.info("进度 %s %.1f%%", path.name, current / max(total, 1) * 100)
-                            reported = time.monotonic()
-            if total and partial.stat().st_size < total:
-                raise OSError("下载提前结束，继续断点续传")
-            if digest(partial) != expected:
-                raise ValueError("SHA256 不匹配，拒绝启用")
-            partial.replace(path)
-            LOG.info("完成并校验 %s", path.name)
-            return
-        except Exception as exc:
-            LOG.warning("%s 第 %d 次失败：%s", path.name, attempt + 1, type(exc).__name__)
-            if isinstance(exc, ValueError):
-                raise
-            time.sleep(min(attempt + 1, 5))
-    raise RuntimeError(f"下载失败：{path.name}，保留续传文件")
+    fetch_resource(*asset)
 
 
 def extract(assets=None, models=MODELS, runtime=RUNTIME, manifest_path=None):

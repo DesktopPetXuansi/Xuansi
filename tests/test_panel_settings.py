@@ -37,17 +37,31 @@ def test_close_persists_edits_and_reopened_panel_keeps_them(panel, tmp_path):
 
     panel.settings_requested.connect(save)
     panel.persona.name.setText("关闭保存测试")
-    panel.preferences.interval.setValue(37)
+    panel.preferences.capture_scope.setCurrentIndex(panel.preferences.capture_scope.findData("screen"))
     panel.model_page.temperature.setValue(0.3)
     panel.close()
     assert path.exists(), "关闭时应保存修改，而不是只隐藏表单"
     assert not panel.isVisible()
     reloaded = load_settings(path)
     assert reloaded.name == "关闭保存测试"
-    assert reloaded.interval == 37 and reloaded.temperature == 0.3
+    assert reloaded.capture_scope == "screen" and reloaded.temperature == 0.3
     panel.show()
     assert panel.persona.name.text() == reloaded.name
-    assert panel.preferences.interval.value() == reloaded.interval
+    assert panel.preferences.capture_scope.currentData() == reloaded.capture_scope
+
+
+def test_screen_controls_start_off_and_consume_one_attachment(panel):
+    panel.screen_mode_requested.connect(panel.screen_mode)
+    assert not panel.with_screen.isEnabled() and not panel.look_button.isEnabled()
+    panel.screen_enabled.click()
+    assert panel.with_screen.isEnabled() and panel.look_button.isEnabled()
+    panel.with_screen.setChecked(True)
+    assert panel.take_screen_attachment()
+    assert not panel.take_screen_attachment()
+    panel.with_screen.setChecked(True)
+    panel.screen_enabled.click()
+    assert not panel.with_screen.isEnabled() and not panel.look_button.isEnabled()
+    assert not panel.with_screen.isChecked()
 
 
 def test_close_waits_for_async_save_and_keeps_draft_on_failure(panel):

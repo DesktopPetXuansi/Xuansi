@@ -8,7 +8,6 @@ from dataclasses import replace
 import httpx
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QDialog,
     QListWidgetItem,
     QPushButton,
 )
@@ -18,6 +17,7 @@ from .platform_auth import authorize, website_url
 from .platform_layout import resource_layout
 from .platform_resources import installed_resources, read_installed
 from .platform_upload import UploadError
+from .theme import ThemedDialog
 
 LOG = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class PlatformTask(QThread):
                 pass
 
 
-class PlatformDialog(QDialog):
+class PlatformDialog(ThemedDialog):
     appearance_requested = Signal(object)
     shutdown_done = Signal()
     activity_changed = Signal(str)
@@ -79,7 +79,7 @@ class PlatformDialog(QDialog):
     busy_changed = Signal(bool)
 
     def __init__(self, owner, *, embedded=False):
-        super().__init__(owner.panel)
+        super().__init__(owner.panel, embedded=embedded)
         self.embedded = embedded
         if embedded:
             self.setParent(owner.panel, Qt.WindowType.Widget)

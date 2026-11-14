@@ -46,8 +46,7 @@ def picture(scene):
 
 def positives(repeats):
     prompts = {
-        "capture_screen": ["请调用截图查看当前屏幕，告诉我它主要是什么颜色。",
-                           "帮我看看现在屏幕上的主色是什么。", "现在截一下屏，描述当前画面颜色。"],
+        "screen_attachment": ["告诉我附图的主色。", "帮我看看附图的主色是什么。", "描述我分享的画面颜色。"],
         "search_memory": ["查询长期记忆，告诉我最喜欢什么茶。", "你长期记忆里存的我的饮品偏好是什么？",
                           "请检索之前保存的记忆，找出我喜欢喝什么。"],
         "save_memory": ["请记住：我最喜欢乌龙茶。", "把我喜欢乌龙茶这件事保存到长期记忆。",
@@ -64,9 +63,12 @@ def positives(repeats):
     cases = []
     for tool, texts in prompts.items():
         for index in range(repeats):
+            kind, image = {
+                "finish_observation": ("observation", "quiet0"),
+                "screen_attachment": ("chat-screen", "blue"),
+            }.get(tool, ("chat", ""))
             cases.append(Case(f"positive/{tool}/{index + 1}", texts[index], tool,
-                              kind="observation" if tool == "finish_observation" else "chat",
-                              image="quiet0" if tool == "finish_observation" else "",
+                              kind=kind, image=image,
                               seed_memory="我的饮品偏好是乌龙茶。" if tool == "search_memory" else "",
                               memory_contains=("乌龙茶",) if tool == "save_memory" else (),
                               memory_excludes=("玄司",) if tool == "save_memory" else ()))

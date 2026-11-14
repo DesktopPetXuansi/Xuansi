@@ -1,4 +1,4 @@
-"""原生标签控制中心验收：临时配置、内存账号替身，只采集本程序窗口，不启麦或联网。"""
+"""原生控制中心验收：临时配置、内存账号替身，只采集本程序窗口，不启麦或联网。"""
 
 import asyncio
 import json
@@ -28,6 +28,7 @@ LOG = logging.getLogger(__name__)
 
 class Runtime(QObject):
     platform_settings_saved = Signal(object, str)
+    settings_saved = Signal(object, str)
 
 
 class LocalClient:
@@ -88,6 +89,8 @@ def inspect(application, temporary, output):
         QTest.keyClick(panel.input, Qt.Key.Key_Return)
         report["chat_sends_once"] = messages == [("同一个控制中心", False)]
         panel.append("玄司", "对话、设置、形象和资源集中在这个控制中心。")
+        panel.resize(1080, 680)
+        QTest.qWait(80)
         bar = panel.navigation.bar
         keys = tuple(bar.tabData(index) for index in range(bar.count()))
         report["horizontal_chrome_style_tabs"] = (
@@ -96,8 +99,9 @@ def inspect(application, temporary, output):
             and len({bar.tabRect(index).center().y() for index in range(bar.count())}) == 1
         )
         panel.persona.name.setText("跨标签保留草稿")
+        report["wide_sidebar"] = panel.navigation.sidebar.isVisible() and not panel.navigation.header.isVisible()
         for key in ("persona", "preferences", "model", "chat"):
-            bar.setCurrentIndex(keys.index(key))
+            panel.navigation.buttons[key].click()
             QTest.qWait(20)
             assert panel.navigation.current_key == key
             assert panel.navigation.stack.currentWidget() is panel.sections[key]
@@ -150,6 +154,7 @@ def inspect(application, temporary, output):
         navigation = panel.navigation
         report["narrow_window_usable"] = (
             panel.width() == 560
+            and navigation.header.isVisible() and not navigation.sidebar.isVisible()
             and panel.sections["upload"].horizontalScrollBar().maximum() == 0
         )
         report["no_corner_dropdown"] = not any(
@@ -190,7 +195,7 @@ def main():
     configure_opengl_sharing()
     application = QApplication.instance() or QApplication([])
     application.setQuitOnLastWindowClosed(False)
-    output = ROOT / "web/.runtime/screenshots"
+    output = ROOT / ".runtime/screenshots"
     output.mkdir(parents=True, exist_ok=True)
     # 固定站点为关闭的回环端口，双重替换客户端和资源枚举，避免用户数据与外部请求。
     with tempfile.TemporaryDirectory(prefix="xuansi-control-") as directory, \

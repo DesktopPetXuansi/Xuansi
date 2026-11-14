@@ -62,10 +62,11 @@ class ProbeDevice(QRunnable):
 
     def run(self):
         from .ai.device import probe_device
-        from .config import ROOT
+        from .config import WRITABLE_ROOT
 
         try:
-            report = probe_device(ROOT, self.model_dir)
+            # 商店版资源写入包外目录，容量检查应测量实际目标盘。
+            report = probe_device(WRITABLE_ROOT, self.model_dir)
             self.signals.device.emit(self.generation, report, "")
         except Exception:
             LOG.warning("设置页环境重新检测未完成")

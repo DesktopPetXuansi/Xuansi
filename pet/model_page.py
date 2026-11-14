@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
@@ -40,6 +41,13 @@ class ModelPage(QWidget):
         layout.addWidget(hint)
         self.ai_page = AIPage(settings.ai)
         layout.addWidget(self.ai_page)
+        self.prepare_model = QPushButton('检查或准备本机模型')
+        layout.addWidget(self.prepare_model)
+        self.auto_download = QCheckBox('以后缺少本机模型时自动下载')
+        self.auto_download.setToolTip('可能联网下载数 GB 模型文件。关闭后，下次下载前会先确认。')
+        layout.addWidget(self.auto_download)
+        self.ai_page.policy.currentIndexChanged.connect(self._setup_visibility)
+        self._setup_visibility()
         advanced = self.ai_page.advanced.content_layout
         self._reply_parameters(advanced, settings)
         self._resource_parameters(advanced, settings)
@@ -48,7 +56,7 @@ class ModelPage(QWidget):
         self.projector = self._file_row(local, "看图组件（GGUF）", settings.projector_path)
         self.ai_page.local_model.currentIndexChanged.connect(self._local_model_changed)
         self.ai_page.model_dir.editingFinished.connect(self._local_model_changed)
-        form_hint(local, "模型和看图组件需配套。路径可直接编辑，悬停可查看完整路径。")
+        form_hint(local, "模型和看图组件需配套。自定义路径可直接编辑。更换下载目录后，先保存再准备模型。")
         hotkeys = form_group(layout, "快捷键")
         self.hotkey = QKeySequenceEdit(QKeySequence(settings.chat_hotkey))
         self.hotkey.setMaximumSequenceLength(1)
@@ -64,6 +72,11 @@ class ModelPage(QWidget):
         layout.addLayout(actions)
         layout.addStretch()
         LOG.debug("模型设置页已就绪，高级参数默认收起")
+
+    def _setup_visibility(self, *_):
+        local = self.ai_page.policy.currentData() != 'online_first'
+        self.prepare_model.setVisible(local)
+        self.auto_download.setVisible(local)
 
     def _reply_parameters(self, layout, settings):
         reply = form_group(layout, "回复参数")

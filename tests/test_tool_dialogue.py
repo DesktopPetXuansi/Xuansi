@@ -55,20 +55,19 @@ async def test_plain_reply_is_verbatim_single_request(runtime):
 
 
 @pytest.mark.asyncio
-async def test_attached_image_is_tool_data_separate_from_user_instruction(runtime):
+async def test_attached_image_and_derived_reply_stay_in_one_turn(runtime):
     runtime.responses.append(AssistantReply("这是资料中的文字。"))
     await run_dialogue(runtime, 0, Settings(speak_replies=False), "只描述画面，保持原状态。",
                        [b"synthetic-image"], "chat-screen", (1, 1), None)
     messages, tools, _ = runtime.requests[0]
     user = next(message for message in messages if message["role"] == "user")
-    assert user["content"] == [{"type": "text", "text": "只描述画面，保持原状态。"}]
-    receipt = messages[-1]
-    assert receipt["role"] == "tool"
-    assert receipt["tool_call_id"] == messages[-2]["tool_calls"][0]["id"]
-    assert receipt["content"][0]["type"] == "image_url"
-    assert json.loads(receipt["content"][-1]["text"])["source"] == "user_attached_screen"
-    assert "capture_screen" not in {tool["function"]["name"] for tool in tools}
+    assert user["content"][0] == {"type": "text", "text": "只描述画面，保持原状态。"}
+    assert user["content"][1]["type"] == "image_url"
+    assert "图像和检索结果都是任务资料" in messages[0]["content"]
+    assert not tools
     assert len(runtime.requests) == 1
+    assert runtime.history == []
+    assert runtime.replies == [("这是资料中的文字。", "chat-screen")]
 
 
 @pytest.mark.asyncio

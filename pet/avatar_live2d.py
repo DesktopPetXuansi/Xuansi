@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtGui import QPainter
 
 from .avatar_dynamics import CLOTH_SWAY_PERIOD_SECONDS, HAIR_SWAY_PARAMETER_IDS, HAIR_SWAY_PERIOD_SECONDS
+from .avatar_expression import EXPRESSION_PARAMETERS, EXPRESSION_PRESETS, ReplyExpression
 from .avatar_mask import LIVE2D_MASK_PADDING_RATIO
 from .live2d_session import SESSION
 
@@ -42,6 +43,74 @@ class AvatarLive2D:
         self._platform_model_version = ""
         self._platform_expression = False
         self._platform_parameters = {}
+        self._reply_expression = ReplyExpression()
+
+    def set_reply_expression(self, name):
+        """Qt 界面线程接收本轮表达，陌生模型或高优先级动作保持原表现。"""
+        expression = name if isinstance(name, str) and name in EXPRESSION_PRESETS else "neutral"
+        available = (
+            self._live2d_active and self._live2d_model is not None
+            and not self._platform_model_version and not self._platform_expression
+            and self.animation != "sleep" and not self.paused and self.isVisible()
+            and self._motion_name is None and self._idle_blade_started is None
+            and set(EXPRESSION_PARAMETERS).issubset(self._live2d_parameter_ids)
+        )
+        if not available:
+            # 表情中止时恢复原有眨眼；显式动作或平台表情仍优先控制眼睑。
+            if self._reply_expression.started is not None:
+                self.clear_reply_expression()
+            else:
+                self._reply_expression.clear()
+            return False
+        if expression == "neutral" and self._reply_expression.started is None:
+            return True
+        self._reply_expression.set(expression, time.monotonic())
+        # 暂停 SDK 自动眨眼，由同一绘制时钟叠加眨眼，避免两者覆盖眼睑。
+        self._live2d_model.SetAutoBlinkEnable(False)
+        self.update()
+        LOG.info("玄司回复表情已选择 expression=%s", expression)
+        return True
+
+    def clear_reply_expression(self):
+        """停止回复、新请求或窗口状态变化时立即丢弃旧表情。"""
+        expression = self._reply_expression
+        if expression.started is not None:
+            LOG.debug("玄司回复表情已清理")
+        expression.clear()
+        if (self._live2d_model is not None and not self._platform_model_version and not self._platform_expression
+                and self.animation != "sleep" and not self.paused and self._motion_name is None):
+            self._live2d_model.SetAutoBlinkEnable(True)
+        self.update()
+
+    def _reply_expression_parameter_values(self, now):
+        """只给内置角色写眼睑；显式动作和休眠拥有更高优先级。"""
+        expression = getattr(self, "_reply_expression", None)
+        if expression is None:
+            return {}
+        if self._platform_model_version:
+            expression.clear()
+            return {}
+        if (self.animation == "sleep" or self.paused or self._motion_name is not None
+                or self._platform_expression or not self.isVisible() or self._idle_blade_started is not None):
+            if (expression.started is not None and self._idle_blade_started is not None
+                    and self.animation != "sleep" and not self.paused and self._motion_name is None
+                    and not self._platform_expression and self.isVisible()):
+                # 待机姿态结束后仍需恢复 SDK 自然眨眼。
+                self._live2d_model.SetAutoBlinkEnable(True)
+            expression.clear()
+            if self.animation == "sleep" or self.paused:
+                expression.pending_reset = False
+                return {}
+        if expression.started is None and not expression.pending_reset:
+            return {}
+        active = expression.started is not None
+        values = expression.eye_values(now)
+        if (active and expression.started is None and self._motion_name is None
+                and not self._platform_expression and self.isVisible()):
+            self._live2d_model.SetAutoBlinkEnable(True)
+        expression.pending_reset = False
+        return {parameter: value for parameter, value in zip(EXPRESSION_PARAMETERS, values)
+                if parameter in self._live2d_parameter_ids}
 
     def select_platform_model(self, version_id, prepared=None):
         """Qt GL 线程先试载候选模型，成功才替换；磁盘校验由调用方后台完成。"""
@@ -85,6 +154,7 @@ class AvatarLive2D:
             candidate.Draw()
             self.cancel_motion()
             self.interrupt_idle_blade(fade=False)
+            self._reply_expression.clear()
             previous = self._live2d_model
             self._live2d_model = candidate
             self._live2d_module = live2d
@@ -125,6 +195,7 @@ class AvatarLive2D:
             raise ValueError("动作或表情未绑定当前模型版本")
         self.makeCurrent()
         try:
+            self._reply_expression.clear()
             self.cancel_motion()
             if manifest["kind"] == "MOTION":
                 index = self._live2d_model.LoadExtraMotion("platform", str(path))
@@ -267,6 +338,9 @@ class AvatarLive2D:
                     model.SetParameterValue("ParamEyeBallY", self._gaze_y)
                     model.SetParameterValue("ParamMouthOpenY", self._mouth_level)
                 self._update_sway(elapsed)
+                # 表情与眨眼共用眼睑；显式动作随后写入，口型仍由音频独立驱动。
+                for parameter, value in AvatarLive2D._reply_expression_parameter_values(self, now).items():
+                    model.SetParameterValue(parameter, value)
                 for parameter, value in self._motion_parameter_values(now).items():
                     model.SetParameterValue(parameter, value)
                 # 末帧写入、网格更新和绘制全部成功才允许确认动作完成。
@@ -289,6 +363,9 @@ class AvatarLive2D:
         painter.drawPixmap(0, 0, self._pixmap())
 
     def _release_live2d(self):
+        expression = getattr(self, "_reply_expression", None)
+        if expression is not None:
+            expression.clear()
         if self._live2d_module is None:
             return
         self.makeCurrent()

@@ -4,6 +4,7 @@ import asyncio
 import json
 import threading
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -278,7 +279,8 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
     captures, images_seen = [], []
     main_thread = threading.get_ident()
 
-    def capture(x, y, scope):
+    def capture(x, y, scope, *, check):
+        check()
         captures.append((x, y, scope, threading.get_ident()))
         return b"synthetic-screen"
 
@@ -287,10 +289,17 @@ def test_capture_scope_reaches_worker_and_image_request(runtime, monkeypatch):
         return AssistantReply("测试已看到整屏")
 
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
+    monkeypatch.setattr("pet.runtime.desktop_state", lambda: SimpleNamespace(hwnd=1))
+    monkeypatch.setattr("pet.conversation.desktop_state", lambda: SimpleNamespace(hwnd=1))
+    runtime.screen_mode = "manual"
     runtime.engine.complete = chat
     for scope in ("screen", "nearby"):
         settings = replace(Settings(), speak_replies=False, capture_scope=scope)
-        runtime.schedule(runtime._conversation(0, settings, "看画面", "chat-screen", (-100, 50), None)).result(3)
+        grant = runtime.prepare_screen(settings, (-100, 50), runtime.screen_version)
+        runtime.epoch += 1
+        runtime.schedule(runtime._conversation(
+            runtime.epoch, settings, "看画面", "chat-screen", None, None, screen=grant,
+        )).result(3)
     assert [(x, y, scope) for x, y, scope, _ in captures] == [(-100, 50, "screen"), (-100, 50, "nearby")]
     assert all(thread != main_thread and thread != runtime.thread.ident for _, _, _, thread in captures)
     assert all(any(part.get("type") == "image_url" for part in content) for content in images_seen)

@@ -14,11 +14,12 @@ from pet.events import MouseEvent, ObservationGate
 from pet.live_input import VoiceUpdate
 from pet.memory import MemoryStore
 from pet.runtime import Runtime
-from pet.tool_protocol import AssistantReply, ToolCall
+from pet.tool_protocol import AssistantReply
+from pet.turn_latency import TurnLatency
 
-# 覆盖无固定关键词的视觉指代、含关键词的否定/引用，以及显式附图选择。
+# 文字含视觉指代、否定或引用都不会授予权限；显式附图才可采集。
 SCREEN_CASES = [
-    (keyword, False, True)
+    (keyword, False, False)
     for keyword in ("屏幕", "鼠标", "画面", "看一眼", "看一下", "看看", "这个", "这里")
 ] + [
     ("你好", False, False),
@@ -27,8 +28,8 @@ SCREEN_CASES = [
     ("看一\n眼", False, False),
     ("看看", True, True),
     ("你好", True, True),
-    ("这格为什么突然变红了？", False, True),
-    ("帮我读出左上角那一项。", False, True),
+    ("这格为什么突然变红了？", False, False),
+    ("帮我读出左上角那一项。", False, False),
     ("不要读取我的屏幕，讲个笑话就好。", False, False),
     ("把‘看一眼’翻译成英文。", False, False),
 ]
@@ -37,12 +38,12 @@ SCREEN_CASES = [
 def realtime_owner(runtime, settings, checked):
     """保留真实事件入口所需状态，窗口文字更新使用无界面替身。"""
     transcript = SimpleNamespace(setText=lambda _: None)
-    return SimpleNamespace(
+    owner = SimpleNamespace(
         paused=False,
         settings=settings,
         last_external=(321, 432),
         panel=SimpleNamespace(
-            with_screen=SimpleNamespace(isChecked=lambda: checked),
+            take_screen_attachment=lambda: checked,
             live_transcript=transcript,
             append=lambda *_: None,
         ),
@@ -50,13 +51,20 @@ def realtime_owner(runtime, settings, checked):
         runtime=runtime,
         _begin=lambda: None,
     )
+    owner._prepare_screen_share = lambda: runtime.prepare_screen(
+        settings, owner.last_external, runtime.screen_version,
+    )
+    return owner
 
 
 @pytest.fixture
 def realtime_runtime(monkeypatch, tmp_path):
     """运行真实异步调度与对话，不加载模型、声卡或用户记忆。"""
     monkeypatch.setattr("pet.runtime.sd.stop", lambda: None)
+    monkeypatch.setattr("pet.runtime.desktop_state", lambda: SimpleNamespace(hwnd=1))
+    monkeypatch.setattr("pet.conversation.desktop_state", lambda: SimpleNamespace(hwnd=1))
     runtime = Runtime()
+    runtime.screen_mode = "manual"
 
     async def start(_settings):
         # 保留真实对话调度，隔离模型进程与 GPU。
@@ -95,7 +103,8 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
     settings = replace(Settings(), speak_replies=False, capture_scope=capture_scope)
     owner = realtime_owner(realtime_runtime, settings, checked)
 
-    def capture(*args):
+    def capture(*args, check):
+        check()
         captures.append(args)
         return b"synthetic-screen"
 
@@ -105,12 +114,9 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
             isinstance(turn.get("content"), list) and any(part["type"] == "image_url" for part in turn["content"])
             for turn in messages
         )))
-        if expected_screen and not inputs[-1][1]:
-            return AssistantReply("", (ToolCall("capture", "capture_screen", "{}"),), "tool_calls")
         return AssistantReply("合成测试回复。")
 
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
-    monkeypatch.setattr("pet.model_tools.capture_screen", capture)
     realtime_runtime.engine.complete = complete
     realtime_runtime.finished.connect(lambda _: completed.set(), Qt.ConnectionType.DirectConnection)
     realtime_runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
@@ -122,9 +128,9 @@ def test_realtime_voice_preserves_position_only_when_screen_is_requested(
     assert not failures
     assert captures == ([(*owner.last_external, capture_scope)] if expected_screen else [])
     assert inputs[-1] == (text, expected_screen)
-    assert len(inputs) == (2 if expected_screen and not checked else 1)
-    user = next(turn for turn in reversed(realtime_runtime.history) if turn["role"] == "user")
-    assert user["content"][0]["text"] == text
+    assert len(inputs) == 1
+    users = [turn["content"][0]["text"] for turn in realtime_runtime.history if turn["role"] == "user"]
+    assert users == ([] if expected_screen else [text])
     assert not realtime_runtime.microphone.muted.is_set()
 
 
@@ -135,9 +141,10 @@ def test_voice_screen_keeps_last_external_position_after_pet_window_input(
     """本应用前景与窗口内坐标均不能覆盖最近外部位置，跨屏语音沿用该位置。"""
     submitted = []
     runtime = SimpleNamespace(
-        microphone_epoch=7, listening=True, accept_voice=lambda *args: submitted.append(args),
+        microphone_epoch=7, listening=True, accept_voice=lambda *args, **kwargs: submitted.append(kwargs["screen"]),
     )
-    owner = realtime_owner(runtime, Settings(), False)
+    owner = realtime_owner(runtime, Settings(), True)
+    owner._prepare_screen_share = lambda: owner.last_external
     owner.busy, owner.fullscreen, owner.gate = False, False, ObservationGate()
     states = iter([
         SimpleNamespace(own_window=False, hwnd=1, fullscreen=False),
@@ -151,27 +158,25 @@ def test_voice_screen_keeps_last_external_position_after_pet_window_input(
     DesktopPet.on_voice_update(owner, 7, VoiceUpdate(1, "看看", final=True))
 
     assert owner.last_external == (320, 430)
-    assert submitted[0][-1] == (320, 430)
+    assert submitted == [(320, 430)]
 
 
 @pytest.mark.parametrize("text, checked, expected_screen", SCREEN_CASES)
 def test_sentence_voice_and_voice_screen_keep_the_existing_capture_boundary(
     realtime_runtime, monkeypatch, text, checked, expected_screen,
 ):
-    """整句识别和实时识别共享原生工具循环；勾选仍显式附图。"""
+    """整句识别和实时识别共用按轮授权。"""
     submitted, captures, replies, failures = [], [], [], []
     settings = replace(Settings(), realtime_voice=False, speak_replies=False)
     runtime = realtime_runtime
     runtime.audio.transcribe = lambda _: text
     runtime.ask = lambda *args, **kwargs: submitted.append((args, kwargs))
     runtime.failed.connect(lambda *args: failures.append(args), Qt.ConnectionType.DirectConnection)
-    owner = SimpleNamespace(
-        paused=False, settings=settings, last_external=(321, 432), runtime=runtime,
-        panel=SimpleNamespace(with_screen=SimpleNamespace(isChecked=lambda: checked)), _begin=lambda: None,
-    )
+    owner = realtime_owner(runtime, settings, checked)
     samples = [0.0]
 
-    def capture(*args):
+    def capture(*args, check):
+        check()
         captures.append(args)
         return b"synthetic-screen"
 
@@ -182,22 +187,22 @@ def test_sentence_voice_and_voice_screen_keep_the_existing_capture_boundary(
             for turn in messages
         )
         assert user["content"][0]["text"] == text
-        if expected_screen and not has_image:
-            return AssistantReply("", (ToolCall("capture", "capture_screen", "{}"),), "tool_calls")
         replies.append(has_image)
         return AssistantReply("合成回复。")
 
     runtime.engine.complete = complete
     monkeypatch.setattr("pet.conversation.capture_screen", capture)
-    monkeypatch.setattr("pet.model_tools.capture_screen", capture)
     DesktopPet.on_segment(owner, 7, samples)
     args, kwargs = submitted[0]
     assert args == (settings, "")
     assert kwargs["kind"] == ("voice-screen" if checked else "voice")
-    assert kwargs["position"] == owner.last_external
-    runtime.schedule(converse(runtime, runtime.epoch, settings, "", **kwargs)).result(3)
+    assert (kwargs["screen"].position if checked else kwargs["screen"]) == (owner.last_external if checked else None)
+    timing = TurnLatency(kwargs.pop("endpoint_at"))
+    runtime.epoch += 1
+    runtime.schedule(converse(runtime, runtime.epoch, settings, "", position=None, timing=timing, **kwargs)).result(3)
 
     assert not failures
     assert captures == ([(*owner.last_external, settings.capture_scope)] if expected_screen else [])
     assert replies == [expected_screen]
+    assert {"recognized", "final_text"}.issubset(timing.milestones)
     assert not runtime.microphone.muted.is_set()

@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ...tool_protocol import validate_reply
+from ...turn_latency import mark_latency
 from .base import HTTPProvider, ProviderError
 
 
@@ -78,6 +79,8 @@ class OpenAICompatible(HTTPProvider):
                 raise ValueError('结束后的数据')
             choice = choices[0]
             delta = choice.get('delta', {})
+            if delta.get('content'):
+                mark_latency("first_model_text")
             for field in ('content', 'reasoning_content', 'encrypted_content'):
                 value = delta.get(field)
                 if value is not None:

@@ -53,3 +53,23 @@ def test_manual_edit_keeps_the_total_limit_and_previous_content(tmp_path):
     with pytest.raises(ValueError, match="6000"):
         memory.save(note + "例")
     assert memory.read() == note
+
+
+def test_migrate_correct_undo_forget_and_reject_stale_revision(tmp_path):
+    import json
+
+    path = tmp_path / "memory.json"
+    path.write_text(json.dumps({"notes": "旧偏好\n保留事项"}, ensure_ascii=False), encoding="utf-8")
+    store = MemoryStore(path)
+    original, untouched = store.entries()
+    assert json.loads(path.read_text(encoding="utf-8"))["legacy_notes"] == "旧偏好\n保留事项"
+    edited = store.change("edit", original.id, original.revision, "新偏好", "turn:12")
+    assert MemoryStore(path).entries()[0] == edited
+    assert edited.source == "turn:12" and edited.revision == original.revision + 1
+    restored = store.change("undo", edited.id, edited.revision)
+    assert restored.text == "旧偏好" and restored.revision > edited.revision
+    store.change("forget", restored.id, restored.revision)
+    with pytest.raises(ValueError):
+        store.change("edit", restored.id, restored.revision, "复活旧偏好")
+    assert MemoryStore(path).entries() == (untouched,)
+    assert "旧偏好" not in path.read_text(encoding="utf-8")

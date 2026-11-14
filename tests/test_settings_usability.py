@@ -74,7 +74,7 @@ def test_run_mode_shows_needed_fields_and_preserves_other_drafts(make_panel, pol
     assert page.key.isVisible() == online
     assert page.cloud_memory.isVisible() == online
     assert page.profile().model == "custom-model" and page.key.text() == "test-only-draft"
-    assert page.cloud_memory.isChecked() and not page.cloud_observation.isChecked()
+    assert page.cloud_memory.isChecked()
 
 
 def test_folding_parameters_keeps_unsaved_values_and_running_validation(make_panel):
@@ -105,7 +105,7 @@ def test_preset_selection_fills_technical_fields_without_clearing_key_or_privacy
     assert profile.provider == "deepseek" and profile.endpoint and profile.model
     assert "tools" in profile.capabilities
     assert page.key.text() == "test-only-draft"
-    assert not page.cloud_memory.isChecked() and not page.cloud_observation.isChecked()
+    assert not page.cloud_memory.isChecked()
     assert not page.endpoint.isVisible(), "选择服务商后无需先理解 API 地址与能力声明"
     assert "https://" in page.key_help.text(), "提供所选服务商的官方密钥入口"
 

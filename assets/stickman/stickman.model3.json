@@ -1,0 +1,28 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "stickman.moc3",
+    "Textures": [
+      "textures/texture_00.png"
+    ],
+    "DisplayInfo": "stickman.cdi3.json",
+    "Motions": {
+      "Idle": [
+        {
+          "File": "motions/wave.motion3.json",
+          "FadeInTime": 0.1,
+          "FadeOutTime": 0.1
+        }
+      ],
+      "Wave": [
+        {
+          "File": "motions/wave.motion3.json",
+          "FadeInTime": 0.1,
+          "FadeOutTime": 0.1
+        }
+      ]
+    }
+  },
+  "Groups": [],
+  "HitAreas": []
+}

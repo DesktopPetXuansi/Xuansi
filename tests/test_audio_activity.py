@@ -30,7 +30,7 @@ def test_only_audible_external_sessions_block(monkeypatch):
     assert not audible(20, 1, False, 1.0, 0.0)
 
 
-def test_silence_hold_errors_and_stale_samples_fail_quiet():
+def test_silence_hold_and_short_detection_failures_pause_speech():
     gate = AudioActivity(clock=lambda: 10.0)
     assert gate.blocked
     gate.update(True, now=8.8)

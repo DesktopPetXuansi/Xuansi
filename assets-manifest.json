@@ -1,44 +1,8 @@
 [
   {
-    "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf",
-    "filename": "Qwen3.5-9B-Q4_K_M.gguf",
-    "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
-    "bytes": 5680522464
-  },
-  {
-    "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/mmproj-F16.gguf",
-    "filename": "mmproj-F16.gguf",
-    "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f",
-    "bytes": 918166080
-  },
-  {
-    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/llama-b10930-bin-win-cuda-12.4-x64.zip",
-    "filename": "llama.zip",
-    "sha256": "7d07deb817f7f380d1da119c76967d7ead0a4dbb02456c0edfda82a99122fed6",
-    "bytes": 254065226
-  },
-  {
-    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/cudart-llama-bin-win-cuda-12.4-x64.zip",
-    "filename": "cudart.zip",
-    "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
-    "bytes": 391443627
-  },
-  {
     "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
     "filename": "sensevoice.tar.bz2",
     "sha256": "7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63",
     "bytes": 165783878
-  },
-  {
-    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
-    "filename": "kokoro.tar.bz2",
-    "sha256": "a1e94694776049035c4f2c6529f003aaece993c76aae9a78995831c3c4dcafc6",
-    "bytes": 147031220
-  },
-  {
-    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2",
-    "filename": "melo.tar.bz2",
-    "sha256": "e58351ed7149f290a54534538badd4077cdbe6fddc964b24d0bee870415d1514",
-    "bytes": 167006755
   }
 ]

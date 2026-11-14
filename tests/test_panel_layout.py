@@ -4,10 +4,12 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-from PySide6.QtCore import QObject, QPoint, QRect, Signal
+from PySide6.QtCore import QObject, QPoint, QPointF, QRect, Qt, Signal
+from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication, QPushButton
 
 from pet.config import Settings
+from pet.memory import MemoryEntry
 from pet.panel import Panel
 from pet.platform_dialog import PlatformDialog
 
@@ -52,11 +54,98 @@ def test_ready_window_reserves_space_for_conversation(panel):
     assert panel.chat.height() >= 230, "紧凑窗口应给对话记录至少 230 个逻辑像素"
 
 
+def wheel_over(widget):
+    point = widget.rect().center()
+    event = QWheelEvent(QPointF(point), QPointF(widget.mapToGlobal(point)), QPoint(), QPoint(0, -120),
+                        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+    QApplication.sendEvent(widget, event)
+
+
+def test_wheel_over_model_fields_keeps_selection_and_numeric_values(panel):
+    panel.open_section("model")
+    page = panel.model_page
+    page.ai_page.advanced.toggle.setChecked(True)
+    QApplication.processEvents()
+    scroll = panel.sections["model"].verticalScrollBar()
+    assert scroll.maximum() > 0
+    for field, value in ((page.tokens, page.tokens.value), (page.context, page.context.currentIndex)):
+        before = value()
+        field.setFocus()
+        scroll.setValue(0)
+        wheel_over(field)
+        assert value() == before and scroll.value() > 0
+
+
+def test_wheel_over_chat_history_still_scrolls_messages(panel):
+    panel.chat.setPlainText("\n".join(f"第 {index} 条消息" for index in range(60)))
+    scroll = panel.chat.verticalScrollBar()
+    scroll.setValue(0)
+    wheel_over(panel.chat.viewport())
+    assert scroll.value() > 0
+
+
+def test_memory_selection_dispatches_revision_and_preserves_unrelated_draft(panel):
+    changes = []
+    panel.memory_change_requested.connect(lambda *args: changes.append(args))
+    first = MemoryEntry("first", "第一条", 1, "legacy", "")
+    second = MemoryEntry("second", "第二条", 3, "manual", "")
+    panel.set_memory_entries((first, second))
+    panel.memory.setPlainText("尚未保存的文本")
+    panel.memory_items.setCurrentIndex(panel.memory_items.findData(second.id))
+    panel.memory_correction.setText("更正第二条")
+    panel._memory_action("edit")
+    assert changes == [("edit", "second", 3, "更正第二条")]
+    panel.set_memory_entries((second,))
+    assert panel.memory.toPlainText() == "尚未保存的文本"
+    assert panel.memory_items.currentData() == second.id
+
+
 def test_conversation_history_grows_with_window(panel):
     settle_size(panel, 720, 560)
     initial_height = panel.chat.height()
     settle_size(panel, 1040, 800)
     assert panel.chat.height() > initial_height, "增高窗口应增加可阅读的对话记录空间"
+
+
+def test_resize_preserves_sidebar_selection_and_composer(panel):
+    settle_size(panel, 1080, 680)
+    assert panel.navigation.sidebar.isVisible() and panel.inspector.isVisible()
+    panel.navigation.buttons['model'].click()
+    assert panel.navigation.current_key == 'model'
+    settle_size(panel, 520, 480)
+    assert panel.navigation.header.isVisible() and not panel.inspector.isVisible()
+    assert panel.navigation.bar.tabData(panel.navigation.bar.currentIndex()) == 'model'
+    panel.open_section('chat')
+    assert_fully_inside(panel.input, panel.sections['chat'].viewport())
+
+
+def test_open_control_center_switches_between_prototype_palettes(panel):
+    settle_size(panel, 1080, 680)
+    panel.first_chat.set_note('准备本机模型', action='prepare-model', label='下载')
+    panel.first_chat.show()
+    panel.first_chat.toggle.setChecked(True)
+    hints = QApplication.styleHints()
+    try:
+        for scheme, expected in (
+            (Qt.ColorScheme.Dark, ('#202622', '#262e28', '#3b4c3d', '#2b342d', '#adc9a7', '#36483c', '#edbc83')),
+            (Qt.ColorScheme.Light, ('#fcfbf7', '#eeefe7', '#dde8da', '#f2f3ea', '#31583f', '#dce6d7', '#805b2e')),
+        ):
+            # 离屏平台不支持修改系统主题；发送 Qt 在真实切换时发出的信号。
+            hints.colorSchemeChanged.emit(scheme)
+            QApplication.processEvents()
+            pixels = [
+                (panel, QPoint(170, 52)),
+                (panel.navigation.sidebar, QPoint(8, 110)),
+                (panel.navigation.buttons['chat'], QPoint(95, 12)),
+                (panel.first_chat, QPoint(28, 8)),
+                (panel.first_chat.action, QPoint(8, 10)),
+                (panel.inspector_avatar, QPoint(10, panel.inspector_avatar.height() - 24)),
+                (panel.model_readiness, QPoint(4, panel.model_readiness.height() // 2)),
+            ]
+            actual = tuple(widget.grab().toImage().pixelColor(point).name() for widget, point in pixels)
+            assert actual == expected
+    finally:
+        hints.colorSchemeChanged.emit(hints.colorScheme())
 
 
 @pytest.mark.parametrize("size", [(520, 480), (560, 660)])

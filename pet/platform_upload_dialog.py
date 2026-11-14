@@ -7,7 +7,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QDialog,
     QFileDialog,
     QPushButton,
 )
@@ -17,13 +16,14 @@ from .platform_auth import authorize, website_url
 from .platform_layout import upload_layout
 from .platform_resources import read_installed
 from .platform_upload import UploadError
+from .theme import ThemedDialog
 
 LOG = logging.getLogger(__name__)
 
 
-class ModelUploadDialog(QDialog):
+class ModelUploadDialog(ThemedDialog):
     def __init__(self, platform, *, embedded=False):
-        super().__init__(platform)
+        super().__init__(platform, embedded=embedded)
         self.embedded = embedded
         if embedded:
             self.setParent(platform, Qt.WindowType.Widget)

@@ -6,6 +6,7 @@ import uuid
 from dataclasses import replace
 from urllib.parse import quote
 
+from ...screen_sharing import screen_turn
 from ...tool_protocol import validate_reply
 from .base import HTTPProvider, ProviderError, TokenEstimate
 
@@ -81,6 +82,8 @@ class GeminiNative(HTTPProvider):
         return payload
 
     async def input_tokens(self, settings, messages, tools=()):
+        if screen_turn.get() is not None:
+            return await super().input_tokens(settings, messages, tools)
         request = self.payload(messages, tools)
         request['model'] = 'models/' + self.profile.model
         data = await self.post(settings, self.path('countTokens'), {'generateContentRequest': request})

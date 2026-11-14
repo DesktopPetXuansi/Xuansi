@@ -86,11 +86,11 @@ def test_disconnected_display_does_not_capture_a_different_screen(capture):
     assert not requests
 
 
-def test_scope_defaults_to_screen_and_persists(tmp_path):
+def test_scope_defaults_to_nearby_and_explicit_screen_persists(tmp_path):
     path = tmp_path / "settings.json"
     path.write_text("{}", encoding="utf-8")
-    assert load_settings(path).capture_scope == "screen"
-    save_settings(replace(Settings(), capture_scope="nearby"), path)
     assert load_settings(path).capture_scope == "nearby"
+    save_settings(replace(Settings(), capture_scope="screen"), path)
+    assert load_settings(path).capture_scope == "screen"
     with pytest.raises(ValueError):
         replace(Settings(), capture_scope="unknown").validate()

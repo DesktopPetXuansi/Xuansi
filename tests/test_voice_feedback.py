@@ -17,12 +17,12 @@ def feedback():
         paused=False, fullscreen=False, busy=False, voice_enabled=True,
         last_voice_notice=float("-inf"), last_external=(0, 0), settings=object(),
         runtime=SimpleNamespace(epoch=3, microphone_epoch=7, listening=True,
-                                accept_voice=lambda *args: accepted.append(args)),
+                                accept_voice=lambda *args, **_kwargs: accepted.append(args)),
         avatar=SimpleNamespace(bubble=SimpleNamespace(present=lambda *args: bubbles.append(args))),
         panel=SimpleNamespace(
             live_transcript=transcript, append=lambda *args: messages.append(args),
             status=SimpleNamespace(setText=lambda text: labels.update(panel=text)),
-            with_screen=SimpleNamespace(isChecked=lambda: False),
+            take_screen_attachment=lambda: False,
         ),
     )
     owner.on_state = lambda *args: DesktopPet.on_state(owner, *args)

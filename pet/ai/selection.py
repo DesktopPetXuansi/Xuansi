@@ -9,6 +9,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
+from ..screen_sharing import check_screen_destination, local_screen_destination, screen_turn
 from .providers.base import Provider, ProviderError
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ class Candidate:
     online: bool = False
     display_name: str = ''
     verified_fallback: bool = False
+    presentation_verified: bool = False
 
 
 class InferenceRouter:
@@ -70,19 +72,32 @@ class InferenceRouter:
     def client(self):
         return getattr(self.active, 'client', None)
 
+    @property
+    def supports_presentation(self):
+        """只对明确完成过专门验证的当前候选开放回复表情协议。"""
+        return bool(self._candidate and not self.online and self._candidate.presentation_verified)
+
     async def _choices(self, settings):
         ai = settings.ai
         # 文件准备检查可能访问慢磁盘；取消直接传播，不在事件循环内阻塞。
         local = list(await asyncio.to_thread(self.local_candidates, settings))
-        if ai.policy == 'online_first':
+        screen = screen_turn.get()
+        if ai.policy == 'online_first' and not (screen is not None and screen.grant.automatic):
             local = [candidate for candidate in local if candidate.verified_fallback]
         remote = []
         if ai.policy != 'local_only' and ai.profile.endpoint and ai.profile.model:
             approved = ai.profile.is_verified(*FULL_CAPABILITIES)
             if ai.policy == 'online_first' or approved:
-                if not self.observation or ai.cloud_observation:
+                if not self.observation:
                     remote = [Candidate(ai.profile.model, settings, True)]
         choices = remote + local if ai.policy == 'online_first' else local + remote
+        if screen is not None:
+            if screen.grant.online_profile:
+                choices = [item for item in remote
+                           if item.settings.ai.profile.fingerprint() == screen.grant.online_profile]
+            else:
+                choices = [item for item in local if local_screen_destination(item.settings) == screen.grant.local_model
+                           and bool(item.settings.projector_path)]
         # 资源恢复有冷却窗口；不因每次轮询在同一轮升档。
         ready = [item for item in choices if self._cooldown.get(item.identifier, 0) <= time.monotonic()]
         return ready or choices
@@ -95,9 +110,11 @@ class InferenceRouter:
         self._deadline = time.monotonic() + 120
         self.candidates = await self._choices(settings)
         if not self.candidates:
-            raise ValueError('未允许在线后台观察，且没有准备本地模型。' if observation
+            raise ValueError('后台观察需要本地视觉模型。' if observation
                              else '尚未配置可用的本地或在线模型。')
         await self.start(settings)
+        if screen_turn.get() is not None:
+            self.mark_committed()
 
     async def start(self, settings):
         if not self.candidates:
@@ -160,6 +177,8 @@ class InferenceRouter:
         self.committed = True
 
     def filter_tools(self, settings, tools):
+        tools = [tool for tool in tools if tool['function']['name'] != 'present_reply'
+                 or self.supports_presentation]
         if not self.online:
             return list(tools)
         profile = settings.ai.profile
@@ -177,6 +196,19 @@ class InferenceRouter:
         while True:
             try:
                 effective_tools = self.filter_tools(settings, tools)
+                effective_messages = messages
+                if (any(tool['function']['name'] == 'present_reply' for tool in tools)
+                        and not any(tool['function']['name'] == 'present_reply' for tool in effective_tools)
+                        and messages and messages[0]['role'] == 'system'):
+                    from ..reply_presentation import PRESENTATION_PROMPT
+
+                    content = messages[0]['content']
+                    if isinstance(content, str) and content.endswith(PRESENTATION_PROMPT):
+                        # 资源回退可能换到未验证的提供方；不让它看到不可用的展示工具指令。
+                        effective_messages = [
+                            {**messages[0], 'content': content.removesuffix(PRESENTATION_PROMPT)},
+                            *messages[1:],
+                        ]
                 if kwargs.get('tool_choice') == 'required' and not effective_tools:
                     raise ProviderError('unsupported', '当前模型未验证所需工具能力。')
                 # 同一轮总等待有上限；取消直接传播，不转发给其它模型。
@@ -184,7 +216,8 @@ class InferenceRouter:
                 async with asyncio.timeout(remaining):
                     effective = replace(self._candidate.settings, temperature=settings.temperature,
                                         top_p=settings.top_p, max_tokens=settings.max_tokens)
-                    reply = await self.active.complete(effective, messages, effective_tools, **kwargs)
+                    check_screen_destination(effective.ai.profile.fingerprint() if self.online else "")
+                    reply = await self.active.complete(effective, effective_messages, effective_tools, **kwargs)
                 self.last_used = time.monotonic()
                 self.stats.update(getattr(self.active, 'stats', {}))
                 return reply
@@ -200,6 +233,7 @@ class InferenceRouter:
 
     async def input_tokens(self, settings, messages, tools=()):
         await self.start(settings)
+        check_screen_destination(self._candidate.settings.ai.profile.fingerprint() if self.online else "")
         return await self.active.input_tokens(self._candidate.settings, messages, self.filter_tools(settings, tools))
 
     async def select_memory(self, settings, text, notes, history=(), limit=700):

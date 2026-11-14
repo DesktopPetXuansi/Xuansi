@@ -129,9 +129,9 @@ def test_only_model_tool_choice_saves_once_before_reply(runtime, monkeypatch, te
     runtime.history = copy.deepcopy(history)
     remember = runtime.memory.remember
 
-    def save(value, source):
+    def save(value, source, turn):
         saved.append(value)
-        return remember(value, source)
+        return remember(value, source, turn)
 
     async def complete(_settings, messages, *_args, **_kwargs):
         seen.append(copy.deepcopy(messages))

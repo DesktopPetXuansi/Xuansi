@@ -149,6 +149,7 @@ def test_unlisted_zip_file_rejected(tmp_path):
 
 
 def test_extra_motion_and_expression_use_sdk(tmp_path, monkeypatch):
+    from pet.avatar_expression import ReplyExpression
     from pet.avatar_live2d import AvatarLive2D
     calls = []
     target = str(uuid4())
@@ -163,7 +164,8 @@ def test_extra_motion_and_expression_use_sdk(tmp_path, monkeypatch):
                             SetExpression=lambda *args: calls.append(args))
     avatar = SimpleNamespace(_platform_model_version=target, _live2d_model=model,
                              _live2d_active=True, makeCurrent=lambda: None, doneCurrent=lambda: None,
-                             cancel_motion=lambda: None, update=lambda: None, _platform_expression=False)
+                             cancel_motion=lambda: None, update=lambda: None, _platform_expression=False,
+                             _reply_expression=ReplyExpression())
     AvatarLive2D.apply_platform_action(avatar, manifest["resourceVersionId"])
     assert calls[-1] == ("platform", 2, 3)
     manifest["kind"] = "EXPRESSION"

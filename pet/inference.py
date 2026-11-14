@@ -15,9 +15,10 @@ from pathlib import Path
 import httpx
 
 from .ai.providers.base import ProviderError, TokenEstimate
-from .config import ROOT, Settings
+from .config import RUNTIME, WRITABLE_ROOT, Settings
 from .model_memory import retrieve_memory
 from .process_guard import ProcessGuard
+from .screen_sharing import check_screen_destination
 from .text_stream import read_completion
 from .tool_protocol import Message, ToolChoice, ToolDefinition, parse_completion
 
@@ -90,7 +91,7 @@ class LocalEngine:
             return
         await self.stop()
         self.resource_failure = False
-        engine_root = ROOT / 'runtime' / 'llama'
+        engine_root = RUNTIME / 'llama'
         backend, executable = await asyncio.to_thread(
             _local_executable, engine_root, settings.ai.local_backend, settings.gpu_layers)
         if executable is None or not all(Path(p).is_file() for p in signature[:2]):
@@ -251,6 +252,7 @@ class LocalEngine:
             if tools and tool_choice != 'none':
                 payload.update(tools=list(tools), tool_choice=tool_choice, parallel_tool_calls=False)
             await self._fit_payload(settings, payload)
+            check_screen_destination()
             if stream:
                 async with self.client.stream('POST', '/v1/chat/completions', json=payload) as response:
                     response.raise_for_status()
@@ -292,7 +294,7 @@ class LocalEngine:
 
         def inspect():
             model = Path(settings.model_path)
-            report = probe_device(ROOT, model.parent)
+            report = probe_device(WRITABLE_ROOT, model.parent)
             weights = sum(Path(path).stat().st_size for path in (settings.model_path, settings.projector_path))
             return report, weights
 
@@ -312,6 +314,7 @@ class LocalEngine:
                    'chat_template_kwargs': {'enable_thinking': False}}
         if tools:
             payload['tools'] = list(tools)
+        check_screen_destination()
         response = await self.client.post('/v1/chat/completions/input_tokens', json=payload)
         response.raise_for_status()
         try:
@@ -337,6 +340,7 @@ class LocalEngine:
         """以真实模板、工具和图像计数；只移除完整旧用户轮。"""
         original_count = len(payload['messages'])
         while True:
+            check_screen_destination()
             response = await self.client.post('/v1/chat/completions/input_tokens', json=payload)
             response.raise_for_status()
             try:

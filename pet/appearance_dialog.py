@@ -3,10 +3,11 @@
 import logging
 
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal
-from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from .appearance import image_path, import_image
 from .appearance_preview import AppearancePreview
+from .theme import ThemedDialog
 
 LOG = logging.getLogger(__name__)
 
@@ -30,11 +31,11 @@ class ImportImage(QRunnable):
             self.result.loaded.emit(self.generation, None, error)
 
 
-class AppearanceDialog(QDialog):
+class AppearanceDialog(ThemedDialog):
     apply_requested = Signal(str)
 
     def __init__(self, parent, *, embedded=False):
-        super().__init__(parent)
+        super().__init__(parent, embedded=embedded)
         self.embedded = embedded
         self.control_panel = parent
         self.needs_prepare = True

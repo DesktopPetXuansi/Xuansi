@@ -62,10 +62,10 @@ def test_late_validation_cannot_overwrite_new_profile(page):
     assert not page.profile().verified_at
 
 
-def test_cloud_permissions_default_off_and_are_independent(page):
-    assert not page.cloud_memory.isChecked() and not page.cloud_observation.isChecked()
+def test_cloud_memory_setting_cannot_enable_legacy_observation(page):
+    assert not page.cloud_memory.isChecked()
     page.cloud_memory.setChecked(True)
-    settings = page.apply(AISettings())
+    settings = page.apply(AISettings(cloud_observation=True))
     assert settings.cloud_memory and not settings.cloud_observation
 
 

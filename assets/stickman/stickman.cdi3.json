@@ -1,0 +1,12 @@
+{
+  "Version": 3,
+  "Parameters": [
+    {
+      "Id": "ParamWave",
+      "GroupId": "",
+      "Name": "循环挥手"
+    }
+  ],
+  "ParameterGroups": [],
+  "Parts": []
+}

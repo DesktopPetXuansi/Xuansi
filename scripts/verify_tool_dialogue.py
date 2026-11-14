@@ -69,7 +69,11 @@ def score(case, item, runtime, final):
     checks = {"no_runtime_error": "error" not in item}
     expected = case.expected
     if expected in {"direct", "literal"}:
-        checks["no_tools"] = not calls
+        # 展示工具只承载正文；用户明确要求不调用工具的场景仍必须完全不调用。
+        if expected == "direct":
+            checks["no_action_tools"] = not (names - {"present_reply"})
+        else:
+            checks["no_tools"] = not calls
         checks["single_completion_request"] = item["completion_requests"] == 1
         checks["has_visible_reply"] = bool(text)
         if expected == "literal":
@@ -100,6 +104,10 @@ def score(case, item, runtime, final):
     elif expected == "memory_tail":
         checks["search_success"] = "search_memory" in successful
         checks["tail_fact_recalled"] = "蓝鲸七号" in text
+    elif expected == "screen_attachment":
+        checks["image_understood"] = "蓝" in text or "blue" in text.lower()
+        checks["no_capture_tool"] = "capture_screen" not in names
+        checks["ordinary_history_not_polluted"] = not runtime.history
     else:
         checks["expected_tool_success"] = expected in successful
         if expected == "save_memory":
@@ -110,15 +118,14 @@ def score(case, item, runtime, final):
             checks["excluded_memory_tokens_absent"] = not any(fact in saved for fact in case.memory_excludes)
         elif expected == "select_tts_engine":
             checks["actual_selected_engine"] = final.selected_tts == "natural"
-        elif expected == "capture_screen":
-            checks["image_understood"] = "蓝" in text or "blue" in text.lower()
         elif expected == "search_memory":
             checks["memory_understood"] = "乌龙茶" in text
         elif expected == "set_speech_enabled":
             checks["actual_speech_state"] = runtime.speech_override is False
         elif expected == "finish_observation":
             checks["silent_finish"] = final.content is None and not item["visible_text"]
-    checks["ordinary_history_not_polluted"] = case.kind != "observation" or not runtime.history
+    if case.kind == "observation":
+        checks["ordinary_history_not_polluted"] = not runtime.history
     return checks
 
 
@@ -128,9 +135,7 @@ class Verification:
         self.report, self.output, self.temporary = report, output, temporary
         self.active = None
         self.runtime = None
-        self.synthetic_picture = picture("blue")
         self.original_complete = engine.complete
-        self.original_capture = model_tools.capture_screen
         self.original_execute = model_tools.ToolContext.execute
 
     def flush(self):
@@ -164,6 +169,9 @@ class Verification:
         runtime.should_speak = lambda settings, kind="chat": (
             runtime.speech_override and (kind != "observation" or settings.speak_observations))
         runtime.reply = SimpleNamespace(emit=emit)
+        runtime.reply_expression = SimpleNamespace(
+            emit=lambda epoch, expression: self.active["expressions"].append(expression)
+        )
         runtime.state = SimpleNamespace(emit=lambda *args: None)
         runtime.memory_loaded = SimpleNamespace(emit=lambda *args: None)
         return runtime
@@ -185,25 +193,22 @@ class Verification:
             self.active["tool_results"].append({"name": call.name, "message": safe_record(message)})
             return message
         self.engine.complete = complete
-        model_tools.capture_screen = lambda *args: self.synthetic_picture
         model_tools.ToolContext.execute = execute
 
     def restore(self):
         self.engine.complete = self.original_complete
-        model_tools.capture_screen = self.original_capture
         model_tools.ToolContext.execute = self.original_execute
 
     async def run_case(self, case):
         number = len(self.report["checks"])
         item = {"case": case.label, "input": case.text, "expected": case.expected,
                 "passed": False, "calls": [], "tool_results": [], "model_responses": [],
-                "speech_changes": [], "motion_receipts": [], "visible_text": [],
+                "speech_changes": [], "motion_receipts": [], "visible_text": [], "expressions": [],
                 "first_visible_text_seconds": None, "completion_requests": 0,
                 "started": time.monotonic()}
         self.active = item
         self.report["checks"].append(item)
         self.runtime = self.runtime_for(case, number)
-        self.synthetic_picture = picture("blue")
         images = [picture(case.image)] if case.image else []
         settings = replace(self.settings, tts_engine=case.tts)
         LOG.info("开始工具验收 case=%s", case.label)

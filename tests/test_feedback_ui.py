@@ -5,9 +5,10 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionSlider
 
 from pet.feedback_client import FeedbackReceipt
 from pet.feedback_dialog import FeedbackDialog
@@ -127,3 +128,56 @@ def test_small_feedback_window_keeps_primary_action_visible(view, app, size):
     assert view.rect().contains(button.mapTo(view, button.rect().topLeft()))
     assert view.rect().contains(button.mapTo(view, button.rect().bottomRight()))
     assert view.scroll.horizontalScrollBar().maximum() == 0
+
+
+def test_feedback_matches_control_center_and_keeps_draft_when_system_theme_changes(view, app):
+    view.resize(440, 480)
+    fill(view)
+    hints = app.styleHints()
+    try:
+        for scheme, background, primary, thumb in (
+            (Qt.ColorScheme.Dark, "#202622", "#adc9a7", "#748b76"),
+            (Qt.ColorScheme.Light, "#fcfbf7", "#31583f", "#899b89"),
+        ):
+            hints.colorSchemeChanged.emit(scheme)
+            app.processEvents()
+            assert view.grab().toImage().pixelColor(5, 5).name() == background
+            assert view.submit_button.grab().toImage().pixelColor(7, 8).name() == primary
+            scroll = view.scroll.verticalScrollBar()
+            scroll.setValue(0)
+            assert scroll.isVisible() and scroll.width() == 10
+            assert scroll.grab().toImage().pixelColor(5, 15).name() == thumb
+            assert view.title_input.text() == "导入形象失败" and view.public_consent.isChecked()
+    finally:
+        hints.colorSchemeChanged.emit(hints.colorScheme())
+
+
+def test_feedback_wheel_scrolls_form_without_changing_category_or_description(view, app):
+    view.resize(440, 480)
+    view.description.setPlainText("\n".join(f"说明第 {index} 行" for index in range(40)))
+    app.processEvents()
+    for field in (view.category, view.description.viewport()):
+        outer = view.scroll.verticalScrollBar()
+        inner = view.description.verticalScrollBar()
+        outer.setValue(0)
+        inner.setValue(0)
+        view.category.setCurrentIndex(0)
+        view.category.setFocus()
+        point = field.rect().center()
+        event = QWheelEvent(QPointF(point), QPointF(field.mapToGlobal(point)), QPoint(), QPoint(0, -120),
+                            Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase,
+                            False)
+        app.sendEvent(field, event)
+        assert outer.value() > 0
+        assert view.category.currentIndex() == 0 and inner.value() == 0
+
+    inner.setValue(0)
+    option = QStyleOptionSlider()
+    inner.initStyleOption(option)
+    handle = inner.style().subControlRect(QStyle.ComplexControl.CC_ScrollBar, option,
+                                          QStyle.SubControl.SC_ScrollBarSlider, inner)
+    point = handle.center()
+    QTest.mousePress(inner, Qt.MouseButton.LeftButton, pos=point)
+    QTest.mouseMove(inner, point + QPoint(0, 25))
+    QTest.mouseRelease(inner, Qt.MouseButton.LeftButton, pos=point + QPoint(0, 25))
+    assert inner.value() > 0

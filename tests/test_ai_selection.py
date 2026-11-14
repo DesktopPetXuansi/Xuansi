@@ -123,12 +123,15 @@ async def test_background_observation_never_sends_to_cloud_without_own_consent()
 
 
 @pytest.mark.asyncio
-async def test_actual_local_status_uses_selected_file_instead_of_stale_preference_label():
+async def test_actual_local_status_uses_selected_file_instead_of_stale_preference_label(tmp_path):
     events = []
     router = InferenceRouter(local=FakeProvider(), local_candidates=LOCAL_CANDIDATES,
                              provider_factory=lambda _: pytest.fail('本地测试不应创建在线提供方'),
                              on_event=events.append)
-    settings = replace(Settings(), model_path='C:/Models/Qwen3.5-4B-Q4_K_M.gguf')
+    weights, projector = tmp_path / 'Qwen3.5-4B-Q4_K_M.gguf', tmp_path / 'projector.gguf'
+    weights.touch()
+    projector.touch()
+    settings = replace(Settings(), model_path=str(weights), projector_path=str(projector))
     await router.begin_turn(settings)
     assert events[-1].preferred == 'qwen3.5-9b'
     assert events[-1].current == 'Qwen3.5-4B-Q4_K_M'
@@ -151,15 +154,17 @@ async def test_online_first_never_implicitly_falls_back_to_unverified_cpu_or_cus
     ('cuda', 99, False), ('cpu', 0, False), ('cuda', 0, False), ('cuda', 99, True),
 ])
 async def test_online_first_local_fallback_requires_verified_backend_and_exact_files(
-        tmp_path, backend, gpu_layers, custom):
+        tmp_path, monkeypatch, backend, gpu_layers, custom):
     """存在文件不等于通过能力验证，自动链必须同时匹配后端和目录。"""
-    from pet.ai.catalog import MODELS
+    from pet.ai.catalog import MODELS, RESOURCES
 
     model = MODELS['qwen3.5-9b']
+    for key in model.resources:
+        monkeypatch.setitem(RESOURCES, key, replace(RESOURCES[key], bytes=1))
     paths = [tmp_path / model.model_path, tmp_path / model.projector_path]
     for path in paths:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.touch()
+        path.write_bytes(b'x')
     if custom:
         paths[0] = tmp_path / 'custom.gguf'
         paths[0].touch()

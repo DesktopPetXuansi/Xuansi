@@ -7,12 +7,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from PySide6.QtCore import QSignalBlocker, Qt, QThreadPool, Signal
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 from .ai.settings import CAPABILITIES
 from .ai_setup_form import KEY_LINKS, SERVICE_NAMES, create_setup_form
 from .ai_tasks import AIResults, ProbeDevice, ValidateProfile
-from .panel_style import COLORS
+from .panel_style import colors_for
 
 LOG = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class AIPage(QWidget):
         self.context_tokens.valueChanged.connect(self._profile_changed)
         for box in self.capabilities.values():
             box.toggled.connect(self._profile_changed)
+        QApplication.styleHints().colorSchemeChanged.connect(self.refresh_online_summary)
         LOG.debug("模型策略与在线设置表单已就绪")
 
     def set_profile(self, profile):
@@ -102,7 +103,7 @@ class AIPage(QWidget):
             self.cancel_validation()
         self.changed.emit()
 
-    def _refresh_online_summary(self):
+    def refresh_online_summary(self, scheme=None):
         profile = self.profile()
         matched = next((index for index in range(1, self.presets.count())
                         if self._same_configuration(profile, self.presets.itemData(index))), 0)
@@ -113,7 +114,10 @@ class AIPage(QWidget):
                                   else "选择服务商后会自动填写模型；也可在高级设置中自定义。")
         link = KEY_LINKS.get(profile.provider)
         # 链接只能来自仓库固定白名单，不能使用端点或其他可编辑文本拼成 HTML。
-        help_text = (f'<a style="color: {COLORS["accent"]}" href="{link}">获取 API 密钥（官方）</a>。' if link
+        if scheme is None:
+            scheme = QApplication.styleHints().colorScheme()
+        accent = colors_for(scheme)["accent"]
+        help_text = (f'<a style="color: {accent}" href="{link}">获取 API 密钥（官方）</a>。' if link
                      else "请从所用服务的官方控制台获取 API 密钥。")
         if profile.provider == "bailian":
             help_text += "密钥需与所选地区一致。"
@@ -168,7 +172,7 @@ class AIPage(QWidget):
             self._credential_ref = self._saved_reference()
         self.cancel_validation()
         self._update_validation_status()
-        self._refresh_online_summary()
+        self.refresh_online_summary()
         if cleared:
             self.validation_status.setText("服务地址已更改，请重新填写对应服务的 API 密钥。\n"
                                            + self.validation_status.text())
@@ -219,7 +223,7 @@ class AIPage(QWidget):
                        local_backend=self.backend.currentData(),
                        model_dir=self.model_dir.text().strip(), backup_model_path=self.backup_model.text().strip(),
                        backup_projector_path=self.backup_projector.text().strip(), profile=self.profile(),
-                       cloud_memory=self.cloud_memory.isChecked(), cloud_observation=self.cloud_observation.isChecked())
+                       cloud_memory=self.cloud_memory.isChecked(), cloud_observation=False)
 
     def restore_configuration(self, settings):
         """历史引用仅用于原服务；历史验证证据已清空，不能绕过重新验证。"""
@@ -238,7 +242,6 @@ class AIPage(QWidget):
         self.backup_model.setText(settings.backup_model_path)
         self.backup_projector.setText(settings.backup_projector_path)
         self.cloud_memory.setChecked(settings.cloud_memory)
-        self.cloud_observation.setChecked(settings.cloud_observation)
         self.changed.emit()
 
     def start_validation(self):

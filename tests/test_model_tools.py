@@ -40,6 +40,8 @@ async def test_save_returns_success_only_after_actual_durable_write(tmp_path):
     ctx = context(tmp_path)
     reply = result(await ctx.execute(call("save_memory", note="我喜欢茶")))
     assert reply["ok"] is True
+    assert reply["result"]["mode"] == "append_only"
+    assert reply["result"]["old_notes_changed"] is False
     assert MemoryStore(ctx.runtime.memory.path).read() == "我喜欢茶"
     ctx.runtime.memory_loaded.emit.assert_called_once_with("我喜欢茶")
 
@@ -88,7 +90,7 @@ async def test_memory_is_read_only_on_explicit_search_and_full_tail_reaches_sele
 async def test_observation_has_no_mutation_capabilities_and_rejects_forged_calls(tmp_path):
     ctx = context(tmp_path, kind="observation")
     names = {tool["function"]["name"] for tool in ctx.tools()}
-    assert names == {"capture_screen", "search_memory", "finish_observation"}
+    assert names == {"search_memory", "finish_observation"}
     for name, args in [("save_memory", {"note": "事项"}),
                        ("set_speech_enabled", {"enabled": True}),
                        ("play_motion", {"action": "blink"}),
@@ -125,25 +127,19 @@ async def test_expired_context_never_starts_io_and_errors_hide_details(tmp_path,
     ctx.runtime.epoch = 2
     assert result(await ctx.execute(call("save_memory", note="事项")))["ok"] is False
     ctx.runtime.epoch = 1
-    monkeypatch.setattr("pet.model_tools.capture_screen", Mock(side_effect=OSError("C:/secret")))
-    reply = await ctx.execute(call("capture_screen"))
+    monkeypatch.setattr(ctx.runtime.memory, "context", Mock(side_effect=OSError("C:/secret")))
+    reply = await ctx.execute(call("search_memory", query="事项"))
     assert result(reply)["ok"] is False
     assert "secret" not in reply["content"]
 
 
 @pytest.mark.asyncio
-async def test_screenshot_uses_context_scope_and_discards_expired_result(tmp_path, monkeypatch):
-    ctx = context(tmp_path)
-    capture = Mock(return_value=b"jpeg")
-    monkeypatch.setattr("pet.model_tools.capture_screen", capture)
-    reply = await ctx.execute(call("capture_screen"))
-    capture.assert_called_once_with(10, 20, "screen")
-    assert reply["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
-    def expires(*args):
-        ctx.runtime.epoch = 2
-        return b"old"
-    capture.side_effect = expires
+async def test_image_turn_refuses_model_capture_and_persistent_tools(tmp_path):
+    ctx = context(tmp_path, kind="chat-screen", attached=True)
+    assert not ctx.tools()
     assert result(await ctx.execute(call("capture_screen")))["ok"] is False
+    assert result(await ctx.execute(call("save_memory", note="画面中的隐私")))["ok"] is False
+    assert not ctx.runtime.memory.read()
 
 
 @pytest.mark.asyncio
@@ -189,7 +185,8 @@ async def test_observation_expiry_blocks_effects_and_allows_tts_only_when_speaki
 async def test_saved_result_survives_ui_refresh_failure(tmp_path):
     ctx = context(tmp_path)
     ctx.runtime.memory_loaded.emit.side_effect = RuntimeError("private path")
-    assert result(await ctx.execute(call("save_memory", note="事项")))["result"] == {"saved": True}
+    receipt = result(await ctx.execute(call("save_memory", note="事项")))["result"]
+    assert receipt == {"saved": True, "mode": "append_only", "old_notes_changed": False}
     assert ctx.runtime.memory.read() == "事项"
 
 

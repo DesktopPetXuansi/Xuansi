@@ -8,6 +8,7 @@ from typing import Protocol
 
 import httpx
 
+from ...screen_sharing import check_screen_destination, screen_turn
 from ...tool_protocol import AssistantReply, Message, ToolDefinition
 
 LOG = logging.getLogger(__name__)
@@ -67,8 +68,12 @@ class HTTPProvider:
         if not self._key:
             raise ProviderError('authentication', '请先配置在线模型 API Key。')
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(90, connect=10), trust_env=False,
-                                        follow_redirects=False, transport=self._transport)
+                                        follow_redirects=False, transport=self._transport,
+                                        event_hooks={'request': [self._check_screen_request]})
         LOG.info('在线模型客户端已准备 provider=%s', self.profile.provider)
+
+    async def _check_screen_request(self, _request):
+        check_screen_destination(self.profile.fingerprint())
 
     def headers(self):
         return {'Authorization': f'Bearer {self._key}'}
@@ -78,6 +83,7 @@ class HTTPProvider:
 
     async def post(self, settings, path, payload):
         await self.start(settings)
+        check_screen_destination(self.profile.fingerprint())
         try:
             response = await self.client.post(self.url(path), headers=self.headers(), json=payload)
             if response.status_code >= 300:
@@ -95,6 +101,7 @@ class HTTPProvider:
 
     async def events(self, settings, path, payload):
         await self.start(settings)
+        check_screen_destination(self.profile.fingerprint())
         try:
             async with self.client.stream('POST', self.url(path), headers=self.headers(), json=payload) as response:
                 if response.status_code >= 300:
@@ -142,7 +149,9 @@ class HTTPProvider:
                 content = [part for part in content if part.get('type') != 'image_url']
             text_messages.append({**message, 'content': content})
         size = len(json.dumps([text_messages, list(tools)], ensure_ascii=False).encode('utf-8'))
-        return self.capacity_estimate(size + images * 16384 + 256)
+        # 授权画面已经限制尺寸；为这类请求留出保守的本地估算预算。
+        image_budget = 8192 if screen_turn.get() is not None else 16384
+        return self.capacity_estimate(size + images * image_budget + 256)
 
     def capacity_estimate(self, tokens, *, exact=False):
         """估算余量进入公共预算值，使记忆分片计数与生成采用完全相同的边界。"""

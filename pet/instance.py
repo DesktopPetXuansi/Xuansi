@@ -2,14 +2,19 @@
 
 import hashlib
 import logging
+import os
 import time
 
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
-from .config import ROOT
+from .config import ROOT, WRITABLE_ROOT
 
 LOG = logging.getLogger(__name__)
-NAME = "neko-local-" + hashlib.sha256(str(ROOT).encode()).hexdigest()[:16]
+# 通知与 DATA 的锁共用目录身份；显式目录跨包版本稳定，并合并 Windows 路径别名。
+_identity = os.path.normcase(str(WRITABLE_ROOT.resolve()))
+if _identity == os.path.normcase(str(ROOT.resolve())):
+    _identity = str(ROOT)  # 保持既有源码版与安装版的管道名兼容。
+NAME = "neko-local-" + hashlib.sha256(_identity.encode()).hexdigest()[:16]
 
 
 def show_existing():

@@ -61,8 +61,6 @@ class PreferencesPage(QWidget):
 
     def __init__(self, settings: Settings):
         super().__init__()
-        self.observe = QCheckBox("结合屏幕画面理解鼠标操作")
-        self.observe.setChecked(settings.observe)
         self.follow = QCheckBox("跟随鼠标走动（关闭时停在原地）")
         self.follow.setChecked(settings.follow_mouse)
         self.speak = QCheckBox("默认朗读对话回复")
@@ -70,6 +68,8 @@ class PreferencesPage(QWidget):
         self.speak.setToolTip("对话中可让模型理解并切换朗读；重启或保存设置后恢复这里的偏好。")
         self.proactive = QCheckBox("也朗读主动观察的回应")
         self.proactive.setChecked(settings.speak_observations)
+        self.proactive_chat = QCheckBox("偶尔主动和我聊一句")
+        self.proactive_chat.setChecked(settings.proactive_chat)
         self.realtime = QCheckBox("边说边显示文字，说完再回复")
         self.realtime.setChecked(settings.realtime_voice)
         self.realtime.setToolTip("开启后边说边识别文字，结束后才回复；关闭后等说完再识别。")
@@ -77,10 +77,6 @@ class PreferencesPage(QWidget):
         self.capture_scope.addItem("整块屏幕 · 鼠标所在显示器", "screen")
         self.capture_scope.addItem("鼠标附近 · 局部画面", "nearby")
         self.capture_scope.setCurrentIndex(self.capture_scope.findData(settings.capture_scope))
-        self.interval = QSpinBox()
-        self.interval.setRange(10, 300)
-        self.interval.setSuffix(" 秒")
-        self.interval.setValue(settings.interval)
         self.size = QComboBox()
         for label, value in [
             ("迷你 · 64", 64),
@@ -101,6 +97,7 @@ class PreferencesPage(QWidget):
         self.speaker.setValue(settings.speaker)
         self.speaker.setEnabled(settings.tts_engine != "fast")
         self.speaker.setToolTip("快速朗读只有一种音色；更多音色可选 0–102，修改后点击试听。")
+        self._natural_speaker = settings.speaker if settings.tts_engine == "natural" else 46
         self.tts_engine.currentIndexChanged.connect(self._voice_engine_changed)
         self.speed = QDoubleSpinBox()
         self.speed.setRange(0.7, 1.5)
@@ -131,14 +128,14 @@ class PreferencesPage(QWidget):
         field_row(microphone, "使用的麦克风", self.device)
         form_hint(microphone, "麦克风需手动开启。休眠暂停收音，唤醒后恢复原来已开启的连续对话。")
 
-        behavior = form_group(layout, "观察与行为")
-        behavior.addRow(self.observe)
-        field_row(behavior, "观察范围", self.capture_scope)
-        form_hint(behavior, "全屏应用运行时暂停观察。使用在线模型时，自动发送屏幕画面需在模型设置中单独允许；手动附图会发给当前模型。")
-        field_row(behavior, "观察间隔", self.interval)
+        behavior = form_group(layout, "屏幕分享与行为")
+        behavior.addRow(self.proactive_chat)
+        form_hint(behavior, "本机短问候，每小时最多一次、每天最多两次；沿用对话朗读偏好，不调用在线模型，也不开启截图或麦克风。")
+        field_row(behavior, "屏幕分享范围", self.capture_scope)
+        form_hint(behavior, "在对话页开启按轮分享。使用在线模型时，每轮附图都需确认服务商、模型和范围。")
         behavior.addRow(self.follow)
         field_row(behavior, "桌宠大小", self.size)
-        for checkbox in (self.observe, self.follow, self.speak, self.proactive, self.realtime):
+        for checkbox in (self.follow, self.speak, self.proactive, self.proactive_chat, self.realtime):
             checkbox.setAccessibleName(checkbox.text())
         self.save_button = QPushButton("保存设置")
         self.save_button.setToolTip("保存后结束当前回复并关闭麦克风；朗读恢复这里设置的默认偏好。")
@@ -148,7 +145,7 @@ class PreferencesPage(QWidget):
         # 控件按原有顺序构造以保留初始化行为，键盘顺序与新的任务分组一致。
         tab_order = (
             self.speak, self.proactive, self.tts_engine, self.speaker, self.speed, preview,
-            self.realtime, self.device, self.observe, self.capture_scope, self.interval,
+            self.realtime, self.device, self.proactive_chat, self.capture_scope,
             self.follow, self.size, self.save_button,
         )
         for previous, following in zip(tab_order, tab_order[1:]):
@@ -189,20 +186,23 @@ class PreferencesPage(QWidget):
 
     def _voice_engine_changed(self):
         natural = self.tts_engine.currentData() == "natural"
+        if not natural:
+            # 缩小范围会把控件值截成 0，先保留本次表单的自然音色草稿。
+            self._natural_speaker = self.speaker.value()
         self.speaker.setMaximum(102 if natural else 0)
         self.speaker.setEnabled(natural)
-        self.speaker.setValue(46 if natural else 0)
+        self.speaker.setValue(self._natural_speaker if natural else 0)
+        LOG.debug("朗读方式已切换 engine=%s speaker=%s", self.tts_engine.currentData(), self.speaker.value())
 
     def apply(self, settings):
         return replace(
             settings,
-            observe=self.observe.isChecked(),
             capture_scope=self.capture_scope.currentData(),
             follow_mouse=self.follow.isChecked(),
             speak_replies=self.speak.isChecked(),
             speak_observations=self.proactive.isChecked(),
+            proactive_chat=self.proactive_chat.isChecked(),
             realtime_voice=self.realtime.isChecked(),
-            interval=self.interval.value(),
             pet_size=self.size.currentData(),
             speaker=self.speaker.value(),
             speed=float(self.speed.value()),

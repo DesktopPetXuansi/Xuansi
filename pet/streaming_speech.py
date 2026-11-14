@@ -8,6 +8,7 @@ import time
 import sounddevice as sd
 
 from .speech_output import play_samples
+from .turn_latency import mark_latency
 
 LOG = logging.getLogger(__name__)
 
@@ -95,11 +96,15 @@ class SpeechStream:
         if not self._allowed():
             return
         for part in self.chunks.feed(text):
+            if part.strip():
+                mark_latency("first_speech_segment")
             await self.texts.put(part)
 
     async def finish(self):
         if self._allowed():
             for part in self.chunks.finish():
+                if part.strip():
+                    mark_latency("first_speech_segment")
                 await self.texts.put(part)
         await self.texts.put(None)
         # shield 让取消先进入 __aexit__ 停声卡，而不是先等 ONNX 计算。
@@ -126,19 +131,23 @@ class SpeechStream:
                 self._silence("语音合成失败 · 回复仍以文字显示")
         await self.clips.put(None)
 
+    def _playing(self, _message):
+        if self.first_audio_seconds is None:
+            self.first_audio_seconds = time.monotonic() - self.started
+            mark_latency("audio_submitted")
+            LOG.info("首段音频已提交声卡 elapsed=%.3fs", self.first_audio_seconds)
+        self.state("正在流式朗读…")
+
     async def _play(self):
         while (clip := await self.clips.get()) is not None:
             if not self._allowed():
                 continue
             try:
-                if self.first_audio_seconds is None:
-                    self.first_audio_seconds = time.monotonic() - self.started
-                    LOG.info("流式首段音频就绪 elapsed=%.3fs", self.first_audio_seconds)
                 played = await play_samples(
                     self.activity,
                     *clip,
                     self._allowed,
-                    lambda _: self.state("正在流式朗读…"),
+                    self._playing,
                     self.mouth_level,
                 )
                 if not played:

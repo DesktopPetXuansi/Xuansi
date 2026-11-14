@@ -6,7 +6,6 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -20,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .feedback import CATEGORIES, FeedbackDraft, diagnostic_text
-from .panel_style import STYLE
+from .theme import ThemedDialog
 
 LOG = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ def add_field(layout, title, field):
     layout.addWidget(field)
 
 
-class FeedbackDialog(QDialog):
+class FeedbackDialog(ThemedDialog):
     submit_requested = Signal(object)
     diagnostics_requested = Signal()
     copy_requested = Signal(str)
@@ -44,8 +43,7 @@ class FeedbackDialog(QDialog):
         self.setWindowTitle("反馈中心")
         self.setModal(False)
         self.setMinimumSize(440, 480)
-        self.resize(520, 580)
-        self.setStyleSheet(STYLE)
+        self.resize(520, 620)
         self._diagnostics = None
         self._diagnostic_pending = False
         self._busy = False
@@ -53,6 +51,15 @@ class FeedbackDialog(QDialog):
         self.allow_connection_settings = True
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        header = QFrame()
+        header.setObjectName("panelHeader")
+        heading = QVBoxLayout(header)
+        heading.setContentsMargins(16, 12, 16, 10)
+        title = QLabel("反馈中心")
+        title.setObjectName("sectionTitle")
+        heading.addWidget(title)
+        outer.addWidget(header)
         self.scroll = QScrollArea()
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll.setWidgetResizable(True)
@@ -60,10 +67,10 @@ class FeedbackDialog(QDialog):
         form = QVBoxLayout(content)
         form.setContentsMargins(16, 14, 16, 10)
         form.setSpacing(6)
-        intro = QLabel("无需 GitHub 账户，即可在这里反馈。提交后，标题、具体说明及你勾选的版本和系统信息"
-                       "会公开至 GitHub 的 DesktopPetXuansi/Xuansi，任何人都能查看。"
-                       "联系方式仅私有保存，不会公开。请勿在标题和说明中填写个人信息、密码或 API 密钥。")
+        intro = QLabel("无需 GitHub 账户。标题、说明和你勾选的版本与系统信息将公开到 GitHub 的 "
+                       "DesktopPetXuansi/Xuansi。联系方式仅私有保存。请勿在标题和说明中填写个人信息或密钥。")
         intro.setWordWrap(True)
+        intro.setObjectName("hint")
         form.addWidget(intro)
         self.category = QComboBox()
         for key, label in CATEGORIES.items():
@@ -75,6 +82,7 @@ class FeedbackDialog(QDialog):
         add_field(form, "标题", self.title_input)
         self.description = QPlainTextEdit()
         self.description.setMinimumHeight(120)
+        self.description.setMaximumHeight(144)
         self.description.setPlaceholderText("刚才做了什么？遇到了什么问题？\n如果是建议，说说你希望怎样使用。\n请勿填写密码或 API 密钥。")
         add_field(form, "具体说明", self.description)
         self.contact = QLineEdit()
@@ -86,6 +94,7 @@ class FeedbackDialog(QDialog):
         self.include_diagnostics.toggled.connect(self._include_changed)
         diagnostic_row.addWidget(self.include_diagnostics)
         self.preview_button = QToolButton()
+        self.preview_button.setObjectName("advancedSettings")
         self.preview_button.setText("查看")
         self.preview_button.setCheckable(True)
         self.preview_button.toggled.connect(self._preview_changed)
@@ -97,20 +106,17 @@ class FeedbackDialog(QDialog):
         self.preview.setAccessibleName("将附带的版本和系统信息")
         self.preview.setFixedHeight(100)
         form.addWidget(self.preview)
-        # 许可不预选；较长公开范围由可换行说明承载，保证小窗口可读。
+        # 许可不预选，公开范围在表单开头说明。
         self.public_consent = QCheckBox("我同意公开这条反馈")
         self.public_consent.setAccessibleName("我同意将这条反馈公开至 GitHub")
         form.addWidget(self.public_consent)
-        consent_hint = QLabel("公开内容：标题、具体说明及勾选的版本和系统信息。联系方式不公开。")
-        consent_hint.setWordWrap(True)
-        consent_hint.setObjectName("hint")
-        form.addWidget(consent_hint)
         self.destination = QLabel()
         self.destination.setTextFormat(Qt.TextFormat.PlainText)
         self.destination.setWordWrap(True)
         self.destination.setObjectName("hint")
         form.addWidget(self.destination)
         self.status = QLabel()
+        self.status.setObjectName("status")
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         self.status.setAccessibleName("反馈提交结果")
@@ -122,7 +128,9 @@ class FeedbackDialog(QDialog):
         form.addWidget(self.connection_button)
         self.scroll.setWidget(content)
         outer.addWidget(self.scroll, 1)
-        footer = QHBoxLayout()
+        footer_frame = QFrame()
+        footer_frame.setObjectName("panelFooter")
+        footer = QHBoxLayout(footer_frame)
         footer.setContentsMargins(16, 8, 16, 12)
         self.copy_button = QPushButton("复制内容")
         self.copy_button.clicked.connect(self._copy)
@@ -135,7 +143,7 @@ class FeedbackDialog(QDialog):
         self.submit_button.setObjectName("primary")
         self.submit_button.clicked.connect(self._submit)
         footer.addWidget(self.submit_button)
-        outer.addLayout(footer)
+        outer.addWidget(footer_frame)
         # 输入回车不会意外发出反馈；文本框可正常换行，提交始终是明确操作。
         for button in self.findChildren(QPushButton):
             button.setAutoDefault(False)

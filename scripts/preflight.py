@@ -4,6 +4,7 @@ import argparse
 import configparser
 import json
 import logging
+import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -196,7 +197,9 @@ def main():
         if args.command == "apply":
             return apply_settings(args)
         plan = load_plan(args.plan)
-        if not plan.app_dir or Path(plan.app_dir).resolve() != ROOT:
+        # 仅允许部署到启动器指定的可写根目录；旧安装器仍绑定自身目录。
+        destination = Path(os.environ.get("XUANSI_WRITABLE_ROOT", str(ROOT)))
+        if not destination.is_absolute() or not plan.app_dir or Path(plan.app_dir).resolve() != destination.resolve():
             raise ValueError("安装计划应用目录与当前部署目录不一致，请重新确认安装位置")
         LOG.info("安装计划已校验")
         return 0

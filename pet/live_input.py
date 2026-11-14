@@ -1,6 +1,7 @@
 """边说边识别，但只在用户停顿后提交；部分文字仅用于界面预览。"""
 
 import logging
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -16,16 +17,16 @@ class VoiceUpdate:
     turn: int
     text: str
     final: bool = False
-    # 界面只携带用户显式选择；自动附图交给模型在后台理解。
-    with_screen: bool = False
+    endpoint_at: float | None = None
+    recognized_at: float | None = None
 
 
 class PartialTurn:
     def __init__(self):
         self.turn = 0
 
-    def update(self, text, final=False):
-        result = VoiceUpdate(self.turn, text, final)
+    def update(self, text, final=False, *, endpoint_at=None):
+        result = VoiceUpdate(self.turn, text, final, endpoint_at, time.monotonic() if final else None)
         if final:
             self.turn += 1
         return result
@@ -88,10 +89,11 @@ class OnlineInput:
         # 轻声依赖分块转写，等待需长于约 600ms 的更新间隔，防止句中抢答。
         endpoint = self.voiced and self.silence >= (0.75 if self.quiet else 0.35)
         if endpoint:
+            endpoint_at = time.monotonic()
             # Paraformer 有前瞻窗口；补尾部静音才能取到最后几个字。
             text = self._decode(np.zeros(int(rate * 0.6), dtype=np.float32), rate)
             text = text[-2000:]
-            self.emit(self.turn.update(text, final=True))
+            self.emit(self.turn.update(text, final=True, endpoint_at=endpoint_at))
             self.stream = self.recognizer.create_stream()
             self.silence = self.elapsed = 0.0
             self.voiced = False

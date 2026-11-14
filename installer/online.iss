@@ -16,7 +16,7 @@ OutputBaseFilename=Xuansi-{#AppVersion}-windows-x64-setup
 SetupIconFile={#Payload}\assets\xuansi\icon.ico
 UninstallDisplayIcon={app}\assets\xuansi\icon.ico
 LicenseFile={#Payload}\LICENSE
-InfoBeforeFile={#ProjectRoot}\omx_wiki\发布与安装\安装须知.txt
+InfoBeforeFile={#ProjectRoot}\installer\安装须知.txt
 Compression=lzma2/fast
 SolidCompression=yes
 WizardStyle=modern
@@ -50,10 +50,16 @@ Source: "{#Payload}\pet\__init__.py"; DestDir: "{tmp}\preflight\pet"; Flags: don
 Source: "{#Payload}\pet\ai\*"; DestDir: "{tmp}\preflight\pet\ai"; Excludes: "__pycache__\*"; Flags: dontcopy recursesubdirs createallsubdirs
 Source: "{#Payload}\pet\tool_protocol.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
 Source: "{#Payload}\pet\text_stream.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
+Source: "{#Payload}\pet\screen_sharing.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
+Source: "{#Payload}\pet\turn_latency.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
 Source: "{#Payload}\pet\model_memory.py"; DestDir: "{tmp}\preflight\pet"; Flags: dontcopy
 Source: "{#Payload}\scripts\preflight*.py"; DestDir: "{tmp}\preflight\scripts"; Flags: dontcopy
-; 桌面包不携带官网源码；运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
-Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 桌面包不携带官网源码和开发笔记；安装须知已由 InfoBeforeFile 编译嵌入。
+; 运行时模型保留，PSD、拆分图层和编辑器工程留在源码仓库。
+Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "\web\*,\docs\context\*,\installer\安装须知.txt,\assets\xuansi\rigging\blink-mouth-reference.png,\assets\xuansi\rigging\blink-talk-preview.png,\assets\xuansi\rigging\neutral-preview.png,\assets\xuansi\rigging\xuansi-layers.psd,\assets\xuansi\rigging\xuansi.cmo3,\assets\xuansi\rigging\layers.json,\assets\xuansi\rigging\layers\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 单独保留 NOTICE 引用的第三方许可和素材说明，维持相对许可链接。
+Source: "{#Payload}\docs\context\THIRD_PARTY.md"; DestDir: "{app}\docs\context"; Flags: ignoreversion
+Source: "{#Payload}\docs\context\玄司素材说明.md"; DestDir: "{app}\docs\context"; Flags: ignoreversion
 ; 安装版资源回归与 Go 共用这份校验样例，显式保留数据文件，不部署官网程序。
 Source: "{#Payload}\web\contracts\fixtures\model-references.json"; DestDir: "{app}\web\contracts\fixtures"; Flags: ignoreversion
 

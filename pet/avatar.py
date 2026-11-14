@@ -116,6 +116,8 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
             )
 
     def set_animation(self, name):
+        if name in ("thinking", "sleep"):
+            self.clear_reply_expression()
         if name != "idle":
             self.interrupt_idle_blade()
         if name == "sleep":
@@ -128,7 +130,9 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
             model = self._live2d_model
             if model is not None:
                 sleeping = self.animation == "sleep"
-                model.SetAutoBlinkEnable(not sleeping and self._motion_name != "blink")
+                model.SetAutoBlinkEnable(
+                    not sleeping and self._motion_name != "blink" and self._reply_expression.started is None
+                )
                 if sleeping and not self._platform_model_version:
                     model.SetParameterValue("ParamEyeLOpen", 0.0)
                     model.SetParameterValue("ParamEyeROpen", 0.0)
@@ -149,6 +153,7 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
             return
         # 先完整生成，再一次切换；保留位置、大小、动画状态和窗口焦点。
         frames, durations, native = build_frames(self.height(), identifier, strict=strict)
+        self.clear_reply_expression()
         self.cancel_motion()
         self.interrupt_idle_blade(fade=False)
         if self._platform_model_version:
@@ -214,6 +219,7 @@ class Avatar(AvatarLive2D, AvatarIdleBlade, AvatarMotion, AvatarMask, AvatarDyna
         super().showEvent(event)
 
     def hideEvent(self, event):
+        self.clear_reply_expression()
         self.interrupt_idle_blade(fade=False)
         self.cancel_motion()
         self.clock.stop()

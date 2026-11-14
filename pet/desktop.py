@@ -37,6 +37,24 @@ class MonitorInfo(ctypes.Structure):
 
 
 USER32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(MonitorInfo)]
+USER32.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+USER32.OpenInputDesktop.restype = wintypes.HANDLE
+USER32.CloseDesktop.argtypes = [wintypes.HANDLE]
+USER32.GetUserObjectInformationW.argtypes = [
+    wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+]
+
+
+def interactive_desktop():
+    desktop = USER32.OpenInputDesktop(0, False, 0x0001)  # DESKTOP_READOBJECTS
+    if not desktop:
+        return False
+    try:
+        name = ctypes.create_unicode_buffer(64)
+        return bool(USER32.GetUserObjectInformationW(desktop, 2, name, ctypes.sizeof(name), None)
+                    and name.value.casefold() == "default")
+    finally:
+        USER32.CloseDesktop(desktop)
 
 
 @dataclass(frozen=True)
@@ -98,7 +116,7 @@ def point_is_own_window(x, y):
     return pid.value == os.getpid()
 
 
-def capture_screen(x: int, y: int, scope="screen"):
+def capture_screen(x: int, y: int, scope="screen", *, check=None, mark_cursor=True):
     """默认保留鼠标所在显示器的完整范围；mss 与鼠标钩子均使用物理坐标。"""
     if scope not in ("screen", "nearby"):
         raise ValueError("观察范围无效")
@@ -122,6 +140,8 @@ def capture_screen(x: int, y: int, scope="screen"):
             monitor["top"] + monitor["height"],
         )
         left, top, right, bottom = bounds if scope == "screen" else crop_rect(x, y, bounds)
+        if check is not None:
+            check()
         frame = grabber.grab({"left": left, "top": top, "width": right - left, "height": bottom - top})
         picture = Image.frombytes("RGB", frame.size, frame.rgb)
     # 整屏按比例缩小，保留四周内容；限制编码与视觉推理成本，不放大小图。
@@ -131,7 +151,8 @@ def capture_screen(x: int, y: int, scope="screen"):
     cx = min(picture.width - 1, round((x - left) * picture.width / original_width))
     cy = min(picture.height - 1, round((y - top) * picture.height / original_height))
     # 缩放后再标记，保证整屏预览里的鼠标位置仍清晰。
-    draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), outline="#e04d46", width=2)
+    if mark_cursor:
+        draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), outline="#e04d46", width=2)
     with BytesIO() as output:
         picture.save(output, format="JPEG", quality=88)
         LOG.info(

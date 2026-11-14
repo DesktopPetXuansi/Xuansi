@@ -3,6 +3,7 @@
 import json
 
 from .tool_protocol import validate_reply
+from .turn_latency import mark_latency
 
 
 async def sse_events(response):
@@ -47,6 +48,8 @@ async def read_completion(response):
             if content is not None:
                 if not isinstance(content, str):
                     raise ValueError('无效正文')
+                if content:
+                    mark_latency("first_model_text")
                 texts.append(content)
             fragments = delta.get('tool_calls', [])
             if not isinstance(fragments, list):

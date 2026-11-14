@@ -42,7 +42,8 @@ def test_concurrent_settings_merge_latest_platform_fields(tmp_path, monkeypatch,
             task = asyncio.create_task(coroutine)
             tasks.append(task)
             return task
-        runtime = SimpleNamespace(current_settings=baseline, storage_control=asyncio.Lock(), schedule=schedule,
+        runtime = SimpleNamespace(current_settings=baseline, screen_mode=baseline.screen_mode,
+                                  storage_control=asyncio.Lock(), schedule=schedule,
                                   settings_saved=SimpleNamespace(emit=lambda *args: events.append(args)),
                                   platform_settings_saved=SimpleNamespace(emit=lambda *args: events.append(args)))
         ordinary = replace(baseline, name="新的本地名字", temperature=0.3)

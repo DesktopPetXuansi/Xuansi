@@ -1,10 +1,12 @@
 """历史列表只负责选择和操作反馈，磁盘任务由串行历史队列执行。"""
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout
+
+from .theme import ThemedDialog
 
 
-class HistoryDialog(QDialog):
+class HistoryDialog(ThemedDialog):
     selected = Signal(object)
 
     def __init__(self, parent, title, description, store, io, resolve, select_label):

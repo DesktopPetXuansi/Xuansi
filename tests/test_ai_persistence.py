@@ -31,7 +31,8 @@ def prepare_runtime(baseline):
         tasks.append(task)
         return task
 
-    runtime = SimpleNamespace(current_settings=baseline, storage_control=asyncio.Lock(), schedule=schedule,
+    runtime = SimpleNamespace(current_settings=baseline, screen_mode=baseline.screen_mode,
+                              storage_control=asyncio.Lock(), schedule=schedule,
                               settings_saved=SimpleNamespace(emit=lambda *args: events.append(args)))
     return runtime, tasks, events
 

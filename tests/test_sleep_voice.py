@@ -19,6 +19,7 @@ class FakeRuntime:
     def __init__(self, owner):
         self.owner = owner
         self.epoch = 0
+        self.screen_epoch = None
         self.microphone_epoch = 0
         self.listening = False
         self.warming = False

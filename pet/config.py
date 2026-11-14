@@ -1,17 +1,24 @@
 """本地设置；只保存用户明确配置，不保存对话、音频或屏幕。"""
 
-import json
-import logging
-from dataclasses import asdict, dataclass, field, fields
+import os
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .ai.install_plan import default_model_dir
 from .ai.settings import AISettings
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
+# 商店启动器可显式分离可写目录；源码与既有安装继续使用原目录，不迁移旧数据。
+WRITABLE_ROOT = Path(os.environ.get("XUANSI_WRITABLE_ROOT", str(ROOT)))
+if not WRITABLE_ROOT.is_absolute():
+    raise ValueError("可写根目录必须是绝对路径")
+DATA = WRITABLE_ROOT / "data"
+# A versioned installation keeps native inference binaries with its own code.
+# Existing source and store installations retain their original runtime path.
+RUNTIME = Path(os.environ.get("XUANSI_VERSION_RUNTIME_ROOT", str(WRITABLE_ROOT / "runtime")))
+if not RUNTIME.is_absolute():
+    raise ValueError("运行时目录必须是绝对路径")
 MODELS = Path(default_model_dir())
-LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,10 +34,12 @@ class Settings:
     feedback_url: str = "https://xuansi.kukude.top"
     platform_model_version: str = ""
     platform_expression_version: str = ""
-    observe: bool = True
-    capture_scope: str = "screen"
+    observe: bool = False  # 旧配置兼容。屏幕权限以 screen_mode 为准。
+    screen_mode: str = "off"
+    capture_scope: str = "nearby"
     speak_replies: bool = True
     speak_observations: bool = False
+    proactive_chat: bool = False
     audio_avoidance: bool = True
     realtime_voice: bool = True
     tts_engine: str = "fast"
@@ -60,6 +69,8 @@ class Settings:
             raise ValueError("观察间隔为 10–300 秒，高度可选 64、96、128、160、224 或 288")
         if self.capture_scope not in ("screen", "nearby"):
             raise ValueError("观察范围需为整块屏幕或鼠标附近")
+        if self.screen_mode not in ("off", "manual"):
+            raise ValueError("屏幕权限需为关闭或仅手动分享")
         from .appearance import image_path
 
         image_path(self.avatar_image)
@@ -100,23 +111,17 @@ class Settings:
 
 
 def load_settings(path: Path = DATA / "settings.json"):
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        allowed = {field.name for field in fields(Settings)}
-        if isinstance(raw, dict) and 'ai' in raw:
-            raw['ai'] = AISettings.from_dict(raw['ai'])
-        return Settings(**{key: value for key, value in raw.items() if key in allowed}).validate()
-    except FileNotFoundError:
-        return Settings()
-    except (ValueError, TypeError, AttributeError, OSError):
-        LOG.warning("设置无法读取，使用默认值并保留原文件")
-        return Settings()
+    return load_settings_result(path).settings
+
+
+def load_settings_result(path: Path = DATA / "settings.json"):
+    # 保留原有 Settings 入口；只有启动界面需要额外展示恢复诊断。
+    from .settings_storage import read_settings
+
+    return read_settings(path)
 
 
 def save_settings(settings: Settings, path: Path = DATA / "settings.json"):
-    settings.validate()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(asdict(settings), ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
-    LOG.info("设置已保存")
+    from .settings_storage import write_settings
+
+    write_settings(settings, path)

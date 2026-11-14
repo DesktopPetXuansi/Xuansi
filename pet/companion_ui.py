@@ -78,15 +78,21 @@ class CompanionUI:
             self.appearance.saved(self.owner.panel.status.text())
 
     def refresh_icon(self):
+        from .panel_chrome import inspector_portrait
+
+        portrait = None
         if self.owner.settings.avatar_image:
             frames = self.owner.avatar.frames["idle"]
             pixmap = next(pix for pix, region in frames if not region.isEmpty())
             icon = QIcon(pixmap)
+            portrait = pixmap
         else:
             icon = QIcon(str(ROOT / "assets/xuansi/icon.png"))
         # 任务栏取窗口图标；更新应用默认图标，让已有及随后打开的窗口一起继承。
         self.owner.application.setWindowIcon(icon)
         self.tray.setIcon(icon)
+        if hasattr(self.owner.panel, "inspector_avatar"):
+            self.owner.panel.inspector_avatar.setPixmap(inspector_portrait(portrait))
         LOG.info("窗口与托盘图标已同步 custom=%s", bool(self.owner.settings.avatar_image))
 
     def _tray(self):
@@ -160,6 +166,10 @@ class CompanionUI:
             self.owner.panel.model_page.credentials_saved(self.credential_snapshot)
         self.credential_snapshot = None
         self.owner.panel.form.complete(error)
+        # 凭据快照确认与表单保存全部成功后，才重新检查已生效的首次聊天配置。
+        first_chat = getattr(self.owner, 'first_chat', None)
+        if not error and first_chat is not None:
+            first_chat.refresh()
         self.owner.panel.audio_avoidance_action.setChecked(self.owner.settings.audio_avoidance)
         if self.appearance_only:
             self.appearance.saved(error)

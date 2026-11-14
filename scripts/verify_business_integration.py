@@ -257,7 +257,7 @@ def main():
                 pet.resource_timer.stop()
                 pet.runtime.shutdown_done.connect(closed.set, Qt.ConnectionType.DirectConnection)
                 pet.runtime.voice_update.connect(lambda _, update: updates.append(update))
-                pet.runtime.mouth_level.connect(mouth_levels.append)
+                pet.runtime.mouth_level.connect(lambda _epoch, level: mouth_levels.append(level))
                 pet.runtime.failed.connect(lambda _, message: failures.append(message))
                 pet.runtime.reply.connect(lambda *_: reply_bubbles.append(pet.avatar.bubble.isVisible()))
                 original_motion = pet.avatar.play_motion

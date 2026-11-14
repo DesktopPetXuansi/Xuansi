@@ -138,6 +138,10 @@ async def test_context_and_threads_reach_engine_start_and_trigger_reload(monkeyp
         launches.append(args)
         return Process()
 
+    async def check_resources(*_args):
+        pass
+
+    monkeypatch.setattr(LocalEngine, "_check_resources", check_resources)
     monkeypatch.setattr("pet.inference.asyncio.create_subprocess_exec", launch)
     monkeypatch.setattr("pet.inference.httpx.AsyncClient", lambda **_: Client())
     monkeypatch.setattr(

@@ -17,12 +17,19 @@ if TYPE_CHECKING:
 LOG = logging.getLogger(__name__)
 
 
+LEGACY_MODEL_DIR = Path("D:/AI/Models/desktop-pet")
+
+
+def user_model_dir():
+    return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Xuansi" / "models"
+
+
 def default_model_dir():
     """识别已有旧模型目录；新安装使用当前用户目录，不要求 D 盘。"""
-    legacy = Path("D:/AI/Models/desktop-pet")
+    legacy = LEGACY_MODEL_DIR
     if legacy.is_dir():
         return str(legacy)
-    return str(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Xuansi" / "models")
+    return str(user_model_dir())
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,7 @@ from pet.tool_protocol import AssistantReply
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('policy', ['local_only', 'local_first', 'online_first'])
-async def test_product_assembly_preserves_local_custom_paths_and_api_only_routing(monkeypatch, policy):
+async def test_product_assembly_preserves_local_custom_paths_and_api_only_routing(tmp_path, monkeypatch, policy):
     requests, starts, events = [], [], []
 
     class Local:
@@ -46,9 +46,12 @@ async def test_product_assembly_preserves_local_custom_paths_and_api_only_routin
                       verified_capabilities=('text', 'image', 'tools', 'stream', 'cancel'),
                       verification_fingerprint=profile.fingerprint())
     # API-only 无本地路径；另两种策略保留用户明确选择的自定义文件。
+    weights, projector = tmp_path / 'manual.gguf', tmp_path / 'projector.gguf'
+    weights.touch()
+    projector.touch()
     settings = Settings(ai=AISettings(policy=policy, profile=profile),
-                        model_path='' if policy == 'online_first' else 'C:/Custom/manual.gguf',
-                        projector_path='' if policy == 'online_first' else 'C:/Custom/projector.gguf')
+                        model_path='' if policy == 'online_first' else str(weights),
+                        projector_path='' if policy == 'online_first' else str(projector))
     router = assembly.create_inference_router(on_event=events.append)
     try:
         await router.begin_turn(settings)

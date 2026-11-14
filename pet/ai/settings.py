@@ -116,6 +116,7 @@ class AISettings:
             raise ValueError('推理配置应为对象。')
         allowed = {item.name for item in fields(cls)}
         values = {key: value for key, value in raw.items() if key in allowed}
+        values.pop('cloud_observation', None)  # 旧后台授权不会迁入按轮分享。
         if 'profile' in values:
             values['profile'] = ModelProfile.from_dict(values['profile'])
         if 'voice_components' in values:

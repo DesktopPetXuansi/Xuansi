@@ -4,6 +4,7 @@ import copy
 import json
 from dataclasses import replace
 
+from ...screen_sharing import screen_turn
 from ...tool_protocol import validate_reply
 from .base import HTTPProvider, ProviderError
 
@@ -68,6 +69,8 @@ class ClaudeMessages(HTTPProvider):
         return payload
 
     async def input_tokens(self, settings, messages, tools=()):
+        if screen_turn.get() is not None:
+            return await super().input_tokens(settings, messages, tools)
         data = await self.post(settings, 'messages/count_tokens', self.payload(messages, tools))
         value = data.get('input_tokens')
         if type(value) is not int or value < 0:

@@ -1,8 +1,19 @@
 """控制中心的紧凑公共区；保留原信号，聊天操作由对话页就近摆放。"""
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QAction, QPainter
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QToolButton, QVBoxLayout
+from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtGui import QAction, QColor, QLinearGradient, QPainter, QPainterPath, QPixmap
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+)
+
+from .config import ROOT
+from .panel_style import colors_for
 
 
 class LiveTranscript(QLabel):
@@ -76,7 +87,7 @@ def create_header(panel):
     header = QFrame()
     header.setObjectName("panelHeader")
     row = QHBoxLayout(header)
-    row.setContentsMargins(12, 8, 12, 8)
+    row.setContentsMargins(16, 9, 16, 9)
     row.setSpacing(8)
     panel.title = ProductName(panel.settings.name)
     panel.title.setObjectName("productName")
@@ -129,6 +140,88 @@ def create_header(panel):
     for label in (panel.live_transcript, panel.audio_status):
         label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     return header
+
+
+class InspectorPortrait(QLabel):
+    scheme = Qt.ColorScheme.Unknown
+
+    def paintEvent(self, event):
+        colors = colors_for(self.scheme)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        mask = QPainterPath()
+        mask.addRoundedRect(QRectF(self.rect()), 14, 14)
+        painter.setClipPath(mask)
+        base = QColor(colors["art"])
+        painter.fillRect(self.rect(), base)
+        painter.setPen(Qt.PenStyle.NoPen)
+        halo = QColor(colors["halo"])
+        halo.setAlphaF(0.9)
+        painter.setBrush(halo)
+        width = self.width()
+        painter.drawEllipse(QRectF(width * .13, self.height() * .11, width * .74, width * .74))
+        pixmap = self.pixmap()
+        if not pixmap.isNull():
+            painter.drawPixmap((width - pixmap.width()) // 2, 8, pixmap)
+        clear = QColor(base)
+        clear.setAlpha(0)
+        fade = QLinearGradient(0, self.height() * .65, 0, self.height())
+        fade.setColorAt(0, clear)
+        fade.setColorAt(1, base)
+        painter.fillRect(self.rect(), fade)
+
+
+class ModelReadiness(QLabel):
+    scheme = Qt.ColorScheme.Unknown
+    ready = False
+
+    def set_status(self, text, *, ready=False):
+        self.ready = ready
+        self.setText(text)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        colors = colors_for(self.scheme)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(colors["accent" if self.ready else "amber"]))
+        painter.drawEllipse(QRectF(1, (self.height() - 7) / 2, 7, 7))
+
+
+def create_inspector(panel):
+    inspector = QFrame()
+    inspector.setObjectName("controlInspector")
+    inspector.setFixedWidth(196)
+    layout = QVBoxLayout(inspector)
+    layout.setContentsMargins(16, 22, 16, 16)
+    layout.setSpacing(12)
+    panel.inspector_avatar = InspectorPortrait()
+    panel.inspector_avatar.setObjectName("inspectorPortrait")
+    panel.inspector_avatar.setFixedHeight(208)
+    panel.inspector_avatar.setAccessibleName("当前桌宠形象")
+    panel.inspector_avatar.setPixmap(inspector_portrait())
+    layout.addWidget(panel.inspector_avatar)
+    title = QLabel("桌宠状态")
+    title.setObjectName("subsectionTitle")
+    layout.addWidget(title)
+    panel.model_readiness = ModelReadiness("正在检查模型")
+    panel.model_readiness.setObjectName("hint")
+    panel.model_readiness.setContentsMargins(13, 0, 0, 0)
+    panel.screen_readiness = QLabel()
+    panel.screen_readiness.setObjectName("hint")
+    for label in (panel.model_readiness, panel.screen_readiness):
+        label.setWordWrap(True)
+        layout.addWidget(label)
+    layout.addStretch()
+    return inspector
+
+
+def inspector_portrait(pixmap=None):
+    if pixmap is None:
+        pixmap = QPixmap(str(ROOT / "assets/xuansi/front.png"))
+    return pixmap.scaled(158, 196, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
 
 def create_footer(panel):
