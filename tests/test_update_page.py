@@ -43,3 +43,16 @@ def test_old_preferences_gain_reminder_defaults(tmp_path):
     path.write_text('{"autoCheck":true,"autoDownload":false,"installOnExit":false}', encoding="utf-8")
     preferences = update_page.read_preferences(path)
     assert preferences["skipVersion"] == "" and preferences["remindAfter"] == 0
+
+
+def test_completed_bundle_is_available_after_reopening_update_page(tmp_path):
+    launcher = tmp_path / "Xuansi.exe"
+    candidate = {"sha256": "b" * 64, "bytes": 3}
+    cache = tmp_path / "update/downloads"
+    cache.mkdir(parents=True)
+    archive = cache / (candidate["sha256"] + ".zip")
+    assert not update_page.cached_bundle(launcher, candidate)
+    archive.write_bytes(b"zip")
+    assert update_page.cached_bundle(launcher, candidate)
+    archive.write_bytes(b"incomplete")
+    assert not update_page.cached_bundle(launcher, candidate)

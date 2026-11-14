@@ -52,6 +52,14 @@ def save_preferences(path: Path, value):
     temporary.replace(path)
 
 
+def cached_bundle(launcher: Path, candidate):
+    archive = launcher.parent / "update/downloads" / (candidate["sha256"] + ".zip")
+    try:
+        return archive.stat().st_size == candidate["bytes"]
+    except OSError:
+        return False
+
+
 class UpdatePage(QWidget):
     install_requested = Signal()
 
@@ -211,7 +219,7 @@ class UpdatePage(QWidget):
             self._dismiss_candidate("版本 " + candidate["version"] + " 已跳过")
             return
         if self.candidate is None or self.candidate["sha256"] != candidate["sha256"]:
-            self.downloaded = False
+            self.downloaded = cached_bundle(self.launcher, candidate)
             self.install_button.hide()
         self.candidate = candidate
         self.status.setText("发现新版本 " + candidate["version"])
@@ -224,8 +232,9 @@ class UpdatePage(QWidget):
             self.install_button.show()
             self.download_button.hide()
         else:
-            self.download_button.show()
-            if self.preferences["autoDownload"]:
+            self.install_button.setVisible(self.downloaded)
+            self.download_button.setVisible(not self.downloaded)
+            if self.preferences["autoDownload"] and not self.downloaded:
                 self.download()
 
     def _dismiss_candidate(self, message):
