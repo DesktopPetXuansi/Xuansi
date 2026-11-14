@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, QTimer, Signal
@@ -30,10 +31,15 @@ def read_preferences(path: Path):
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(raw, dict) and all(type(raw.get(key)) is bool for key in ("autoCheck", "autoDownload", "installOnExit")):
+            if not isinstance(raw.get("skipVersion", ""), str) or type(raw.get("remindAfter", 0)) not in (int, float):
+                raise ValueError("invalid update reminder")
+            raw.setdefault("skipVersion", "")
+            raw.setdefault("remindAfter", 0)
             return raw
     except (OSError, ValueError):
         pass
-    return {"autoCheck": True, "autoDownload": False, "installOnExit": False}
+    return {"autoCheck": True, "autoDownload": False, "installOnExit": False,
+            "skipVersion": "", "remindAfter": 0}
 
 
 def save_preferences(path: Path, value):
@@ -58,6 +64,7 @@ class UpdatePage(QWidget):
         self.downloaded = False
         self.installation_started = False
         self.operation = ""
+        self.automatic = False
         self.process = QProcess(self)
         self.process.finished.connect(self._finished)
         self.progress_timer = QTimer(self)
@@ -94,6 +101,14 @@ class UpdatePage(QWidget):
         self.install_button.clicked.connect(self._confirm_install)
         self.install_button.hide()
         row.addWidget(self.install_button)
+        self.remind_button = QPushButton("稍后提醒")
+        self.remind_button.clicked.connect(self.remind_later)
+        self.remind_button.hide()
+        row.addWidget(self.remind_button)
+        self.skip_button = QPushButton("跳过此版本")
+        self.skip_button.clicked.connect(self.skip_version)
+        self.skip_button.hide()
+        row.addWidget(self.skip_button)
         row.addStretch()
         layout.addLayout(row)
         for key, label in (("autoCheck", "自动检查更新"), ("autoDownload", "自动下载更新"), ("installOnExit", "退出时安装已下载更新")):
@@ -124,16 +139,19 @@ class UpdatePage(QWidget):
         except OSError:
             self.details.setText("更新偏好保存失败，请检查数据目录。")
 
-    def _run(self, operation):
+    def _run(self, operation, automatic=False):
         if self.launcher is None or self.process.state() != QProcess.ProcessState.NotRunning:
             return
         self.operation = operation
+        self.automatic = automatic
         self.check_button.setEnabled(False)
         self.download_button.setEnabled(False)
         self.process.start(str(self.launcher), ["--" + operation + "-update"])
         if operation == "download":
             self.status.setText("正在下载并验证更新…")
             self.cancel_button.show()
+            self.remind_button.hide()
+            self.skip_button.hide()
             self.progress.show()
             self.progress_timer.start()
         else:
@@ -143,8 +161,8 @@ class UpdatePage(QWidget):
         self._run("check")
 
     def _automatic_check(self):
-        if self.preferences["autoCheck"]:
-            self.check()
+        if self.preferences["autoCheck"] and time.time() >= self.preferences["remindAfter"]:
+            self._run("check", automatic=True)
 
     def download(self):
         self._run("download")
@@ -165,7 +183,9 @@ class UpdatePage(QWidget):
 
     def _finished(self, code, _status):
         operation = self.operation
+        automatic = self.automatic
         self.operation = ""
+        self.automatic = False
         self.progress_timer.stop()
         self.cancel_button.hide()
         self.check_button.setEnabled(True)
@@ -184,6 +204,11 @@ class UpdatePage(QWidget):
         if candidate is None:
             self.status.setText("当前已是最新版本")
             self.download_button.hide()
+            self.remind_button.hide()
+            self.skip_button.hide()
+            return
+        if automatic and candidate["version"] == self.preferences["skipVersion"]:
+            self._dismiss_candidate("版本 " + candidate["version"] + " 已跳过")
             return
         if self.candidate is None or self.candidate["sha256"] != candidate["sha256"]:
             self.downloaded = False
@@ -191,6 +216,8 @@ class UpdatePage(QWidget):
         self.candidate = candidate
         self.status.setText("发现新版本 " + candidate["version"])
         self.details.setText("完整更新包 · " + f"{candidate['bytes'] / 1024**2:.1f} MiB")
+        self.remind_button.show()
+        self.skip_button.show()
         if operation == "download":
             self.downloaded = True
             self.progress.setValue(100)
@@ -200,6 +227,34 @@ class UpdatePage(QWidget):
             self.download_button.show()
             if self.preferences["autoDownload"]:
                 self.download()
+
+    def _dismiss_candidate(self, message):
+        self.status.setText(message)
+        self.downloaded = False
+        self.download_button.hide()
+        self.install_button.hide()
+        self.remind_button.hide()
+        self.skip_button.hide()
+
+    def remind_later(self):
+        self.preferences["remindAfter"] = time.time() + 24 * 60 * 60
+        try:
+            save_preferences(self.preferences_path, self.preferences)
+        except OSError:
+            self.details.setText("更新偏好保存失败，请检查数据目录。")
+            return
+        self._dismiss_candidate("已设为明天再提醒；仍可手动检查更新")
+
+    def skip_version(self):
+        if not self.candidate:
+            return
+        self.preferences["skipVersion"] = self.candidate["version"]
+        try:
+            save_preferences(self.preferences_path, self.preferences)
+        except OSError:
+            self.details.setText("更新偏好保存失败，请检查数据目录。")
+            return
+        self._dismiss_candidate("已跳过版本 " + self.candidate["version"] + "；手动检查仍可安装")
 
     def _confirm_install(self):
         if not self.downloaded:
