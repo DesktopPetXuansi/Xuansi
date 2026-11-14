@@ -26,7 +26,7 @@ LOG = logging.getLogger(__name__)
 SECTIONS = (
     ("chat", "对话"), ("persona", "人设与提示词"), ("memory", "长期记忆"),
     ("preferences", "语音与行为"), ("model", "模型与快捷键"), ("appearance", "更换形象"),
-    ("resources", "官网资源"), ("upload", "上传本地 Live2D"), ("logs", "运行日志"),
+    ("resources", "官网资源"), ("upload", "上传本地 Live2D"), ("updates", "更新中心"), ("logs", "运行日志"),
 )
 
 

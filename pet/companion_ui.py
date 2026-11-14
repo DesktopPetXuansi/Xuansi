@@ -102,6 +102,7 @@ class CompanionUI:
         menu = QMenu()
         for text, slot in [
             ("打开控制中心", pet.open_panel),
+            ("检查更新", pet.check_updates),
             ("休眠/唤醒", pet.toggle_sleep),
             ("反馈中心", self.feedback.open),
             ("退出", pet.quit),

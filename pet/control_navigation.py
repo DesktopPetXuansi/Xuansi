@@ -9,9 +9,9 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QStackedWidget, 
 from .control_section import ControlSection
 
 LOG = logging.getLogger(__name__)
-TAB_LABELS = ("对话", "人设", "记忆", "语音与行为", "模型设置", "更换形象", "官网资源", "模型上传", "运行日志")
+TAB_LABELS = ("对话", "人设", "记忆", "语音与行为", "模型设置", "更换形象", "官网资源", "模型上传", "更新中心", "运行日志")
 COMPACT_LABELS = {
-    "preferences": "语音", "model": "模型", "appearance": "形象", "logs": "日志",
+    "preferences": "语音", "model": "模型", "appearance": "形象", "updates": "更新", "logs": "日志",
 }
 
 

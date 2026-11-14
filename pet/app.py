@@ -57,6 +57,7 @@ class DesktopPet(QObject):
         self.avatar.follow = self.settings.follow_mouse
         self.panel = Panel(self.settings, window_state_path=DATA / 'panel-window.json',
                            settings_warning=settings_warning)
+        self.panel.update_page.install_requested.connect(self._install_update)
         preference = ('首选在线 · ' + self.settings.ai.profile.model if self.settings.ai.policy == 'online_first'
                       else '首选本地 · ' + self.settings.ai.local_model)
         self.panel.footer.set_provider(preference + ' · 尚未连接')
@@ -148,6 +149,16 @@ class DesktopPet(QObject):
         self.panel.show()
         self.panel.raise_()
         self.panel.activateWindow()
+
+    def check_updates(self):
+        self.panel.open_section("updates")
+        self.panel.update_page.check()
+
+    def _install_update(self):
+        if self.panel.update_page.launch_install():
+            self.quit()
+        else:
+            QMessageBox.warning(self.panel, "更新未启动", "请重试；当前会话仍在运行。")
 
     def _begin(self):
         if self.paused:
@@ -651,6 +662,8 @@ class DesktopPet(QObject):
     def quit(self):
         if self._quitting:
             return
+        if self.panel.update_page.preferences["installOnExit"] and self.panel.update_page.downloaded:
+            self.panel.update_page.launch_install()
         self._quitting = True
         self.resource_timer.stop()
         self.monitor.stop()

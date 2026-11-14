@@ -18,6 +18,7 @@ from .first_chat_card import FirstChatCard
 from .log_viewer import LogViewer
 from .model_page import ModelPage
 from .preferences import PersonaPage, PreferencesPage
+from .update_page import UpdatePage
 
 
 def chat_content(panel):
@@ -161,6 +162,8 @@ def populate_sections(panel):
         widget.save_button.hide()
         panel.mount_section(key, widget)
     panel.mount_section("memory", memory_content(panel))
+    panel.update_page = UpdatePage(panel)
+    panel.mount_section("updates", panel.update_page)
     panel.logs = LogViewer("")
     panel.logs.content.setMinimumHeight(220)
     panel.mount_section("logs", panel.logs)

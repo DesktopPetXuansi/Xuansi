@@ -94,7 +94,7 @@ def inspect(application, temporary, output):
         bar = panel.navigation.bar
         keys = tuple(bar.tabData(index) for index in range(bar.count()))
         report["horizontal_chrome_style_tabs"] = (
-            isinstance(bar, QTabBar) and bar.count() == 7 and len(panel.sections) == 9 and not bar.tabsClosable()
+            isinstance(bar, QTabBar) and bar.count() == 8 and len(panel.sections) == 10 and not bar.tabsClosable()
             and bar.shape() in (QTabBar.Shape.RoundedNorth, QTabBar.Shape.TriangularNorth)
             and len({bar.tabRect(index).center().y() for index in range(bar.count())}) == 1
         )

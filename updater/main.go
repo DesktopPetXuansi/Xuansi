@@ -86,7 +86,9 @@ func run() error {
 			return err
 		}
 	}
-	if len(os.Args) == 2 && (os.Args[1] == "--check-update" || os.Args[1] == "--download-update" || os.Args[1] == "--apply-update") {
+	updateCommand := (len(os.Args) == 2 && (os.Args[1] == "--check-update" || os.Args[1] == "--download-update")) ||
+		(len(os.Args) == 4 && os.Args[1] == "--apply-update")
+	if updateCommand {
 		keys, err := trustedKeys()
 		if err != nil {
 			return err
@@ -95,6 +97,9 @@ func run() error {
 		candidate, err := checkUpdates(client, releaseEndpoint, state.Current, keys, time.Now())
 		if err != nil {
 			return err
+		}
+		if os.Args[1] == "--apply-update" && (candidate == nil || candidate.Version != os.Args[2] || candidate.SHA256 != os.Args[3]) {
+			return errors.New("selected update has changed or was withdrawn")
 		}
 		if candidate != nil && os.Args[1] != "--check-update" {
 			cache := filepath.Join(root, "update", "downloads")
