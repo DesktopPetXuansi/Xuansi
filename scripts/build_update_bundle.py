@@ -4,10 +4,12 @@ import argparse
 import json
 import shutil
 import stat
+import sys
 import zipfile
 from pathlib import Path
 from uuid import uuid4
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.stage_store_payload import stage_payload
 
 NATIVE_IDS = ("llama-cpu", "llama-cuda", "cudart")
