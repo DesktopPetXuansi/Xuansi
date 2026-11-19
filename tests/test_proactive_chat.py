@@ -89,6 +89,8 @@ def test_shared_quota_and_quiet_today_survive_restart(tmp_path):
     assert limiter.reserve(now + 7200) is None
     limiter.quiet_today(now)
     assert not ProactiveLimiter(path).available(now + 10800)
+    assert ProactiveLimiter(path).saved_quiet_until(now + 10800) > now + 10800
+    assert ProactiveLimiter(path).saved_quiet_until(now + 86400) == 0
     assert ProactiveLimiter(path).available(now + 86400)
 
 

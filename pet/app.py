@@ -570,6 +570,14 @@ class DesktopPet(QObject):
             self.panel.status.setText("可用内存偏低，已自动休眠")
         now = time.monotonic()
         self._update_idle_action(state, now)
+        announcements = getattr(self.ui, "announcements", None)
+        if announcements is not None:
+            announcements.remind(bool(
+                state.hwnd and not self.fullscreen and not self.paused and not self.busy and not self._quitting
+                and not self.runtime.listening and not self.ui.saving
+                and self.avatar.isVisible() and not self.avatar.bubble.isVisible()
+                and time.time() >= self.runtime.quiet_until
+            ))
         if getattr(self, "proactive_gate", None) is not None:
             self._update_proactive(state, now)
         if (

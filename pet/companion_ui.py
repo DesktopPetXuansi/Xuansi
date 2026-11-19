@@ -6,9 +6,11 @@ from dataclasses import replace
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from .announcement_ui import AnnouncementController
+from .announcements import OFFICIAL_SOURCE
 from .appearance_flow import AppearanceFlow
 from .appearance_hub import AppearanceHub
-from .config import ROOT
+from .config import DATA, ROOT
 from .feedback_controller import FeedbackController
 from .history_controller import PersonalHistory
 from .hotkey import GlobalHotkey
@@ -41,6 +43,7 @@ class CompanionUI:
                                               on_applied=self.refresh_icon, is_saving=lambda: self.saving)
         self.history = PersonalHistory(owner, self.appearance_flow, self.platform)
         self.feedback = FeedbackController(owner.panel, lambda: owner.settings, owner.runtime.loop)
+        self.announcements = AnnouncementController(owner, DATA / "official-announcements.json", OFFICIAL_SOURCE)
         owner.panel.feedback_requested.connect(self.feedback.open)
         self.feedback.connection_requested.connect(lambda: owner.panel.open_section("resources"))
         owner.panel.mount_section('appearance', self.appearance, on_open=self.appearance_flow.present)
@@ -103,6 +106,7 @@ class CompanionUI:
         for text, slot in [
             ("打开控制中心", pet.open_panel),
             ("检查更新", pet.check_updates),
+            ("官方公告", self.announcements.open),
             ("休眠/唤醒", pet.toggle_sleep),
             ("反馈中心", self.feedback.open),
             ("退出", pet.quit),
@@ -195,6 +199,7 @@ class CompanionUI:
     def close(self):
         self.closed = True
         self.feedback.shutdown()
+        self.announcements.close()
         self.hotkey.close()
         self.owner.panel.logs.hide()
         self.appearance_flow.close()

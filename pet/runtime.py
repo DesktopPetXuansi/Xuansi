@@ -87,7 +87,7 @@ class Runtime(QObject):
         self.proactive_limiter = ProactiveLimiter(DATA / "proactive-chat.json")
         self._proactive_delivery = None
         self._proactive_context = None
-        self.quiet_until = 0.0
+        self.quiet_until = self.proactive_limiter.saved_quiet_until(time.time())
         self.proactive_epoch = None
         self.pending_motions: dict[str, tuple[int, str, asyncio.Future[dict[str, str]], float]] = {}
         self.job: asyncio.Task | None = None

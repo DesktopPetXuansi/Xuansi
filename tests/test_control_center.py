@@ -28,9 +28,9 @@ def panel(monkeypatch, tmp_path):
 def test_horizontal_tabs_switch_content_inside_one_control_window(panel):
     assert panel.findChildren(QTabBar) == [panel.navigation.bar]
     assert not panel.findChildren(QMenuBar), "控制中心不再依赖多层菜单"
-    assert panel.navigation.bar.count() == 7
-    assert len(panel.sections) == 9, "资源与上传仍保留为更换形象的次级页面"
-    for key in ("chat", "persona", "memory", "preferences", "model", "logs"):
+    assert panel.navigation.bar.count() == 9
+    assert len(panel.sections) == 11, "资源与上传仍保留为更换形象的次级页面"
+    for key in ("chat", "persona", "memory", "preferences", "model", "updates", "announcements", "logs"):
         panel.open_section(key)
         assert panel.navigation.current_key == key
         assert [name for name, page in panel.sections.items() if page.active] == [key]

@@ -3,15 +3,18 @@
 import logging
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QStackedWidget, QTabBar, QVBoxLayout
 
 from .control_section import ControlSection
 
 LOG = logging.getLogger(__name__)
-TAB_LABELS = ("对话", "人设", "记忆", "语音与行为", "模型设置", "更换形象", "官网资源", "模型上传", "更新中心", "运行日志")
+TAB_LABELS = (
+    "对话", "人设", "记忆", "语音与行为", "模型设置", "更换形象", "官网资源", "模型上传", "更新中心", "官方公告", "运行日志",
+)
 COMPACT_LABELS = {
     "preferences": "语音", "model": "模型", "appearance": "形象", "updates": "更新", "logs": "日志",
+    "announcements": "公告",
 }
 
 
@@ -73,6 +76,24 @@ class ControlNavigation(QObject):
     @property
     def current_key(self):
         return self.stack.currentWidget().key
+
+    def set_announcement_unread(self, unread):
+        icon = QIcon()
+        if unread:
+            dot = QPixmap(12, 12)
+            dot.fill(Qt.GlobalColor.transparent)
+            with QPainter(dot) as painter:
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor("#d33541"))
+                painter.drawEllipse(2, 2, 8, 8)
+            icon = QIcon(dot)
+        title = "官方公告，有未读" if unread else "官方公告"
+        index = next(i for i in range(self.bar.count()) if self.bar.tabData(i) == "announcements")
+        self.bar.setTabIcon(index, icon)
+        self.bar.setTabToolTip(index, title)
+        self.buttons["announcements"].setIcon(icon)
+        self.buttons["announcements"].setAccessibleName(title)
 
     def select(self, key):
         parent_key = 'appearance' if key in ('resources', 'upload') else key

@@ -9,6 +9,7 @@
 | 接续当前任务，找证据与下一步 | [当前工作](docs/context/NOW.md) |
 | 确定目录、版本、配置和部署位置 | [项目映射](docs/context/MAP.md) |
 | 规划自动与手动更新、核对参考项目及验收边界 | [更新方案](docs/context/UPDATE_PLAN.md) |
+| 实施及验证软件端官方公告、查看 GitHub 参考 | [公告修改方案](docs/context/ANNOUNCEMENTS_PLAN.md)、[可行性分析](docs/context/ANNOUNCEMENTS_FEASIBILITY.md) |
 | 查看桌宠最终制作方案、验收条件和参考项目 | [最终制作方案](docs/context/AI_DESKTOP_PET_FEASIBILITY.md#最终修改方案)、[GitHub 筛选](docs/context/AI_DESKTOP_PET_FEASIBILITY.md#本轮-github-筛选) |
 | 核对操作前置条件、命令和验证步骤 | [操作手册](docs/context/RUNBOOK.md) |
 | 查已确认的决定、理由和范围 | [决策记录](docs/context/DECISIONS.md) |

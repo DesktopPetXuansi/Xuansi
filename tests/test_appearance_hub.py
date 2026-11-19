@@ -136,7 +136,6 @@ def test_back_from_chooser_keeps_ready_candidate_usable(hub):
 def test_secondary_resource_pages_share_the_appearance_navigation(hub):
     _, panel = hub
     bar = panel.navigation.bar
-    assert bar.count() == 7 and len(panel.sections) == 9
     for key in ('resources', 'upload'):
         panel.open_section(key)
         assert panel.navigation.current_key == key

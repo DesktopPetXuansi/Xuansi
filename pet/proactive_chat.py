@@ -4,7 +4,7 @@ import json
 import logging
 import math
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -112,6 +112,14 @@ class ProactiveLimiter:
                 return False
             state["quiet_day"] = datetime.fromtimestamp(now).date().isoformat()
             return self._write(state)
+
+    def saved_quiet_until(self, now):
+        with self.lock:
+            state = self._read(now)
+            if state is None or state["quiet_day"] != state["day"]:
+                return 0.0
+            end = datetime.fromisoformat(state["quiet_day"]) + timedelta(days=1)
+            return end.timestamp()
 
     def mark_shown(self, text, now=None):
         if text not in GREETINGS:

@@ -211,8 +211,9 @@ def test_resource_progress_stays_visible_across_tabs_and_resource_refresh(panel)
     assert panel.footer.text() == resources
 
 
-def test_navigation_preserves_all_nine_pages_in_order(panel):
-    expected = ("chat", "persona", "memory", "preferences", "model", "appearance", "resources", "upload", "logs")
+def test_navigation_preserves_page_order(panel):
+    expected = ("chat", "persona", "memory", "preferences", "model", "appearance", "resources", "upload",
+                "updates", "announcements", "logs")
     bar = panel.navigation.bar
     primary = tuple(key for key in expected if key not in ("resources", "upload"))
     assert tuple(bar.tabData(index) for index in range(bar.count())) == primary
